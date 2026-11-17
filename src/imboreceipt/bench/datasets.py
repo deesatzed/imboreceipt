@@ -627,13 +627,16 @@ def load_tier2_diabetes130(
 def load_tier2_credit_card_fraud(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     max_negatives: int | None = 60000,
+    window_idx: int | None = None,
+    n_windows: int = 5,
     seed: int = 42,
 ) -> MultiChannelCohort:
     """Load ULB Credit Card Fraud (OpenML 1597) with strict chronological ordering on Time!
 
-    Preserves 100% of the 492 positive fraud events and chronologically orders transactions.
-    When ``max_negatives`` is set for fast CPU iteration, subsamples negatives uniformly
-    across time while preserving chronological split integrity and extreme imbalance (<1%).
+    - When ``max_negatives`` is None and ``window_idx`` is provided (0..n_windows-1),
+      slices a contiguous 76% chronological horizon window across the full 284,807-row
+      transaction stream so multi-window replication evaluates genuinely distinct
+      out-of-time regimes without negative subsampling!
     """
     df = _fetch_openml_cached(1597, "tier2_ulb_creditcard", cache_dir)
     df.columns = [c.strip() for c in df.columns]
@@ -646,6 +649,15 @@ def load_tier2_credit_card_fraud(
     raw_cls = df["Class"].astype(str).str.strip().str.replace("'", "")
     y_all = (raw_cls == "1").to_numpy(dtype=int)
     df["__y__"] = y_all
+    df = df.sort_values("__seq_order__", kind="mergesort").reset_index(drop=True)
+
+    if window_idx is not None and n_windows > 1:
+        span_frac = 0.76
+        step_frac = (1.0 - span_frac) / float(n_windows - 1)
+        start_f = step_frac * float(window_idx)
+        lo_i = int(round(start_f * len(df)))
+        hi_i = min(len(df), int(round((start_f + span_frac) * len(df))))
+        df = df.iloc[lo_i:hi_i].reset_index(drop=True)
 
     if max_negatives is not None:
         pos_df = df[df["__y__"] == 1]
@@ -654,8 +666,8 @@ def load_tier2_credit_card_fraud(
             rng = np.random.default_rng(seed)
             keep_neg = rng.choice(neg_df.index.to_numpy(), size=max_negatives, replace=False)
             df = pd.concat([pos_df, df.loc[keep_neg]], axis=0)
+            df = df.sort_values("__seq_order__", kind="mergesort").reset_index(drop=True)
 
-    df = df.sort_values("__seq_order__", kind="mergesort").reset_index(drop=True)
     y_true = df.pop("__y__").to_numpy(dtype=int)
     time_arr = df.pop("__seq_order__").to_numpy(dtype=float)
 

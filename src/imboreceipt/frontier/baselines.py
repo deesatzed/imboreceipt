@@ -252,7 +252,7 @@ class FittedDecoderArm:
         return self.calibrator.predict_proba(raw)
 
 
-def _make_lgbm(seed: int = 42, scale_pos_weight: float = 1.0) -> LGBMClassifier:
+def _make_lgbm(seed: int = 42, scale_pos_weight: float = 1.0, n_jobs: int = 4) -> LGBMClassifier:
     return LGBMClassifier(
         n_estimators=180,
         learning_rate=0.05,
@@ -261,7 +261,7 @@ def _make_lgbm(seed: int = 42, scale_pos_weight: float = 1.0) -> LGBMClassifier:
         subsample_for_bin=50000,
         scale_pos_weight=scale_pos_weight,
         random_state=seed,
-        n_jobs=1,
+        n_jobs=n_jobs,
         verbose=-1,
     )
 
@@ -297,6 +297,7 @@ def train_decoder_saturation_suite(
     y_cal: np.ndarray,
     *,
     semantic_types: dict[str, SemanticType] | None = None,
+    include_extended_smote: bool = True,
     seed: int = 42,
 ) -> dict[str, FittedDecoderArm]:
     """Train standard imbalanced-learning decoder interventions on fixed channel X.
@@ -360,35 +361,38 @@ def train_decoder_saturation_suite(
         cal_sm = PlattLogitCalibrator().fit(sm_gbdt.predict_proba(X_c)[:, 1], y_c)
         arms["smote_gbdt"] = FittedDecoderArm("smote_gbdt", prep, [sm_gbdt], cal_sm)
 
-        # 5. Borderline-SMOTE + GBDT
-        if n_pos >= 6 and (n_pos / max(1, n_neg)) < 0.45:
-            try:
-                bsm = BorderlineSMOTE(k_neighbors=k_nb, sampling_strategy=0.5, random_state=seed)
-                X_bsm, y_bsm = bsm.fit_resample(X_tr, y_tr)
-            except ValueError:
+        if include_extended_smote:
+            # 5. Borderline-SMOTE + GBDT
+            if n_pos >= 6 and (n_pos / max(1, n_neg)) < 0.45:
+                try:
+                    bsm = BorderlineSMOTE(
+                        k_neighbors=k_nb, sampling_strategy=0.5, random_state=seed
+                    )
+                    X_bsm, y_bsm = bsm.fit_resample(X_tr, y_tr)
+                except ValueError:
+                    X_bsm, y_bsm = X_sm, y_sm
+            else:
                 X_bsm, y_bsm = X_sm, y_sm
-        else:
-            X_bsm, y_bsm = X_sm, y_sm
-        bsm_gbdt = _make_lgbm(seed=seed)
-        bsm_gbdt.fit(X_bsm, y_bsm)
-        cal_bsm = PlattLogitCalibrator().fit(bsm_gbdt.predict_proba(X_c)[:, 1], y_c)
-        arms["borderline_smote_gbdt"] = FittedDecoderArm(
-            "borderline_smote_gbdt", prep, [bsm_gbdt], cal_bsm
-        )
+            bsm_gbdt = _make_lgbm(seed=seed)
+            bsm_gbdt.fit(X_bsm, y_bsm)
+            cal_bsm = PlattLogitCalibrator().fit(bsm_gbdt.predict_proba(X_c)[:, 1], y_c)
+            arms["borderline_smote_gbdt"] = FittedDecoderArm(
+                "borderline_smote_gbdt", prep, [bsm_gbdt], cal_bsm
+            )
 
-        # 6. ADASYN + GBDT
-        if n_pos >= 6 and (n_pos / max(1, n_neg)) < 0.45:
-            try:
-                ada = ADASYN(n_neighbors=k_nb, sampling_strategy=0.5, random_state=seed)
-                X_ada, y_ada = ada.fit_resample(X_tr, y_tr)
-            except (ValueError, RuntimeError):
+            # 6. ADASYN + GBDT
+            if n_pos >= 6 and (n_pos / max(1, n_neg)) < 0.45:
+                try:
+                    ada = ADASYN(n_neighbors=k_nb, sampling_strategy=0.5, random_state=seed)
+                    X_ada, y_ada = ada.fit_resample(X_tr, y_tr)
+                except (ValueError, RuntimeError):
+                    X_ada, y_ada = X_sm, y_sm
+            else:
                 X_ada, y_ada = X_sm, y_sm
-        else:
-            X_ada, y_ada = X_sm, y_sm
-        ada_gbdt = _make_lgbm(seed=seed)
-        ada_gbdt.fit(X_ada, y_ada)
-        cal_ada = PlattLogitCalibrator().fit(ada_gbdt.predict_proba(X_c)[:, 1], y_c)
-        arms["adasyn_gbdt"] = FittedDecoderArm("adasyn_gbdt", prep, [ada_gbdt], cal_ada)
+            ada_gbdt = _make_lgbm(seed=seed)
+            ada_gbdt.fit(X_ada, y_ada)
+            cal_ada = PlattLogitCalibrator().fit(ada_gbdt.predict_proba(X_c)[:, 1], y_c)
+            arms["adasyn_gbdt"] = FittedDecoderArm("adasyn_gbdt", prep, [ada_gbdt], cal_ada)
 
         # 7. Latent Gaussian-Copula Augmentation + GBDT
         X_cop, y_cop = _gaussian_copula_minority_augment(X_tr, y_tr, target_ratio=0.4, seed=seed)
@@ -403,7 +407,11 @@ def train_decoder_saturation_suite(
         hgb = HistGradientBoostingClassifier(max_iter=150, learning_rate=0.05, random_state=seed)
         hgb.fit(X_tr, y_tr)
         brf = BalancedRandomForestClassifier(
-            n_estimators=120, sampling_strategy="all", replacement=True, random_state=seed, n_jobs=1
+            n_estimators=120,
+            sampling_strategy="all",
+            replacement=True,
+            random_state=seed,
+            n_jobs=4,
         )
         brf.fit(X_tr, y_tr)
         ens_members: list[object] = [glm, gbdt, hgb, brf]

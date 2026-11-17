@@ -11,13 +11,16 @@ from imboreceipt.bench.datasets import (
 )
 from imboreceipt.bench.gate05_sandbox import MultiChannelCohort, generate_gate05_cohort
 from imboreceipt.bench.runner import (
+    ABLATION_LADDER_ORDER,
     run_gate05_suite,
     run_multi_channel_cohort_benchmark,
+    run_multiseed_paper_campaign,
     run_tier1_saturation_suite,
     run_tier2_credo_bench,
 )
 
 __all__ = [
+    "ABLATION_LADDER_ORDER",
     "MultiChannelCohort",
     "TIER1_PUBLIC_SPECS",
     "Tier1DatasetSpec",
@@ -29,6 +32,7 @@ __all__ = [
     "load_tier2_taiwan_credit_panel",
     "run_gate05_suite",
     "run_multi_channel_cohort_benchmark",
+    "run_multiseed_paper_campaign",
     "run_tier1_saturation_suite",
     "run_tier2_credo_bench",
 ]

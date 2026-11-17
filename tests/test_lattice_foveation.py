@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from imboreceipt.bench.gate05_sandbox import generate_gate05_cohort
 from imboreceipt.bench.runner import run_multi_channel_cohort_benchmark
 from imboreceipt.contract import DecisionContract
-from imboreceipt.lattice import BinaryConformalFoveator, estimate_tail_coincidence_surrogate
+from imboreceipt.lattice import (
+    BinaryConformalFoveator,
+    ConfirmRescueLattice,
+    estimate_tail_coincidence_surrogate,
+)
 
 
 def test_ligo_time_shift_surrogate_separates_independent_and_confounded_tails() -> None:
@@ -96,3 +101,55 @@ def test_full_credo_lattice_end_to_end_on_gate05() -> None:
             sub["orthogonal_coincidence"]["credo_np_recall"]
             > sub["exogenous_shock"]["credo_np_recall"] + 0.15
         )
+
+
+def test_kappa0_hybrid_lattice_adapts_to_coupled_interaction_regime() -> None:
+    """When kappa_0 is high across coupled channels, hybrid lattice beats pure orthogonal."""
+    rng = np.random.default_rng(123)
+    n = 5000
+    # Shared false-positive spike u_fp elevates x_base, z_1, and z_2 in the same upper tail!
+    u_fp = rng.binomial(1, 0.08, size=n) * 2.2
+    m1 = rng.normal(0.0, 1.0, size=n)
+    m2 = rng.normal(0.0, 1.0, size=n)
+    m3 = rng.normal(0.0, 1.0, size=n)
+
+    x_base_sig = m1 + u_fp
+    z1_sig = m2 + u_fp
+    z2_sig = m3 + 0.8 * u_fp
+
+    # True event requires simultaneous 3-way coupled synergy across X_base, Z_1, and Z_2
+    # while u_fp==0 (so joint [X_base, Z_1, Z_2] separates the 3-way synergy from the u_fp spike!)
+    y = ((m1 > 0.75) & (m2 > 0.75) & (m3 > 0.95) & (u_fp == 0)).astype(int)
+
+    X_base = pd.DataFrame({"x_sig": x_base_sig, "noise": rng.normal(0, 1, n)})
+    Z_1 = pd.DataFrame({"z1_sig": z1_sig})
+    Z_2 = pd.DataFrame({"z2_sig": z2_sig})
+
+    s1, s2, s3 = 2700, 3500, 4250
+    Xb_tr, Xb_cal, Xb_val, Xb_tst = (
+        X_base.iloc[:s1],
+        X_base.iloc[s1:s2],
+        X_base.iloc[s2:s3],
+        X_base.iloc[s3:],
+    )
+    Zc_tr = {"ch_1": Z_1.iloc[:s1], "ch_2": Z_2.iloc[:s1]}
+    Zc_cal = {"ch_1": Z_1.iloc[s1:s2], "ch_2": Z_2.iloc[s1:s2]}
+    Zc_val = {"ch_1": Z_1.iloc[s2:s3], "ch_2": Z_2.iloc[s2:s3]}
+    Zc_tst = {"ch_1": Z_1.iloc[s3:], "ch_2": Z_2.iloc[s3:]}
+    y_tr, y_cal, y_val, y_tst = y[:s1], y[s1:s2], y[s2:s3], y[s3:]
+
+    orth = ConfirmRescueLattice(max_fpr_budget=0.02, mode="pure_orthogonal", seed=123).fit(
+        Xb_tr, Zc_tr, y_tr, Xb_cal, Zc_cal, y_cal, Xb_val, Zc_val, y_val
+    )
+    hyb = ConfirmRescueLattice(max_fpr_budget=0.02, mode="hybrid_kappa0", seed=123).fit(
+        Xb_tr, Zc_tr, y_tr, Xb_cal, Zc_cal, y_cal, Xb_val, Zc_val, y_val
+    )
+
+    from sklearn.metrics import average_precision_score
+
+    ap_orth = average_precision_score(y_tst, orth.predict_proba(Xb_tst, Zc_tst))
+    ap_hyb = average_precision_score(y_tst, hyb.predict_proba(Xb_tst, Zc_tst))
+
+    assert hyb.mean_kappa0_ > 1.5
+    assert hyb.orthogonal_lattice_weight_ < 0.85
+    assert ap_hyb > ap_orth + 0.03

@@ -11,6 +11,7 @@ from rich.table import Table
 from imboreceipt.bench.datasets import DEFAULT_CACHE_DIR
 from imboreceipt.bench.runner import (
     run_gate05_suite,
+    run_multiseed_paper_campaign,
     run_tier1_saturation_suite,
     run_tier2_credo_bench,
 )
@@ -81,32 +82,70 @@ def cmd_bench_tier1(out: Path, cache_dir: Path, seed: int) -> None:
 @click.option("--out", type=click.Path(path_type=Path), default=Path("artifacts/bench/tier2"))
 @click.option("--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR)
 @click.option("--seed", type=int, default=42)
-def cmd_bench_tier2(out: Path, cache_dir: Path, seed: int) -> None:
+@click.option("--uncapped/--capped", default=False)
+def cmd_bench_tier2(out: Path, cache_dir: Path, seed: int, uncapped: bool) -> None:
     """Run Tier-2 CREDO-Bench Multi-Channel & Receipt Public Cohort Suite."""
-    results = run_tier2_credo_bench(out_dir=out, cache_dir=cache_dir, seed=seed)
+    results = run_tier2_credo_bench(out_dir=out, cache_dir=cache_dir, seed=seed, uncapped=uncapped)
     tbl = Table(title="Tier-2 CREDO-Bench: Public Multi-Channel & Receipt Benchmarks")
     tbl.add_column("Cohort", style="cyan")
-    tbl.add_column("Base GBDT AUPRC", justify="right")
-    tbl.add_column("SMOTE AUPRC", justify="right")
-    tbl.add_column("CREDO Lattice AUPRC", justify="right", style="bold green")
-    tbl.add_column("NP TPR (Base->CREDO)", justify="right")
-    tbl.add_column("Stage-2 Sensor Saved", justify="right")
+    tbl.add_column("Base GBDT", justify="right")
+    tbl.add_column("REG Mono", justify="right")
+    tbl.add_column("Orth Lattice", justify="right")
+    tbl.add_column("Full CREDO (Hybrid)", justify="right", style="bold green")
+    tbl.add_column("kappa_0", justify="right")
 
     for r in results:
         b = r["arms"]["calibrated_gbdt"]
-        s = r["arms"]["smote_gbdt"]
+        m = r["arms"]["monolithic_credo_reg"]
+        o = r["arms"]["pure_orthogonal_lattice"]
         c = r["arms"]["full_credo_lattice"]
-        fov = r["conformal_foveation"]
         tbl.add_row(
             r["cohort_name"],
             f"{b['auprc']:.4f}",
-            f"{s['auprc']:.4f}",
+            f"{m['auprc']:.4f}",
+            f"{o['auprc']:.4f}",
             f"{c['auprc']:.4f}",
-            f"{b['np_tpr_at_fpr_budget']:.3f} -> {c['np_tpr_at_fpr_budget']:.3f}",
-            f"{100.0 * fov['stage2_sensor_savings_fraction']:.1f}%",
+            f"{r['mean_kappa0']:.2f} (w={r['orthogonal_lattice_weight']:.2f})",
         )
     console.print(tbl)
     console.print(f"[green]Saved Tier-2 CREDO-Bench artifacts & plot to {out}[/green]")
+
+
+@main.command("bench-paper-full")
+@click.option("--out", type=click.Path(path_type=Path), default=Path("artifacts/bench/paper_full"))
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR)
+@click.option("--n-seeds", type=int, default=5)
+@click.option("--uncapped/--capped", default=True)
+def cmd_bench_paper_full(out: Path, cache_dir: Path, n_seeds: int, uncapped: bool) -> None:
+    """Run full multi-seed Paper A campaign across Tier 0, Tier 1, and Uncapped Tier 2."""
+    seeds = tuple(42 + i for i in range(n_seeds))
+    summary = run_multiseed_paper_campaign(
+        out_dir=out, cache_dir=cache_dir, seeds=seeds, uncapped=uncapped
+    )
+    tbl = Table(
+        title=f"Paper A Multi-Seed ({n_seeds}x, uncapped={uncapped}) Knockout Ablation Summary"
+    )
+    tbl.add_column("Cohort", style="cyan")
+    tbl.add_column("Base AUPRC", justify="right")
+    tbl.add_column("Global MI", justify="right")
+    tbl.add_column("Pure Orth", justify="right")
+    tbl.add_column("Full CREDO", justify="right", style="bold green")
+    tbl.add_column("kappa_0 -> w_orth", justify="right")
+    tbl.add_column("Wilcoxon p", justify="right")
+
+    for c in summary["multi_channel_summary"]:
+        ab = c["ablation_ladder"]
+        tbl.add_row(
+            c["cohort_name"],
+            f"{ab['calibrated_gbdt']['auprc']['mean']:.4f}±{ab['calibrated_gbdt']['auprc']['sd']:.3f}",
+            f"{ab['monolithic_global_mi']['auprc']['mean']:.4f}±{ab['monolithic_global_mi']['auprc']['sd']:.3f}",
+            f"{ab['pure_orthogonal_lattice']['auprc']['mean']:.4f}±{ab['pure_orthogonal_lattice']['auprc']['sd']:.3f}",
+            f"{ab['full_credo_lattice']['auprc']['mean']:.4f}±{ab['full_credo_lattice']['auprc']['sd']:.3f}",
+            f"{c['mean_kappa0']['mean']:.2f} -> {c['orthogonal_lattice_weight']['mean']:.2f}",
+            f"{c['wilcoxon_credo_vs_base_p']:.4f}",
+        )
+    console.print(tbl)
+    console.print(f"[green]Saved multi-seed Paper A campaign artifacts to {out}[/green]")
 
 
 if __name__ == "__main__":
