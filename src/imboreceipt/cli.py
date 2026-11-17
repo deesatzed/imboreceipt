@@ -14,6 +14,7 @@ from imboreceipt.bench.runner import (
     run_multiseed_paper_campaign,
     run_tier1_saturation_suite,
     run_tier2_credo_bench,
+    run_wave2_paper_campaign,
 )
 
 console = Console()
@@ -146,6 +147,41 @@ def cmd_bench_paper_full(out: Path, cache_dir: Path, n_seeds: int, uncapped: boo
         )
     console.print(tbl)
     console.print(f"[green]Saved multi-seed Paper A campaign artifacts to {out}[/green]")
+
+
+@main.command("bench-wave2")
+@click.option("--out", type=click.Path(path_type=Path), default=Path("artifacts/bench/wave2_full"))
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR)
+@click.option("--n-seeds", type=int, default=5)
+@click.option("--uncapped/--capped", default=True)
+def cmd_bench_wave2(out: Path, cache_dir: Path, n_seeds: int, uncapped: bool) -> None:
+    """Run Wave-2 Flagship Expansion (Scania 76k, Home Credit 307k, IEEE-CIS 590k, BAF 1M)."""
+    seeds = tuple(42 + i for i in range(n_seeds))
+    summary = run_wave2_paper_campaign(
+        out_dir=out, cache_dir=cache_dir, seeds=seeds, uncapped=uncapped
+    )
+    tbl = Table(title=f"Unified 9-Cohort CREDO-Bench Summary ({n_seeds}x, uncapped={uncapped})")
+    tbl.add_column("Cohort", style="cyan")
+    tbl.add_column("Base AUPRC", justify="right")
+    tbl.add_column("Global MI", justify="right")
+    tbl.add_column("6-Ens (A5b)", justify="right")
+    tbl.add_column("Full CREDO", justify="right", style="bold green")
+    tbl.add_column("Pilot %", justify="right")
+    tbl.add_column("Holm FWER p", justify="right")
+
+    for c in summary["multi_channel_summary"]:
+        ab = c["ablation_ladder"]
+        tbl.add_row(
+            c["cohort_name"],
+            f"{ab['calibrated_gbdt']['auprc']['mean']:.4f}",
+            f"{ab['monolithic_global_mi']['auprc']['mean']:.4f}",
+            f"{ab['monolithic_credo_ensemble']['auprc']['mean']:.4f}",
+            f"{ab['full_credo_lattice']['auprc']['mean']:.4f}",
+            f"{100.0 * c['pilot_fraction_measured']['mean']:.1f}%",
+            f"{c['holm_bonferroni_fwer_p']:.5f}",
+        )
+    console.print(tbl)
+    console.print(f"[green]Saved unified 9-cohort Wave-2 campaign artifacts to {out}[/green]")
 
 
 if __name__ == "__main__":

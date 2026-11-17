@@ -52,6 +52,10 @@ TIER1_PUBLIC_SPECS: tuple[Tier1DatasetSpec, ...] = (
     Tier1DatasetSpec("pc1_defects", "PC1 Software Defects", "openml", 1068, "true", 0.35, 0.02),
     Tier1DatasetSpec("yeast_me2", "Yeast ME2", "imblearn", "yeast_me2", 1, 0.35, 0.02),
     Tier1DatasetSpec("abalone_19", "Abalone 19", "imblearn", "abalone_19", 1, 0.20, 0.02),
+    Tier1DatasetSpec("webpage", "Webpage (35k)", "imblearn", "webpage", 1, 0.60, 0.01),
+    Tier1DatasetSpec(
+        "protein_homo", "KDD Protein Homology (146k)", "imblearn", "protein_homo", 1, 0.75, 0.005
+    ),
 )
 
 

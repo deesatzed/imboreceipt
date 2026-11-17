@@ -11,6 +11,7 @@ from lightgbm import LGBMClassifier
 from scipy.stats import fisher_exact
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import mutual_info_score
 
 from imboreceipt.contract.decision import DecisionContract, instance_evidence_deficit
 from imboreceipt.core.types import SemanticType
@@ -349,7 +350,26 @@ def score_channels_baseline_strategy(
         for cand in candidates:
             prep = TabularPreprocessor().fit(Z_pool_train[list(cand.columns)])
             Zm = prep.transform(Z_pool_train[list(cand.columns)])
-            mi = float(np.sum(mutual_info_classif(Zm, y, random_state=seed)))
+            if y.size <= 35000:
+                mi = float(np.sum(mutual_info_classif(Zm, y, random_state=seed)))
+            else:
+                # Exact 100%-row O(N) Miller-Madow bias-corrected 64-quantile plug-in MI
+                # (avoids O(N log N) KDTree tie-jittering explosion on 300k-1M zero-inflated rows)
+                mi_sum = 0.0
+                q_grid = np.linspace(0.0, 1.0, 65)
+                for j in range(Zm.shape[1]):
+                    col_v = Zm[:, j]
+                    edges = np.unique(np.quantile(col_v, q_grid))
+                    bins = (
+                        np.searchsorted(edges[1:-1], col_v, side="right")
+                        if edges.size > 2
+                        else (col_v > edges[0]).astype(int)
+                    )
+                    raw_mi = float(mutual_info_score(y, bins))
+                    n_bins_eff = max(1, int(np.unique(bins).size))
+                    mm_bias = float(n_bins_eff - 1) / float(2 * max(1, y.size))
+                    mi_sum += max(0.0, raw_mi - mm_bias)
+                mi = mi_sum
             records.append(
                 ChannelScoreRecord(
                     channel_id=cand.channel_id,

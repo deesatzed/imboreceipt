@@ -170,3 +170,24 @@ def test_nadeau_bengio_and_equal_capacity_ablation_arm() -> None:
     g05 = generate_gate05_cohort(n_samples=1500, seed=42, selective_receipts=True)
     res = run_multi_channel_cohort_benchmark(g05, seed=42, n_boot=60)
     assert "monolithic_credo_ensemble" in res["arms"]
+
+
+def test_wave2_home_credit_compiler_zero_presplit_leakage() -> None:
+    """Verify Home Credit 7-table compilers never leak across train/val/test splits."""
+    from pathlib import Path
+
+    if not Path("data/cache/tier2_home_credit_7table.pkl").exists():
+        return
+    from imboreceipt.bench.wave2_datasets import load_wave2_home_credit_relational
+
+    hc_a = load_wave2_home_credit_relational(max_rows=3000, seed=42)
+    hc_b = load_wave2_home_credit_relational(max_rows=3000, seed=42)
+    assert hc_a.raw_aux_df is not None and hc_b.raw_aux_df is not None
+    tr = np.arange(0, 1600)
+    va = np.arange(1600, 2200)
+    ts = np.arange(2200, 3000)
+    hc_b.raw_aux_df.iloc[ts] = hc_b.raw_aux_df.iloc[ts] * 1e6 + 1e8
+
+    za_va = hc_a.materialize_z_splits(tr, va, ts)[1].to_numpy(dtype=float)
+    zb_va = hc_b.materialize_z_splits(tr, va, ts)[1].to_numpy(dtype=float)
+    np.testing.assert_allclose(np.nan_to_num(za_va), np.nan_to_num(zb_va), rtol=0.0, atol=0.0)

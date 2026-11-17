@@ -7,7 +7,11 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from imblearn.ensemble import BalancedRandomForestClassifier
+from imblearn.ensemble import (
+    BalancedRandomForestClassifier,
+    EasyEnsembleClassifier,
+    RUSBoostClassifier,
+)
 from imblearn.over_sampling import ADASYN, SMOTE, BorderlineSMOTE
 from lightgbm import LGBMClassifier
 from scipy.special import logit
@@ -16,6 +20,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
+from sklearn.tree import DecisionTreeClassifier
 
 from imboreceipt.core.types import SemanticType, infer_semantic_types
 
@@ -463,6 +468,35 @@ def train_decoder_saturation_suite(
             ada_gbdt.fit(X_ada, y_ada)
             cal_ada = PlattLogitCalibrator().fit(ada_gbdt.predict_proba(X_c)[:, 1], y_c)
             arms["adasyn_gbdt"] = FittedDecoderArm("adasyn_gbdt", prep, [ada_gbdt], cal_ada)
+
+            # 6b. CLIMB-style EasyEnsembleClassifier (Bagged Balanced AdaBoost)
+            eec = EasyEnsembleClassifier(
+                n_estimators=15,
+                sampling_strategy="auto",
+                random_state=seed,
+                n_jobs=4,
+            )
+            try:
+                eec.fit(X_tr, y_tr)
+                cal_eec = PlattLogitCalibrator().fit(eec.predict_proba(X_c)[:, 1], y_c)
+                arms["easy_ensemble"] = FittedDecoderArm("easy_ensemble", prep, [eec], cal_eec)
+            except ValueError:
+                arms["easy_ensemble"] = arms["smote_gbdt"]
+
+            # 6c. CLIMB-style RUSBoostClassifier (Depth-3 Tree Base + Undersampled Boosting)
+            rus = RUSBoostClassifier(
+                estimator=DecisionTreeClassifier(max_depth=3, random_state=seed),
+                n_estimators=60,
+                learning_rate=0.1,
+                sampling_strategy="auto",
+                random_state=seed,
+            )
+            try:
+                rus.fit(X_tr, y_tr)
+                cal_rus = PlattLogitCalibrator().fit(rus.predict_proba(X_c)[:, 1], y_c)
+                arms["rusboost"] = FittedDecoderArm("rusboost", prep, [rus], cal_rus)
+            except ValueError:
+                arms["rusboost"] = arms["easy_ensemble"]
 
         # 7. Latent Gaussian-Copula Augmentation + GBDT
         X_cop, y_cop = _gaussian_copula_minority_augment(X_tr, y_tr, target_ratio=0.4, seed=seed)

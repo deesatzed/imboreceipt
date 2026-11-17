@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,12 @@ from imboreceipt.bench.datasets import (
     load_tier2_taiwan_credit_panel,
 )
 from imboreceipt.bench.gate05_sandbox import MultiChannelCohort, generate_gate05_cohort
+from imboreceipt.bench.wave2_datasets import (
+    load_wave2_home_credit_relational,
+    load_wave2_ieee_cis_fraud,
+    load_wave2_neurips_baf,
+    load_wave2_scania_aps,
+)
 from imboreceipt.contract.decision import DecisionContract, gate_c_audit
 from imboreceipt.core.bootstrap import (
     holm_bonferroni_adjust,
@@ -593,6 +600,8 @@ def run_tier1_saturation_suite(
         for comp_name in (
             "smote_gbdt",
             "adasyn_gbdt",
+            "easy_ensemble",
+            "rusboost",
             "cost_sensitive_gbdt",
             "latent_copula_gbdt",
             "soft_avg_ensemble",
@@ -725,10 +734,13 @@ def run_multiseed_paper_campaign(
         runs = tier1_by_key[spec.key]
         gbdt_ap = [r["arms"]["calibrated_gbdt"]["auprc"] for r in runs]
         smote_ap = [r["arms"]["smote_gbdt"]["auprc"] for r in runs]
+        eec_ap = [r["arms"]["easy_ensemble"]["auprc"] for r in runs]
+        rus_ap = [r["arms"]["rusboost"]["auprc"] for r in runs]
         cop_ap = [r["arms"]["latent_copula_gbdt"]["auprc"] for r in runs]
         cs_ap = [r["arms"]["cost_sensitive_gbdt"]["auprc"] for r in runs]
         ens_ap = [r["arms"]["soft_avg_ensemble"]["auprc"] for r in runs]
         smote_deltas = [sm - gb for sm, gb in zip(smote_ap, gbdt_ap, strict=True)]
+        eec_deltas = [ee - gb for ee, gb in zip(eec_ap, gbdt_ap, strict=True)]
         ece_deg = [
             r["decoder_deltas_vs_calibrated_gbdt"]["smote_gbdt"]["ece_degradation_uncal"]
             for r in runs
@@ -742,6 +754,12 @@ def run_multiseed_paper_campaign(
 
         nb_smote = nadeau_bengio_ttest(
             smote_deltas,
+            n_test=int(round(runs[0]["n_rows"] * 0.15)),
+            n_train=int(round(runs[0]["n_rows"] * 0.55)),
+            disjoint_test_blocks=False,
+        )
+        nb_eec = nadeau_bengio_ttest(
+            eec_deltas,
             n_test=int(round(runs[0]["n_rows"] * 0.15)),
             n_train=int(round(runs[0]["n_rows"] * 0.55)),
             disjoint_test_blocks=False,
@@ -763,13 +781,17 @@ def run_multiseed_paper_campaign(
                 ),
                 "calibrated_gbdt_auprc": _agg_mean_sd(gbdt_ap),
                 "smote_gbdt_auprc": _agg_mean_sd(smote_ap),
+                "easy_ensemble_auprc": _agg_mean_sd(eec_ap),
+                "rusboost_auprc": _agg_mean_sd(rus_ap),
                 "latent_copula_auprc": _agg_mean_sd(cop_ap),
                 "cost_sensitive_auprc": _agg_mean_sd(cs_ap),
                 "soft_ensemble_auprc": _agg_mean_sd(ens_ap),
                 "smote_minus_gbdt_auprc": _agg_mean_sd(smote_deltas),
+                "easy_ensemble_minus_gbdt_auprc": _agg_mean_sd(eec_deltas),
                 "uncal_smote_ece_degradation": _agg_mean_sd(ece_deg),
                 "wilcoxon_one_sided_p": p_w,
                 "nadeau_bengio_one_sided_p": nb_smote.p_value_one_sided,
+                "easy_ensemble_nb_one_sided_p": nb_eec.p_value_one_sided,
                 "nadeau_bengio_ci95": [nb_smote.ci95_low, nb_smote.ci95_high],
             }
         )
@@ -819,8 +841,45 @@ def run_multiseed_paper_campaign(
             run_multi_channel_cohort_benchmark(c_ulb, seed=s, n_boot=250)
         )
 
+    cohort_summaries = _summarize_multi_cohort_runs(multi_cohort_runs, n_seeds)
+
+    campaign = {
+        "seeds": list(seeds),
+        "uncapped": uncapped,
+        "tier1_summary": tier1_summary,
+        "multi_channel_summary": cohort_summaries,
+        "raw_multi_channel_runs": multi_cohort_runs,
+    }
+
+    (out_dir / "campaign_summary.json").write_text(
+        json.dumps(
+            {
+                "seeds": list(seeds),
+                "uncapped": uncapped,
+                "tier1_summary": tier1_summary,
+                "multi_channel_summary": cohort_summaries,
+            },
+            indent=2,
+        )
+    )
+
+    _plot_multiseed_fig1_tier1(tier1_summary, out_dir / "fig1_tier1_saturation")
+    _plot_multiseed_fig2_ablations(cohort_summaries, out_dir / "fig2_ablation_ladder")
+    _plot_multiseed_fig3_kappa0_foveation(cohort_summaries, out_dir / "fig3_kappa0_and_foveation")
+    _write_latex_and_markdown_tables(tier1_summary, cohort_summaries, len(seeds), out_dir)
+
+    return campaign
+
+
+def _summarize_multi_cohort_runs(
+    multi_cohort_runs: dict[str, list[dict[str, Any]]],
+    n_seeds: int,
+) -> list[dict[str, Any]]:
+    """Aggregate per-seed cohort benchmark receipts and apply Holm-Bonferroni FWER control."""
     cohort_summaries: list[dict[str, Any]] = []
     for c_name, runs in multi_cohort_runs.items():
+        if not runs:
+            continue
         ablation_table: dict[str, Any] = {}
         for arm_key, arm_label in ABLATION_LADDER_ORDER:
             ap_vals = [r["arms"][arm_key]["auprc"] for r in runs]
@@ -849,7 +908,6 @@ def run_multiseed_paper_campaign(
             r["arms"]["monolithic_credo_reg"]["auprc"] - r["arms"]["monolithic_global_mi"]["auprc"]
             for r in runs
         ]
-
         credo_minus_ens = [
             r["arms"]["full_credo_lattice"]["auprc"]
             - r["arms"]["monolithic_credo_ensemble"]["auprc"]
@@ -878,7 +936,6 @@ def run_multiseed_paper_campaign(
         except ValueError:
             p_credo_f = 1.0
 
-        # Subtype recall aggregation if present
         all_sub_tags = sorted({tag for r in runs for tag in r["subtype_np_recall"].keys()})
         subtype_agg: dict[str, Any] = {}
         for tag in all_sub_tags:
@@ -958,38 +1015,227 @@ def run_multiseed_paper_campaign(
             }
         )
 
-    # Apply Holm-Bonferroni FWER multiplicity adjustment across all 5 multi-channel cohorts!
     raw_nb_ps = [c["nadeau_bengio_credo_vs_base_p"] for c in cohort_summaries]
     holm_ps = holm_bonferroni_adjust(raw_nb_ps)
     for c, hp in zip(cohort_summaries, holm_ps, strict=True):
         c["holm_bonferroni_fwer_p"] = hp
+    return cohort_summaries
 
-    campaign = {
+
+def run_wave2_paper_campaign(
+    out_dir: Path,
+    cache_dir: Path = DEFAULT_CACHE_DIR,
+    wave1_summary_path: Path = Path("artifacts/bench/paper_hardened/campaign_summary.json"),
+    seeds: tuple[int, ...] = (42, 43, 44, 45, 46),
+    uncapped: bool = True,
+) -> dict[str, Any]:
+    """Execute Wave-2 Expansion: 10-dataset CLIMB Tier-1 + 4 High-Scale Multi-Table Flagships.
+
+    Merges Wave-1 hardened summaries (when present) to emit a unified 9-Cohort + 10-Dataset
+    campaign summary with joint Holm-Bonferroni FWER multiplicity control across all 9 cohorts!
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    n_seeds = len(seeds)
+
+    print(
+        f"[Wave-2] Step 1/5: Running 10-dataset Tier-1 + CLIMB Ensembles ({n_seeds} seeds)...",
+        flush=True,
+    )
+    ckpt_dir = out_dir / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    tier1_by_key: dict[str, list[dict[str, Any]]] = {s.key: [] for s in TIER1_PUBLIC_SPECS}
+    for s in seeds:
+        t1_seed_dir = out_dir / "seeds" / f"tier1_seed{s}"
+        t1_json = t1_seed_dir / "tier1_results.json"
+        if t1_json.exists():
+            seed_runs = json.loads(t1_json.read_text())
+        else:
+            seed_runs = run_tier1_saturation_suite(t1_seed_dir, cache_dir=cache_dir, seed=s)
+        for rec in seed_runs:
+            tier1_by_key[rec["dataset_key"]].append(rec)
+        gc.collect()
+
+    tier1_summary: list[dict[str, Any]] = []
+    for spec in TIER1_PUBLIC_SPECS:
+        runs = tier1_by_key[spec.key]
+        gbdt_ap = [r["arms"]["calibrated_gbdt"]["auprc"] for r in runs]
+        smote_ap = [r["arms"]["smote_gbdt"]["auprc"] for r in runs]
+        eec_ap = [r["arms"]["easy_ensemble"]["auprc"] for r in runs]
+        rus_ap = [r["arms"]["rusboost"]["auprc"] for r in runs]
+        cop_ap = [r["arms"]["latent_copula_gbdt"]["auprc"] for r in runs]
+        cs_ap = [r["arms"]["cost_sensitive_gbdt"]["auprc"] for r in runs]
+        ens_ap = [r["arms"]["soft_avg_ensemble"]["auprc"] for r in runs]
+        smote_deltas = [sm - gb for sm, gb in zip(smote_ap, gbdt_ap, strict=True)]
+        eec_deltas = [ee - gb for ee, gb in zip(eec_ap, gbdt_ap, strict=True)]
+        ece_deg = [
+            r["decoder_deltas_vs_calibrated_gbdt"]["smote_gbdt"]["ece_degradation_uncal"]
+            for r in runs
+        ]
+        try:
+            _, p_wilc = wilcoxon(smote_deltas, alternative="greater")
+            p_w = float(p_wilc)
+        except ValueError:
+            p_w = 1.0
+
+        nb_smote = nadeau_bengio_ttest(
+            smote_deltas,
+            n_test=int(round(runs[0]["n_rows"] * 0.15)),
+            n_train=int(round(runs[0]["n_rows"] * 0.55)),
+            disjoint_test_blocks=False,
+        )
+        nb_eec = nadeau_bengio_ttest(
+            eec_deltas,
+            n_test=int(round(runs[0]["n_rows"] * 0.15)),
+            n_train=int(round(runs[0]["n_rows"] * 0.55)),
+            disjoint_test_blocks=False,
+        )
+        tier1_summary.append(
+            {
+                "dataset_key": spec.key,
+                "display_name": spec.display_name,
+                "n_rows": runs[0]["n_rows"],
+                "n_features": runs[0]["n_features"],
+                "prevalence": runs[0]["prevalence"],
+                "n_pos_test": runs[0]["n_pos_test"],
+                "recall_ci_half_width": runs[0]["gate_c"]["recall_ci_half_width_at_80"],
+                "modal_regime": max(
+                    set(r["four_ceilings"]["bottleneck_regime"] for r in runs),
+                    key=lambda reg: sum(
+                        1 for r in runs if r["four_ceilings"]["bottleneck_regime"] == reg
+                    ),
+                ),
+                "calibrated_gbdt_auprc": _agg_mean_sd(gbdt_ap),
+                "smote_gbdt_auprc": _agg_mean_sd(smote_ap),
+                "easy_ensemble_auprc": _agg_mean_sd(eec_ap),
+                "rusboost_auprc": _agg_mean_sd(rus_ap),
+                "latent_copula_auprc": _agg_mean_sd(cop_ap),
+                "cost_sensitive_auprc": _agg_mean_sd(cs_ap),
+                "soft_ensemble_auprc": _agg_mean_sd(ens_ap),
+                "smote_minus_gbdt_auprc": _agg_mean_sd(smote_deltas),
+                "easy_ensemble_minus_gbdt_auprc": _agg_mean_sd(eec_deltas),
+                "uncal_smote_ece_degradation": _agg_mean_sd(ece_deg),
+                "wilcoxon_one_sided_p": p_w,
+                "nadeau_bengio_one_sided_p": nb_smote.p_value_one_sided,
+                "easy_ensemble_nb_one_sided_p": nb_eec.p_value_one_sided,
+                "nadeau_bengio_ci95": [nb_smote.ci95_low, nb_smote.ci95_high],
+            }
+        )
+
+    wave2_runs: dict[str, list[dict[str, Any]]] = {
+        "Scania_APS_76k_Fleet": [],
+        "Home_Credit_307k_7Table_Relational": [],
+        "IEEE_CIS_590k_MultiTable": [],
+        "NeurIPS_BAF_1M_Chronological": [],
+    }
+
+    cap_rows = None if uncapped else 150000
+
+    def _run_or_load_ckpt(c_key: str, s_val: int, loader_fn: Any) -> dict[str, Any]:
+        cp = ckpt_dir / f"{c_key}_seed{s_val}.json"
+        if cp.exists():
+            return json.loads(cp.read_text())
+        coh_obj = loader_fn()
+        res_obj = run_multi_channel_cohort_benchmark(coh_obj, seed=s_val, n_boot=200)
+        cp.write_text(json.dumps(res_obj, indent=2))
+        print(
+            f"  [Done] {c_key} seed={s_val}: "
+            f"Base={res_obj['arms']['calibrated_gbdt']['auprc']:.4f} | "
+            f"MI={res_obj['arms']['monolithic_global_mi']['auprc']:.4f} | "
+            f"6-Ens={res_obj['arms']['monolithic_credo_ensemble']['auprc']:.4f} | "
+            f"CREDO={res_obj['arms']['full_credo_lattice']['auprc']:.4f}",
+            flush=True,
+        )
+        del coh_obj
+        gc.collect()
+        return res_obj
+
+    print("[Wave-2] Step 2/5: Running Scania APS 76k Fleet across seeds...", flush=True)
+    for s in seeds:
+        wave2_runs["Scania_APS_76k_Fleet"].append(
+            _run_or_load_ckpt(
+                "Scania_APS_76k_Fleet",
+                s,
+                lambda s=s: load_wave2_scania_aps(cache_dir=cache_dir, seed=s),
+            )
+        )
+
+    print(
+        "[Wave-2] Step 3/5: Running Home Credit 307k 7-Table Relational across seeds...", flush=True
+    )
+    for s in seeds:
+        wave2_runs["Home_Credit_307k_7Table_Relational"].append(
+            _run_or_load_ckpt(
+                "Home_Credit_307k_7Table_Relational",
+                s,
+                lambda s=s: load_wave2_home_credit_relational(
+                    cache_dir=cache_dir, max_rows=cap_rows, seed=s
+                ),
+            )
+        )
+
+    print(
+        "[Wave-2] Step 4/5: Running IEEE-CIS 590k 2-Table Fraud across disjoint eras...", flush=True
+    )
+    for w_idx, s in enumerate(seeds):
+        wave2_runs["IEEE_CIS_590k_MultiTable"].append(
+            _run_or_load_ckpt(
+                "IEEE_CIS_590k_MultiTable",
+                s,
+                lambda w_idx=w_idx, s=s: load_wave2_ieee_cis_fraud(
+                    cache_dir=cache_dir,
+                    window_idx=w_idx if uncapped else None,
+                    n_windows=n_seeds,
+                    max_rows=cap_rows,
+                    seed=s,
+                ),
+            )
+        )
+
+    print("[Wave-2] Step 5/5: Running NeurIPS BAF 1M Fraud across disjoint eras...", flush=True)
+    for w_idx, s in enumerate(seeds):
+        wave2_runs["NeurIPS_BAF_1M_Chronological"].append(
+            _run_or_load_ckpt(
+                "NeurIPS_BAF_1M_Chronological",
+                s,
+                lambda w_idx=w_idx, s=s: load_wave2_neurips_baf(
+                    cache_dir=cache_dir,
+                    window_idx=w_idx if uncapped else None,
+                    n_windows=n_seeds,
+                    max_rows=cap_rows,
+                    seed=s,
+                ),
+            )
+        )
+
+    wave2_only_summaries = _summarize_multi_cohort_runs(wave2_runs, n_seeds)
+
+    # Combine Wave-1 Hardened + Wave-2 Flagships and re-compute joint 9-Cohort Holm-Bonferroni FWER!
+    combined_summaries: list[dict[str, Any]] = []
+    if wave1_summary_path.exists():
+        w1_data = json.loads(wave1_summary_path.read_text())
+        combined_summaries.extend(w1_data.get("multi_channel_summary", []))
+    combined_summaries.extend(wave2_only_summaries)
+
+    joint_raw_ps = [c["nadeau_bengio_credo_vs_base_p"] for c in combined_summaries]
+    joint_holm_ps = holm_bonferroni_adjust(joint_raw_ps)
+    for c, hp in zip(combined_summaries, joint_holm_ps, strict=True):
+        c["holm_bonferroni_fwer_p"] = hp
+
+    payload = {
         "seeds": list(seeds),
         "uncapped": uncapped,
         "tier1_summary": tier1_summary,
-        "multi_channel_summary": cohort_summaries,
-        "raw_multi_channel_runs": multi_cohort_runs,
+        "wave2_only_summary": wave2_only_summaries,
+        "multi_channel_summary": combined_summaries,
     }
-
-    (out_dir / "campaign_summary.json").write_text(
-        json.dumps(
-            {
-                "seeds": list(seeds),
-                "uncapped": uncapped,
-                "tier1_summary": tier1_summary,
-                "multi_channel_summary": cohort_summaries,
-            },
-            indent=2,
-        )
-    )
+    (out_dir / "campaign_summary.json").write_text(json.dumps(payload, indent=2))
 
     _plot_multiseed_fig1_tier1(tier1_summary, out_dir / "fig1_tier1_saturation")
-    _plot_multiseed_fig2_ablations(cohort_summaries, out_dir / "fig2_ablation_ladder")
-    _plot_multiseed_fig3_kappa0_foveation(cohort_summaries, out_dir / "fig3_kappa0_and_foveation")
-    _write_latex_and_markdown_tables(tier1_summary, cohort_summaries, len(seeds), out_dir)
-
-    return campaign
+    _plot_multiseed_fig2_ablations(combined_summaries, out_dir / "fig2_ablation_ladder")
+    _plot_multiseed_fig3_kappa0_foveation(combined_summaries, out_dir / "fig3_kappa0_and_foveation")
+    _write_latex_and_markdown_tables(tier1_summary, combined_summaries, len(seeds), out_dir)
+    return payload
 
 
 def _plot_multiseed_fig1_tier1(tier1_summary: list[dict[str, Any]], stem: Path) -> None:
@@ -1050,10 +1296,14 @@ def _plot_multiseed_fig2_ablations(cohorts: list[dict[str, Any]], stem: Path) ->
     short_names = [
         c["cohort_name"]
         .replace("Gate05_Synthetic_MultiMechanism", "Gate 0.5 (Truth)")
-        .replace("UCI_AI4I_2020_Maintenance", "AI4I Maintenance")
-        .replace("UCI_Taiwan_Credit_6m_Panel", "Taiwan Credit 6m")
-        .replace("UCI_Diabetes_130US_Hospitals", "Diabetes 130-US (102k)")
+        .replace("UCI_AI4I_2020_Maintenance", "AI4I Maint (10k)")
+        .replace("UCI_Taiwan_Credit_6m_Panel", "Taiwan Credit (27k)")
+        .replace("UCI_Diabetes_130US_Hospitals", "Diabetes 130 (102k)")
         .replace("ULB_CreditCard_Fraud_Chronological", "ULB Fraud (285k)")
+        .replace("Scania_APS_76k_Fleet", "Scania APS (76k)")
+        .replace("Home_Credit_307k_7Table_Relational", "Home Credit 7T (308k)")
+        .replace("IEEE_CIS_590k_MultiTable", "IEEE-CIS 2T (591k)")
+        .replace("NeurIPS_BAF_1M_Chronological", "NeurIPS BAF (1.0M)")
         for c in cohorts
     ]
     x = np.arange(len(short_names))
@@ -1119,10 +1369,14 @@ def _plot_multiseed_fig3_kappa0_foveation(cohorts: list[dict[str, Any]], stem: P
     short_names = [
         c["cohort_name"]
         .replace("Gate05_Synthetic_MultiMechanism", "Gate 0.5")
-        .replace("UCI_AI4I_2020_Maintenance", "AI4I 2020")
-        .replace("UCI_Taiwan_Credit_6m_Panel", "Taiwan Credit")
-        .replace("UCI_Diabetes_130US_Hospitals", "Diabetes 130")
-        .replace("ULB_CreditCard_Fraud_Chronological", "ULB Fraud")
+        .replace("UCI_AI4I_2020_Maintenance", "AI4I")
+        .replace("UCI_Taiwan_Credit_6m_Panel", "Taiwan")
+        .replace("UCI_Diabetes_130US_Hospitals", "Diabetes")
+        .replace("ULB_CreditCard_Fraud_Chronological", "ULB")
+        .replace("Scania_APS_76k_Fleet", "Scania")
+        .replace("Home_Credit_307k_7Table_Relational", "HomeCredit")
+        .replace("IEEE_CIS_590k_MultiTable", "IEEE-CIS")
+        .replace("NeurIPS_BAF_1M_Chronological", "BAF-1M")
         for c in cohorts
     ]
 
@@ -1208,20 +1462,24 @@ def _write_latex_and_markdown_tables(
         "",
         (
             "| Dataset | $N$ | Test $n_+$ | Recall 95% Half-Width | Calibrated GBDT AUPRC | "
-            "SMOTE+GBDT AUPRC | $\\Delta$AUPRC (Mean $\\pm$ SD) | Nadeau-Bengio $p$ |"
+            "SMOTE+GBDT | EasyEnsemble | RUSBoost | NB $p$ (SMOTE / EEC) |"
         ),
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for r in tier1:
         gb = r["calibrated_gbdt_auprc"]
         sm = r["smote_gbdt_auprc"]
-        dl = r["smote_minus_gbdt_auprc"]
+        ee = r.get("easy_ensemble_auprc", sm)
+        ru = r.get("rusboost_auprc", sm)
+        p_ee = r.get("easy_ensemble_nb_one_sided_p", 1.0)
         md_lines.append(
             f"| {r['display_name']} | {r['n_rows']:,} | {r['n_pos_test']} | "
             f"$\\pm {r['recall_ci_half_width']:.3f}$ | "
             f"${gb['mean']:.4f} \\pm {gb['sd']:.4f}$ | "
             f"${sm['mean']:.4f} \\pm {sm['sd']:.4f}$ | "
-            f"${dl['mean']:+.4f} \\pm {dl['sd']:.4f}$ | {r['nadeau_bengio_one_sided_p']:.3f} |"
+            f"${ee['mean']:.4f} \\pm {ee['sd']:.4f}$ | "
+            f"${ru['mean']:.4f} \\pm {ru['sd']:.4f}$ | "
+            f"{r['nadeau_bengio_one_sided_p']:.3f} / {p_ee:.3f} |"
         )
 
     md_lines.extend(
