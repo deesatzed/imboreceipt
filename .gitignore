@@ -1,0 +1,24 @@
+# Legacy read-only reference repository (never track or modify)
+/imbora/
+
+# Python & virtual environments
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local dataset cache & benchmark outputs
+data/cache/
+artifacts/
+
+# Secrets & OS files
+.env
+.env.*
+!.env.example
+.DS_Store
