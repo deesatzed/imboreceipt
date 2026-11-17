@@ -18,9 +18,10 @@ from imboreceipt.discover import (
 def test_case_cohort_reg_prioritizes_orthogonal_mechanisms_over_confounded_traps() -> None:
     """Verify Predictions 2 & 3 on Gate 0.5: REG rejects confounded FP traps at ~18% cohort cost."""
     cohort = generate_gate05_cohort(n_samples=6000, seed=42, selective_receipts=False)
-    Xb = cohort.X_base.iloc[:4000].reset_index(drop=True)
-    Zp = cohort.Z_pool.iloc[:4000].reset_index(drop=True)
-    y = cohort.y_true[:4000]
+    tr_idx = np.arange(4000, dtype=int)
+    Xb = cohort.X_base.iloc[tr_idx].reset_index(drop=True)
+    Zp = cohort.materialize_z_splits(tr_idx)[0]
+    y = cohort.y_true[tr_idx]
 
     strata = build_consensus_residual_strata(
         Xb, y, semantic_types=cohort.base_semantic_types, seed=42

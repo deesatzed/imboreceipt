@@ -29,7 +29,11 @@ from imboreceipt.bench.datasets import (
 )
 from imboreceipt.bench.gate05_sandbox import MultiChannelCohort, generate_gate05_cohort
 from imboreceipt.contract.decision import DecisionContract, gate_c_audit
-from imboreceipt.core.bootstrap import paired_cluster_bootstrap
+from imboreceipt.core.bootstrap import (
+    holm_bonferroni_adjust,
+    nadeau_bengio_ttest,
+    paired_cluster_bootstrap,
+)
 from imboreceipt.core.types import freeze_split, infer_semantic_types
 from imboreceipt.discover.selector import (
     score_channels_baseline_strategy,
@@ -38,6 +42,7 @@ from imboreceipt.discover.selector import (
 )
 from imboreceipt.discover.strata import build_consensus_residual_strata, sample_case_cohort_pilot
 from imboreceipt.frontier.baselines import (
+    fit_equal_capacity_monolithic_ensemble,
     fit_single_calibrated_gbdt,
     train_decoder_saturation_suite,
 )
@@ -58,6 +63,7 @@ ABLATION_LADDER_ORDER: tuple[tuple[str, str], ...] = (
     ("monolithic_random", "A3: Random Channels + Monolithic GBDT"),
     ("monolithic_global_mi", "A4: Full-Cohort Global MI + Monolithic GBDT"),
     ("monolithic_credo_reg", "A5: Case-Cohort CREDO REG + Monolithic GBDT"),
+    ("monolithic_credo_ensemble", "A5b: CREDO REG + Equal-Capacity 6-Model Ensemble"),
     ("pure_orthogonal_lattice", "A6: CREDO Pure Orthogonal Lattice"),
     ("full_credo_lattice", "A7: Full CREDO (kappa_0-Gated Hybrid Lattice)"),
 )
@@ -94,8 +100,12 @@ def run_multi_channel_cohort_benchmark(
 
     Xb_tr, Xb_cal = cohort.X_base.iloc[tr_i], cohort.X_base.iloc[cal_i]
     Xb_val, Xb_tst = cohort.X_base.iloc[val_i], cohort.X_base.iloc[tst_i]
-    Zp_tr, Zp_cal = cohort.Z_pool.iloc[tr_i], cohort.Z_pool.iloc[cal_i]
-    Zp_val, Zp_tst = cohort.Z_pool.iloc[val_i], cohort.Z_pool.iloc[tst_i]
+    Zp_tr, Zp_cal, Zp_val, Zp_tst = cohort.materialize_z_splits(tr_i, cal_i, val_i, tst_i)
+
+    grp_tr = cohort.group_ids[tr_i] if cohort.group_ids is not None else None
+    grp_cal = cohort.group_ids[cal_i] if cohort.group_ids is not None else None
+    time_tr = cohort.time_order[tr_i] if cohort.time_order is not None else None
+    time_cal = cohort.time_order[cal_i] if cohort.time_order is not None else None
 
     yt_tr = cohort.y_tilde[tr_i]
     yt_cal = cohort.y_tilde[cal_i]
@@ -210,18 +220,40 @@ def run_multi_channel_cohort_benchmark(
     ).model_dump()
 
     # Stage D: Residual Strata + Case-Cohort Pilot + Channel Selection Strategies
-    strata = build_consensus_residual_strata(Xb_tr, yt_tr, semantic_types=sem_types, seed=seed)
+    strata = build_consensus_residual_strata(
+        Xb_tr,
+        yt_tr,
+        semantic_types=sem_types,
+        groups=grp_tr,
+        time_order=time_tr,
+        seed=seed,
+    )
     pilot = sample_case_cohort_pilot(
         yt_tr, strata.oof_consensus_prob, controls_per_positive=4, seed=seed
     )
     spec_map = {c.channel_id: c for c in cohort.candidates}
 
     credo_scores = score_channels_credo_reg(
-        Xb_tr, Zp_tr, yt_tr, cohort.candidates, strata, pilot, cohort.contract, seed=seed
+        Xb_tr,
+        Zp_tr,
+        yt_tr,
+        cohort.candidates,
+        strata,
+        pilot,
+        cohort.contract,
+        groups_train=grp_tr,
+        time_order_train=time_tr,
+        seed=seed,
     )
     chosen_credo = select_channels_within_budget(
         credo_scores, spec_map, cohort.acquisition_budget, require_fdr=True
     )
+
+    # Single-factor knockout fairness: ALL multi-channel arms (A3..A7) share the EXACT SAME
+    # ReceiptRepairer training expansion & weights so Stage R never confounds Stage D or Stage O!
+    Xb_tr_rep = repaired.X_expanded
+    y_tr_rep = repaired.y_expanded
+    sw_rep = repaired.sample_weight
 
     discovery_comparisons: dict[str, dict[str, Any]] = {}
     for strat in ("credo_reg", "global_mi", "global_shap_gain", "global_residual", "random"):
@@ -229,7 +261,15 @@ def run_multi_channel_cohort_benchmark(
             chosen = chosen_credo
         else:
             ranked = score_channels_baseline_strategy(
-                strat, Xb_tr, Zp_tr, yt_tr, cohort.candidates, strata, seed=seed
+                strat,
+                Xb_tr,
+                Zp_tr,
+                yt_tr,
+                cohort.candidates,
+                strata,
+                groups_train=grp_tr,
+                time_order_train=time_tr,
+                seed=seed,
             )
             chosen = select_channels_within_budget(
                 ranked, spec_map, cohort.acquisition_budget, require_fdr=False
@@ -240,8 +280,12 @@ def run_multi_channel_cohort_benchmark(
         precision_at_budget = float(relevant_hits / max(1, len(chosen_ids)))
 
         z_cols = [col for c in chosen for col in c.columns]
-        XZ_tr = pd.concat(
-            [Xb_tr.reset_index(drop=True), Zp_tr[z_cols].reset_index(drop=True)], axis=1
+        XZ_tr_rep = pd.concat(
+            [
+                Xb_tr_rep.reset_index(drop=True),
+                Zp_tr.iloc[repaired.source_indices][z_cols].reset_index(drop=True),
+            ],
+            axis=1,
         )
         XZ_cal = pd.concat(
             [Xb_cal.reset_index(drop=True), Zp_cal[z_cols].reset_index(drop=True)], axis=1
@@ -254,7 +298,13 @@ def run_multi_channel_cohort_benchmark(
         )
 
         mono_arm = fit_single_calibrated_gbdt(
-            XZ_tr, yt_tr, XZ_cal, yt_cal, arm_name=f"monolithic_{strat}", seed=seed
+            XZ_tr_rep,
+            y_tr_rep,
+            XZ_cal,
+            yt_cal,
+            sample_weight=sw_rep,
+            arm_name=f"monolithic_{strat}",
+            seed=seed,
         )
         vp_m = mono_arm.predict_proba(XZ_val)
         tp_m = mono_arm.predict_proba(XZ_tst)
@@ -273,10 +323,29 @@ def run_multi_channel_cohort_benchmark(
             arm_test_probs[f"monolithic_{strat}"] = tp_m
             arm_metrics[f"monolithic_{strat}"] = f_m.model_dump()
 
+        if strat == "credo_reg":
+            # A5b: Equal-Capacity 6-Learner Monolithic Ensemble on [X_base, Z_CREDO]
+            ens_arm = fit_equal_capacity_monolithic_ensemble(
+                XZ_tr_rep,
+                y_tr_rep,
+                XZ_cal,
+                yt_cal,
+                sample_weight=sw_rep,
+                arm_name="monolithic_credo_ensemble",
+                seed=seed,
+            )
+            vp_ens = ens_arm.predict_proba(XZ_val)
+            tp_ens = ens_arm.predict_proba(XZ_tst)
+            f_ens = evaluate_certified_frontier(
+                "monolithic_credo_ensemble", y_val_e, vp_ens, y_tst_e, tp_ens, cohort.contract
+            )
+            arm_test_probs["monolithic_credo_ensemble"] = tp_ens
+            arm_metrics["monolithic_credo_ensemble"] = f_ens.model_dump()
+
     # Stage O: Evaluate BOTH A6 (Pure Orthogonal Lattice) AND A7 (Full kappa_0-Gated Hybrid Lattice)
-    Xb_tr_lat = repaired.X_expanded
-    y_tr_lat = repaired.y_expanded
-    sw_lat = repaired.sample_weight
+    Xb_tr_lat = Xb_tr_rep
+    y_tr_lat = y_tr_rep
+    sw_lat = sw_rep
     Z_tr_lattice = {
         c.channel_id: Zp_tr.iloc[repaired.source_indices][list(c.columns)].reset_index(drop=True)
         for c in chosen_credo
@@ -303,6 +372,8 @@ def run_multi_channel_cohort_benchmark(
         y_val_e,
         base_semantic_types=sem_types,
         sample_weight_train=sw_lat,
+        groups_cal=grp_cal,
+        time_order_cal=time_cal,
     )
     vp_orth = orth_lattice.predict_proba(Xb_val_e, Z_val_lattice)
     tp_orth = orth_lattice.predict_proba(Xb_tst_e, Z_tst_lattice)
@@ -330,6 +401,8 @@ def run_multi_channel_cohort_benchmark(
         y_val_e,
         base_semantic_types=sem_types,
         sample_weight_train=sw_lat,
+        groups_cal=grp_cal,
+        time_order_cal=time_cal,
     )
 
     vp_credo = lattice.predict_proba(Xb_val_e, Z_val_lattice)
@@ -425,6 +498,7 @@ def run_multi_channel_cohort_benchmark(
     return {
         "cohort_name": cohort.name,
         "seed": seed,
+        "disjoint_test_blocks": bool(cohort.disjoint_test_blocks),
         "split_hash": split.split_hash,
         "n_train": int(tr_i.size),
         "n_test_evaluated": int(y_tst_e.size),
@@ -666,6 +740,12 @@ def run_multiseed_paper_campaign(
         except ValueError:
             p_w = 1.0
 
+        nb_smote = nadeau_bengio_ttest(
+            smote_deltas,
+            n_test=int(round(runs[0]["n_rows"] * 0.15)),
+            n_train=int(round(runs[0]["n_rows"] * 0.55)),
+            disjoint_test_blocks=False,
+        )
         tier1_summary.append(
             {
                 "dataset_key": spec.key,
@@ -689,6 +769,8 @@ def run_multiseed_paper_campaign(
                 "smote_minus_gbdt_auprc": _agg_mean_sd(smote_deltas),
                 "uncal_smote_ece_degradation": _agg_mean_sd(ece_deg),
                 "wilcoxon_one_sided_p": p_w,
+                "nadeau_bengio_one_sided_p": nb_smote.p_value_one_sided,
+                "nadeau_bengio_ci95": [nb_smote.ci95_low, nb_smote.ci95_high],
             }
         )
 
@@ -768,6 +850,28 @@ def run_multiseed_paper_campaign(
             for r in runs
         ]
 
+        credo_minus_ens = [
+            r["arms"]["full_credo_lattice"]["auprc"]
+            - r["arms"]["monolithic_credo_ensemble"]["auprc"]
+            for r in runs
+        ]
+        is_indep = bool(
+            runs[0].get("disjoint_test_blocks", False)
+            or c_name == "Gate05_Synthetic_MultiMechanism"
+        )
+        nb_credo = nadeau_bengio_ttest(
+            credo_minus_base,
+            n_test=int(np.mean([r["n_test_evaluated"] for r in runs])),
+            n_train=int(np.mean([r["n_train"] for r in runs])),
+            disjoint_test_blocks=is_indep,
+        )
+        reg_prec = _agg_mean_sd(
+            [r["discovery_strategies"]["credo_reg"]["hidden_channel_precision"] for r in runs]
+        )
+        mi_prec = _agg_mean_sd(
+            [r["discovery_strategies"]["global_mi"]["hidden_channel_precision"] for r in runs]
+        )
+
         try:
             _, p_credo = wilcoxon(credo_minus_base, alternative="greater")
             p_credo_f = float(p_credo)
@@ -841,13 +945,24 @@ def run_multiseed_paper_campaign(
                     ]
                 ),
                 "ablation_ladder": ablation_table,
+                "credo_relevant_channel_precision": reg_prec,
+                "global_mi_relevant_channel_precision": mi_prec,
                 "credo_minus_base_auprc": _agg_mean_sd(credo_minus_base),
+                "credo_minus_equal_ensemble_auprc": _agg_mean_sd(credo_minus_ens),
                 "hybrid_minus_pure_orth_auprc": _agg_mean_sd(hybrid_minus_orth),
                 "credo_reg_minus_global_mi_auprc": _agg_mean_sd(credo_minus_mi),
                 "wilcoxon_credo_vs_base_p": p_credo_f,
+                "nadeau_bengio_credo_vs_base_p": nb_credo.p_value_one_sided,
+                "nadeau_bengio_ci95": [nb_credo.ci95_low, nb_credo.ci95_high],
                 "subtype_recall": subtype_agg,
             }
         )
+
+    # Apply Holm-Bonferroni FWER multiplicity adjustment across all 5 multi-channel cohorts!
+    raw_nb_ps = [c["nadeau_bengio_credo_vs_base_p"] for c in cohort_summaries]
+    holm_ps = holm_bonferroni_adjust(raw_nb_ps)
+    for c, hp in zip(cohort_summaries, holm_ps, strict=True):
+        c["holm_bonferroni_fwer_p"] = hp
 
     campaign = {
         "seeds": list(seeds),
@@ -1093,7 +1208,7 @@ def _write_latex_and_markdown_tables(
         "",
         (
             "| Dataset | $N$ | Test $n_+$ | Recall 95% Half-Width | Calibrated GBDT AUPRC | "
-            "SMOTE+GBDT AUPRC | $\\Delta$AUPRC (Mean $\\pm$ SD) | Wilcoxon $p$ |"
+            "SMOTE+GBDT AUPRC | $\\Delta$AUPRC (Mean $\\pm$ SD) | Nadeau-Bengio $p$ |"
         ),
         "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
@@ -1106,20 +1221,20 @@ def _write_latex_and_markdown_tables(
             f"$\\pm {r['recall_ci_half_width']:.3f}$ | "
             f"${gb['mean']:.4f} \\pm {gb['sd']:.4f}$ | "
             f"${sm['mean']:.4f} \\pm {sm['sd']:.4f}$ | "
-            f"${dl['mean']:+.4f} \\pm {dl['sd']:.4f}$ | {r['wilcoxon_one_sided_p']:.3f} |"
+            f"${dl['mean']:+.4f} \\pm {dl['sd']:.4f}$ | {r['nadeau_bengio_one_sided_p']:.3f} |"
         )
 
     md_lines.extend(
         [
             "",
-            "## Table 2: Multi-Channel 8-Arm Knockout Ablation Matrix (Test AUPRC, Mean $\\pm$ SD)",
+            "## Table 2: Multi-Channel 9-Arm Knockout Ablation Matrix (Test AUPRC, Mean $\\pm$ SD)",
             "",
             (
                 "| Cohort | A0: Base GBDT | A1: SMOTE | A2: Receipt Only | A3: Random Ch | "
-                "A4: Global MI | A5: CREDO REG Mono | A6: Pure Orth Lattice | "
-                "A7: Full CREDO ($\\kappa_0$ Hybrid) |"
+                "A4: Global MI | A5: CREDO REG Mono | A5b: 6-Model Ens | A6: Pure Orth Lattice | "
+                "A7: Full CREDO ($\\kappa_0$ Hybrid) | Holm-Bonferroni $p$ |"
             ),
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for c in cohorts:
@@ -1128,7 +1243,11 @@ def _write_latex_and_markdown_tables(
             f"${ab[k]['auprc']['mean']:.4f} \\pm {ab[k]['auprc']['sd']:.4f}$"
             for k, _ in ABLATION_LADDER_ORDER
         ]
-        md_lines.append(f"| **{c['cohort_name']}** | " + " | ".join(cells) + " |")
+        md_lines.append(
+            f"| **{c['cohort_name']}** | "
+            + " | ".join(cells)
+            + f" | {c['holm_bonferroni_fwer_p']:.4f} |"
+        )
 
     md_lines.extend(
         [

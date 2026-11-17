@@ -156,6 +156,9 @@ class TabularPreprocessor:
         return np.hstack(blocks).astype(np.float64, copy=False)
 
 
+_PLATT_EPS = 1e-15
+
+
 class PlattLogitCalibrator:
     """Monotonic logit-scale Platt calibrator fit on natural-prevalence calibration fold."""
 
@@ -170,9 +173,9 @@ class PlattLogitCalibrator:
         if int(y.sum()) < 5 or int((1 - y).sum()) < 5:
             self._active = False
             return self
-        z = logit(np.clip(np.asarray(raw_probs, dtype=float).ravel(), 1e-6, 1.0 - 1e-6)).reshape(
-            -1, 1
-        )
+        z = logit(
+            np.clip(np.asarray(raw_probs, dtype=float).ravel(), _PLATT_EPS, 1.0 - _PLATT_EPS)
+        ).reshape(-1, 1)
         self._lr.fit(z, y)
         # Enforce monotone non-decreasing calibration slope
         if float(self._lr.coef_[0, 0]) <= 0.0:
@@ -182,7 +185,7 @@ class PlattLogitCalibrator:
         return self
 
     def predict_proba(self, raw_probs: np.ndarray) -> np.ndarray:
-        p = np.clip(np.asarray(raw_probs, dtype=float).ravel(), 1e-6, 1.0 - 1e-6)
+        p = np.clip(np.asarray(raw_probs, dtype=float).ravel(), _PLATT_EPS, 1.0 - _PLATT_EPS)
         if not self._active:
             return p
         z = logit(p).reshape(-1, 1)
@@ -253,11 +256,13 @@ class FittedDecoderArm:
 
 
 def _make_lgbm(seed: int = 42, scale_pos_weight: float = 1.0, n_jobs: int = 4) -> LGBMClassifier:
+    """Create a Newton-stabilized GBDT (max_delta_step=1.0 prevents Hessian blowup)."""
     return LGBMClassifier(
         n_estimators=180,
         learning_rate=0.05,
         num_leaves=31,
         min_child_samples=15,
+        max_delta_step=1.0,
         subsample_for_bin=50000,
         scale_pos_weight=scale_pos_weight,
         random_state=seed,
@@ -287,6 +292,71 @@ def fit_single_calibrated_gbdt(
     arm = FittedDecoderArm(arm_name=arm_name, preprocessor=prep, estimators=[clf], calibrator=None)
     cal = PlattLogitCalibrator().fit(arm.predict_raw_proba(X_cal), y_cal)
     arm.calibrator = cal
+    return arm
+
+
+def fit_equal_capacity_monolithic_ensemble(
+    X_train: pd.DataFrame,
+    y_train: np.ndarray,
+    X_cal: pd.DataFrame,
+    y_cal: np.ndarray,
+    *,
+    semantic_types: dict[str, SemanticType] | None = None,
+    sample_weight: np.ndarray | None = None,
+    arm_name: str = "monolithic_credo_ensemble",
+    seed: int = 42,
+) -> FittedDecoderArm:
+    """Fit a 6-learner monolithic ensemble matching ConfirmRescueLattice's exact learner count.
+
+    Controls against model-count / bagging variance-reduction confounding in ablations:
+    trains 4 diverse seeded GBDTs + 1 FN-upweighted GBDT + 1 Penalized GLM on the joint
+    table ``[X_base, Z]`` and calibrates on ``X_cal``.
+    """
+    y_tr = np.asarray(y_train, dtype=int).ravel()
+    prep = TabularPreprocessor(semantic_types=semantic_types).fit(X_train)
+    X_tr = prep.transform(X_train)
+
+    learners: list[object] = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        # 4 diverse GBDTs
+        for idx, (n_l, col_f) in enumerate(((31, 1.0), (23, 0.8), (39, 0.85), (19, 0.9))):
+            gb = LGBMClassifier(
+                n_estimators=180,
+                learning_rate=0.05,
+                num_leaves=n_l,
+                colsample_bytree=col_f,
+                subsample=0.85,
+                subsample_freq=1,
+                min_child_samples=15,
+                max_delta_step=1.0,
+                subsample_for_bin=50000,
+                random_state=seed + 17 * idx,
+                n_jobs=4,
+                verbose=-1,
+            )
+            gb.fit(X_tr, y_tr, sample_weight=sample_weight)
+            learners.append(gb)
+
+        # 5th learner: FN-upweighted GBDT (mirrors Rescue learner upweighting on joint table)
+        p0 = learners[0].predict_proba(X_tr)[:, 1]  # type: ignore[attr-defined]
+        pos_med = float(np.median(p0[y_tr == 1])) if np.any(y_tr == 1) else 0.2
+        fn_miss = (y_tr == 1) & (p0 <= pos_med)
+        rw = sample_weight.copy() if sample_weight is not None else np.ones(y_tr.size, dtype=float)
+        rw[fn_miss] *= 2.5
+        gb_rescue = _make_lgbm(seed=seed + 99)
+        gb_rescue.fit(X_tr, y_tr, sample_weight=rw)
+        learners.append(gb_rescue)
+
+        # 6th learner: Penalized Logistic Regression
+        glm = LogisticRegression(C=1.0, max_iter=600, random_state=seed)
+        glm.fit(X_tr, y_tr, sample_weight=sample_weight)
+        learners.append(glm)
+
+    arm = FittedDecoderArm(
+        arm_name=arm_name, preprocessor=prep, estimators=learners, calibrator=None
+    )
+    arm.calibrator = PlattLogitCalibrator().fit(arm.predict_raw_proba(X_cal), y_cal)
     return arm
 
 

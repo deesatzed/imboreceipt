@@ -6,8 +6,10 @@ import hashlib
 import io
 import urllib.request
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -195,6 +197,8 @@ def load_tier2_ai4i_maintenance(
     overstrain_nm_min = wear * torque
 
     rng = np.random.default_rng(seed)
+    rpm_arr = X_base["rotational_rpm"].to_numpy(dtype=float)
+    air_arr = X_base["air_temp_k"].to_numpy(dtype=float)
     Z_pool = pd.DataFrame(
         {
             "process_temp_k": proc_temp,
@@ -203,6 +207,10 @@ def load_tier2_ai4i_maintenance(
             "mechanical_power_w": mech_power_w,
             "tool_wear_min": wear,
             "overstrain_product": overstrain_nm_min,
+            # Realistic collinear baseline-echo decoy (secondary tachometer + ambient thermistor):
+            # exhibits genuine marginal MI with failure via RPM/air_temp, yet ZERO residual gain!
+            "redundant_tach_rpm_echo": rpm_arr + rng.normal(0.0, 18.0, size=len(df)),
+            "redundant_air_therm_echo": air_arr + rng.normal(0.0, 0.25, size=len(df)),
             "decoy_vibration_1": rng.normal(0.0, 1.0, size=len(df)),
             "decoy_ambient_humidity": rng.normal(50.0, 10.0, size=len(df)),
         }
@@ -226,6 +234,12 @@ def load_tier2_ai4i_maintenance(
             ("tool_wear_min", "overstrain_product"),
             acquisition_cost=1.0,
             mechanism_tag="TWF_OSF_wear",
+        ),
+        CandidateChannelSpec(
+            "ch_redundant_tach_proxy",
+            ("redundant_tach_rpm_echo", "redundant_air_therm_echo"),
+            acquisition_cost=1.0,
+            mechanism_tag="redundant_proxy",
         ),
         CandidateChannelSpec(
             "ch_decoy_vibration",
@@ -329,9 +343,13 @@ def load_tier2_taiwan_credit_panel(
     for c in bill_cols + pay_amt_cols + pay_stat_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-    # Rare high-exposure default event (default == 1 AND utilization > 55% of limit)
-    high_util = (df["BILL_AMT1"] / np.maximum(1000.0, limit_bal)) > 0.55
-    y_true = ((raw_default == 1) & high_util).to_numpy(dtype=int)
+    # Zero target circularity: restrict cohort STRICTLY on baseline month-6 standing (PAY_6 <= 0,
+    # i.e., accounts current 6 months prior, observed inside X_base!) and predict the 100%
+    # unmodified UCI ground-truth next-month default label!
+    baseline_current = df["PAY_6"].to_numpy(dtype=float) <= 0.0
+    df = df.loc[baseline_current].reset_index(drop=True)
+    y_true = raw_default[baseline_current].astype(int)
+    limit_bal = pd.to_numeric(df["LIMIT_BAL"], errors="coerce").fillna(1.0)
 
     X_base = pd.DataFrame(
         {
@@ -345,10 +363,12 @@ def load_tier2_taiwan_credit_panel(
         }
     )
 
-    csd_df = CriticalSlowingDownCompiler({"bill": bill_cols}).fit(df).transform(df)
-    eesh_df = MissingLineSilenceCompiler({"payment": pay_amt_cols}).fit(df).transform(df)
-    inv_df = (
-        ConservationMismatchCompiler(
+    # Stateful trajectory/invariant compilers MUST be fit strictly on train_idx after freeze_split!
+    raw_aux = df[bill_cols + pay_amt_cols].copy().reset_index(drop=True)
+    compiler_factories: list[Callable[[], Any]] = [
+        lambda: CriticalSlowingDownCompiler({"bill": bill_cols}),
+        lambda: MissingLineSilenceCompiler({"payment": pay_amt_cols}),
+        lambda: ConservationMismatchCompiler(
             [
                 ConservationRule(
                     "net_debt_surge",
@@ -357,17 +377,24 @@ def load_tier2_taiwan_credit_panel(
                     ("BILL_AMT3",),
                 )
             ]
-        )
-        .fit(df)
-        .transform(df)
+        ),
+    ]
+    csd_cols = (
+        "csd__bill__diff_base",
+        "csd__bill__log_var_inflation",
+        "csd__bill__ac1",
+        "csd__bill__slope",
+    )
+    eesh_inv_cols = (
+        "eesh__payment__silence_streak",
+        "eesh__payment__silence_hazard",
+        "inv__net_debt_surge__signed_z",
+        "inv__net_debt_surge__violation_abs",
     )
 
     rng = np.random.default_rng(seed)
     Z_pool = pd.concat(
         [
-            csd_df,
-            eesh_df,
-            inv_df,
             df[["PAY_3", "PAY_2", "PAY_1", "BILL_AMT1", "PAY_AMT1"]].rename(
                 columns={
                     "PAY_3": "precursor_pay_m3",
@@ -379,6 +406,12 @@ def load_tier2_taiwan_credit_panel(
             ),
             pd.DataFrame(
                 {
+                    # Redundant baseline bureau clone: nonlinear echo of X_base
+                    "redundant_bureau_limit_echo": np.log1p(np.maximum(0.0, limit_bal))
+                    + 0.35 * df["PAY_6"].to_numpy(dtype=float)
+                    + rng.normal(0, 0.20, len(df)),
+                    "redundant_m6_bill_echo": df["BILL_AMT6"].to_numpy(dtype=float)
+                    + rng.normal(0, 1200.0, len(df)),
                     "decoy_macro_idx": rng.normal(0, 1, len(df)),
                     "decoy_branch_noise": rng.normal(0, 1, len(df)),
                 }
@@ -396,15 +429,21 @@ def load_tier2_taiwan_credit_panel(
         ),
         CandidateChannelSpec(
             "ch_bill_csd_trajectory",
-            tuple(csd_df.columns) + ("latest_bill_m1",),
+            csd_cols + ("latest_bill_m1",),
             acquisition_cost=1.0,
             mechanism_tag="critical_slowing_down",
         ),
         CandidateChannelSpec(
             "ch_payment_silence_conservation",
-            tuple(eesh_df.columns) + tuple(inv_df.columns) + ("latest_pay_m1",),
+            eesh_inv_cols + ("latest_pay_m1",),
             acquisition_cost=1.0,
             mechanism_tag="missing_line_conservation",
+        ),
+        CandidateChannelSpec(
+            "ch_redundant_bureau_clone",
+            ("redundant_bureau_limit_echo", "redundant_m6_bill_echo"),
+            acquisition_cost=1.0,
+            mechanism_tag="redundant_proxy",
         ),
         CandidateChannelSpec(
             "ch_decoy_macro",
@@ -433,11 +472,11 @@ def load_tier2_taiwan_credit_panel(
         y_true=y_true,
         y_tilde=y_true.copy(),
         contract=DecisionContract(
-            task_name="Taiwan_Severe_Default",
-            target_precision=0.45,
+            task_name="Taiwan_BaselineCurrent_Default",
+            target_precision=0.55,
             max_fpr_budget=0.02,
             cost_fp=1.0,
-            cost_fn=20.0,
+            cost_fn=12.0,
             graded_action_cost_fp=0.20,
         ),
         acquisition_budget=2.0,
@@ -450,6 +489,8 @@ def load_tier2_taiwan_credit_panel(
             "initial_bill_m6": SemanticType.CONTINUOUS,
             "initial_status_m6": SemanticType.ORDINAL,
         },
+        raw_aux_df=raw_aux,
+        compiler_factories=compiler_factories,
     )
 
 
@@ -527,12 +568,20 @@ def load_tier2_diabetes130(
     )
 
     rng = np.random.default_rng(seed)
+    # Sanitize discharge_disposition_id so competing-censor codes {11,13,14,19,20,21}
+    # are masked to a neutral category and never create code-level circularity with censoring!
+    sanitized_disp = np.where(
+        competing_censor, "other_or_censored", df["discharge_disposition_id"].astype(str)
+    )
+    t_hosp = X_base["time_in_hospital"].fillna(3.0).to_numpy(dtype=float)
+    n_labs = X_base["num_lab_procedures"].fillna(40.0).to_numpy(dtype=float)
+
     Z_pool = pd.DataFrame(
         {
             "number_inpatient": pd.to_numeric(df["number_inpatient"], errors="coerce"),
             "number_emergency": pd.to_numeric(df["number_emergency"], errors="coerce"),
             "number_outpatient": pd.to_numeric(df["number_outpatient"], errors="coerce"),
-            "discharge_disposition_id": df["discharge_disposition_id"].astype(str),
+            "discharge_disposition_clean": sanitized_disp,
             "medical_specialty": df["medical_specialty"].astype(str),
             "number_diagnoses": pd.to_numeric(df["number_diagnoses"], errors="coerce"),
             "diag_1_chapter": df["diag_1"].astype(str).str.slice(0, 3),
@@ -542,8 +591,10 @@ def load_tier2_diabetes130(
             "diabetesMed": df["diabetesMed"].astype(str),
             "A1Cresult": df["A1Cresult"].astype(str),
             "max_glu_serum": df["max_glu_serum"].astype(str),
+            "redundant_intake_los_echo": t_hosp + rng.normal(0, 0.5, size=len(df)),
+            "redundant_lab_intensity_echo": n_labs + rng.normal(0, 3.0, size=len(df)),
             "decoy_ward_code": rng.integers(1, 15, size=len(df)).astype(str),
-            "decoy_ chart_noise": rng.normal(0, 1, size=len(df)),
+            "decoy_chart_noise": rng.normal(0, 1, size=len(df)),
         }
     )
 
@@ -556,7 +607,7 @@ def load_tier2_diabetes130(
         ),
         CandidateChannelSpec(
             "ch_discharge_routing",
-            ("discharge_disposition_id", "medical_specialty"),
+            ("discharge_disposition_clean", "medical_specialty"),
             acquisition_cost=1.0,
             mechanism_tag="care_transition",
         ),
@@ -579,8 +630,14 @@ def load_tier2_diabetes130(
             mechanism_tag="glycemic_panel",
         ),
         CandidateChannelSpec(
+            "ch_redundant_intake_proxy",
+            ("redundant_intake_los_echo", "redundant_lab_intensity_echo"),
+            acquisition_cost=1.0,
+            mechanism_tag="redundant_proxy",
+        ),
+        CandidateChannelSpec(
             "ch_decoy_ward",
-            ("decoy_ward_code", "decoy_ chart_noise"),
+            ("decoy_ward_code", "decoy_chart_noise"),
             acquisition_cost=1.0,
             mechanism_tag="decoy",
         ),
@@ -651,13 +708,18 @@ def load_tier2_credit_card_fraud(
     df["__y__"] = y_all
     df = df.sort_values("__seq_order__", kind="mergesort").reset_index(drop=True)
 
+    is_disjoint_windows = False
     if window_idx is not None and n_windows > 1:
-        span_frac = 0.76
+        # Strictly disjoint out-of-time test blocks across n_windows!
+        # With freeze_split assigning the final 15% to test, span_frac <= 0.52
+        # guarantees step_frac > 0.15 * span_frac so test intervals NEVER overlap!
+        span_frac = min(0.52, 1.0 / (1.0 + 0.23 * float(n_windows - 1)))
         step_frac = (1.0 - span_frac) / float(n_windows - 1)
         start_f = step_frac * float(window_idx)
         lo_i = int(round(start_f * len(df)))
         hi_i = min(len(df), int(round((start_f + span_frac) * len(df))))
         df = df.iloc[lo_i:hi_i].reset_index(drop=True)
+        is_disjoint_windows = True
 
     if max_negatives is not None:
         pos_df = df[df["__y__"] == 1]
@@ -679,9 +741,16 @@ def load_tier2_credit_card_fraud(
     )
 
     rng = np.random.default_rng(seed + 7)
+    # Redundant gateway echo of X_base (V1..V4 carry strong marginal fraud MI, testing whether
+    # Global MI wastes acquisition budget re-buying baseline PCA components!)
     Z_pool = pd.DataFrame(
         {
             **{f"V{i}": pd.to_numeric(df[f"V{i}"], errors="coerce") for i in range(6, 29)},
+            **{
+                f"redundant_v{i}_echo": X_base[f"V{i}"].to_numpy(dtype=float)
+                + rng.normal(0.0, 0.25, len(df))
+                for i in range(1, 5)
+            },
             "decoy_merchant_hash": rng.normal(0, 1, len(df)),
             "decoy_latency_ms": rng.exponential(20.0, len(df)),
         }
@@ -705,6 +774,12 @@ def load_tier2_credit_card_fraud(
             tuple(f"V{i}" for i in range(20, 29)),
             acquisition_cost=1.0,
             mechanism_tag="pca_block_C",
+        ),
+        CandidateChannelSpec(
+            "ch_redundant_gateway_echo",
+            tuple(f"redundant_v{i}_echo" for i in range(1, 5)),
+            acquisition_cost=1.0,
+            mechanism_tag="redundant_proxy",
         ),
         CandidateChannelSpec(
             "ch_decoy_gateway",
@@ -736,4 +811,5 @@ def load_tier2_credit_card_fraud(
         ),
         acquisition_budget=2.0,
         time_order=time_arr,
+        disjoint_test_blocks=is_disjoint_windows,
     )

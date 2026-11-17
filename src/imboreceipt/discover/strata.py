@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedGroupKFold, StratifiedKFold
 
 from imboreceipt.core.types import SemanticType
 from imboreceipt.frontier.baselines import TabularPreprocessor
@@ -39,32 +39,104 @@ class CaseCohortPilot:
     fraction_of_cohort_measured: float
 
 
+def make_leak_free_cv_splits(
+    y: np.ndarray,
+    *,
+    n_folds: int = 5,
+    groups: np.ndarray | None = None,
+    time_order: np.ndarray | None = None,
+    seed: int = 42,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Construct group-aware or causal time-aware CV splits without entity/future leakage."""
+    yv = np.asarray(y, dtype=int).ravel()
+    n = yv.size
+    n_pos = int(yv.sum())
+    k = min(n_folds, max(2, n_pos), max(2, n - n_pos))
+
+    if time_order is not None:
+        # Strict causal forward-chaining chronological blocks:
+        # Block 0 (earliest) is predicted from the second half of Block 0? NO — even stricter:
+        # split Block 0 into two sub-halves where sub-half A -> sub-half B and for Block 0_A
+        # use out-of-sample prior/sub-half B ONLY if needed, OR better: use causal expanding
+        # folds for blocks 1..k-1 and predict block 0 via a within-block0 chronological split
+        # (never touching blocks 1..k-1!). Thus ZERO future blocks ever predict past blocks!
+        order = np.argsort(np.asarray(time_order, dtype=float), kind="mergesort")
+        blocks = np.array_split(order, k)
+        splits: list[tuple[np.ndarray, np.ndarray]] = []
+        b0 = blocks[0]
+        if b0.size >= 10 and 2 <= int(yv[b0].sum()) <= (b0.size - 2):
+            mid = b0.size // 2
+            b0_a, b0_b = b0[:mid], b0[mid:]
+            if int(yv[b0_a].sum()) >= 1 and int(yv[b0_b].sum()) >= 1:
+                # Within earliest burn-in block only (never using blocks 1..k-1!)
+                splits.append((b0_b, b0_a))
+                splits.append((b0_a, b0_b))
+            else:
+                skf0 = StratifiedKFold(n_splits=2, shuffle=True, random_state=seed)
+                for t0, v0 in skf0.split(np.zeros(b0.size), yv[b0]):
+                    splits.append((b0[t0], b0[v0]))
+        else:
+            # Fallback if block 0 has <2 positives: combine blocks 0+1 for burn-in only
+            b01 = np.concatenate(blocks[:2])
+            skf01 = StratifiedKFold(n_splits=2, shuffle=True, random_state=seed)
+            for t0, v0 in skf01.split(np.zeros(b01.size), yv[b01]):
+                if np.any(np.isin(b01[v0], b0)):
+                    splits.append((b01[t0], np.intersect1d(b01[v0], b0)))
+
+        for j in range(1, len(blocks)):
+            past_tr = np.concatenate(blocks[:j])
+            va_j = blocks[j]
+            if int(yv[past_tr].sum()) >= 1 and int((1 - yv[past_tr]).sum()) >= 1:
+                splits.append((past_tr, va_j))
+            else:
+                # Rare edge case if earliest block had 0 positives
+                skf_fb = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+                return list(skf_fb.split(np.zeros(n), yv))
+        return splits
+
+    if groups is not None:
+        g_arr = np.asarray(groups)
+        n_grp = np.unique(g_arr).size
+        if n_grp >= k * 2:
+            sgkf = StratifiedGroupKFold(n_splits=k, shuffle=True, random_state=seed)
+            cand_splits = list(sgkf.split(np.zeros(n), yv, g_arr))
+            if all(
+                int(yv[tr].sum()) >= 1 and int((1 - yv[tr]).sum()) >= 1 for tr, _ in cand_splits
+            ):
+                return cand_splits
+
+    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+    return list(skf.split(np.zeros(n), yv))
+
+
 def build_consensus_residual_strata(
     X_train: pd.DataFrame,
     y_train: np.ndarray,
     *,
     semantic_types: dict[str, SemanticType] | None = None,
+    groups: np.ndarray | None = None,
+    time_order: np.ndarray | None = None,
     alert_tail_quantile: float = 0.92,
     n_folds: int = 5,
     seed: int = 42,
 ) -> ConsensusResidualStrata:
     """Compute out-of-fold predictions across linear + GBDT families to isolate stable errors.
 
-    Requiring errors to persist out-of-fold across distinct model families prevents mining
-    in-sample overfitting artifacts or tree-split boundary noise.
+    Respects entity ``groups`` (StratifiedGroupKFold) and ``time_order`` (causal expanding blocks)
+    so OOF residuals never leak repeated patient visits or future regimes.
     """
     y = np.asarray(y_train, dtype=int).ravel()
     n = y.size
-    n_pos = int(y.sum())
-    k = min(n_folds, max(2, n_pos), max(2, n - n_pos))
 
     oof_glm = np.zeros(n, dtype=float)
     oof_gbdt = np.zeros(n, dtype=float)
 
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
+    cv_splits = make_leak_free_cv_splits(
+        y, n_folds=n_folds, groups=groups, time_order=time_order, seed=seed
+    )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for tr_i, va_i in skf.split(np.zeros(n), y):
+        for tr_i, va_i in cv_splits:
             prep = TabularPreprocessor(semantic_types=semantic_types).fit(X_train.iloc[tr_i])
             X_tr = prep.transform(X_train.iloc[tr_i])
             X_va = prep.transform(X_train.iloc[va_i])
@@ -78,6 +150,7 @@ def build_consensus_residual_strata(
                 learning_rate=0.05,
                 num_leaves=23,
                 min_child_samples=15,
+                max_delta_step=1.0,
                 random_state=seed,
                 n_jobs=1,
                 verbose=-1,

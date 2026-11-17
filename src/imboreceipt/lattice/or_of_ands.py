@@ -12,9 +12,9 @@ from lightgbm import LGBMClassifier
 from scipy.special import expit, logit
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score
-from sklearn.model_selection import StratifiedKFold
 
 from imboreceipt.core.types import SemanticType
+from imboreceipt.discover.strata import make_leak_free_cv_splits
 from imboreceipt.frontier.baselines import (
     FittedDecoderArm,
     PlattLogitCalibrator,
@@ -26,6 +26,8 @@ from imboreceipt.lattice.coincidence import (
     TailCoincidenceReport,
     estimate_tail_coincidence_surrogate,
 )
+
+_LOGIT_EPS = 1e-15
 
 
 @dataclass(slots=True)
@@ -42,8 +44,15 @@ class MechanismBranch:
     tau_rescue: float = 0.9
 
 
-def _oof_platt_probs(raw_probs: np.ndarray, y: np.ndarray, seed: int = 42) -> np.ndarray:
-    """Cross-fit Platt calibration on calibration fold to prevent in-fold meta-overfitting."""
+def _oof_platt_probs(
+    raw_probs: np.ndarray,
+    y: np.ndarray,
+    *,
+    groups: np.ndarray | None = None,
+    time_order: np.ndarray | None = None,
+    seed: int = 42,
+) -> np.ndarray:
+    """Cross-fit Platt calibration on calibration fold respecting groups/time order."""
     yv = np.asarray(y, dtype=int).ravel()
     rp = np.asarray(raw_probs, dtype=float).ravel()
     n_pos = int(yv.sum())
@@ -52,9 +61,11 @@ def _oof_platt_probs(raw_probs: np.ndarray, y: np.ndarray, seed: int = 42) -> np
         return PlattLogitCalibrator().fit(rp, yv).predict_proba(rp)
 
     k = min(3, n_pos, n_neg)
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
-    oof = np.empty_like(rp)
-    for tr, va in skf.split(np.zeros(yv.size), yv):
+    splits = make_leak_free_cv_splits(
+        yv, n_folds=k, groups=groups, time_order=time_order, seed=seed
+    )
+    oof = np.full_like(rp, float(yv.mean()))
+    for tr, va in splits:
         cal = PlattLogitCalibrator().fit(rp[tr], yv[tr])
         oof[va] = cal.predict_proba(rp[va])
     return oof
@@ -118,6 +129,8 @@ class ConfirmRescueLattice:
         *,
         base_semantic_types: dict[str, SemanticType] | None = None,
         sample_weight_train: np.ndarray | None = None,
+        groups_cal: np.ndarray | None = None,
+        time_order_cal: np.ndarray | None = None,
     ) -> ConfirmRescueLattice:
         """Fit Scout, Confirmation, Rescue, and Coupled arms; route via kappa_0 without leakage."""
         y_tr = np.asarray(y_train, dtype=int).ravel()
@@ -138,7 +151,11 @@ class ConfirmRescueLattice:
         )
         scout_tr_p = self.scout_arm_.predict_proba(X_base_train)
         scout_cal_oof = _oof_platt_probs(
-            self.scout_arm_.predict_raw_proba(X_base_cal), y_c, seed=self.seed
+            self.scout_arm_.predict_raw_proba(X_base_cal),
+            y_c,
+            groups=groups_cal,
+            time_order=time_order_cal,
+            seed=self.seed,
         )
 
         # Upweight Scout false negatives on training fold for Rescue learners
@@ -175,6 +192,7 @@ class ConfirmRescueLattice:
                         learning_rate=0.05,
                         num_leaves=23,
                         min_child_samples=15,
+                        max_delta_step=1.0,
                         random_state=self.seed + idx,
                         n_jobs=4,
                         verbose=-1,
@@ -182,7 +200,13 @@ class ConfirmRescueLattice:
                     clf_b.fit(Zb_tr, y_tr, sample_weight=sample_weight_train)  # type: ignore[attr-defined]
             arm_b = FittedDecoderArm(f"confirm_{ch_id}", prep_b, [clf_b], None)
             raw_b_cal = arm_b.predict_raw_proba(Z_c)
-            b_cal_oof = _oof_platt_probs(raw_b_cal, y_c, seed=self.seed + idx)
+            b_cal_oof = _oof_platt_probs(
+                raw_b_cal,
+                y_c,
+                groups=groups_cal,
+                time_order=time_order_cal,
+                seed=self.seed + idx,
+            )
             arm_b.calibrator = PlattLogitCalibrator().fit(raw_b_cal, y_c)
             cal_b_oof_list.append(b_cal_oof)
 
@@ -217,7 +241,11 @@ class ConfirmRescueLattice:
                 seed=self.seed + 100 + idx,
             )
             c_cal_oof = _oof_platt_probs(
-                arm_c.predict_raw_proba(XZ_c), y_c, seed=self.seed + 100 + idx
+                arm_c.predict_raw_proba(XZ_c),
+                y_c,
+                groups=groups_cal,
+                time_order=time_order_cal,
+                seed=self.seed + 100 + idx,
             )
             cal_c_oof_list.append(c_cal_oof)
 
@@ -275,20 +303,30 @@ class ConfirmRescueLattice:
 
             # Cross-fitted OOF predictions on CAL (leaving VAL 100% untouched for thresholds!)
             p_coup_cal_oof = _oof_platt_probs(
-                self.coupled_arm_.predict_raw_proba(all_cal), y_c, seed=self.seed + 300
+                self.coupled_arm_.predict_raw_proba(all_cal),
+                y_c,
+                groups=groups_cal,
+                time_order=time_order_cal,
+                seed=self.seed + 300,
             )
             if int(y_c.sum()) >= 6 and int((1 - y_c).sum()) >= 6:
-                skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=self.seed)
-                p_orth_cal_oof = np.empty(y_c.size, dtype=float)
-                for tr_k, va_k in skf.split(np.zeros(y_c.size), y_c):
+                cal_splits = make_leak_free_cv_splits(
+                    y_c,
+                    n_folds=3,
+                    groups=groups_cal,
+                    time_order=time_order_cal,
+                    seed=self.seed,
+                )
+                p_orth_cal_oof = np.full(y_c.size, float(y_c.mean()), dtype=float)
+                for tr_k, va_k in cal_splits:
                     lr_k = LogisticRegression(C=0.8, max_iter=500, random_state=self.seed)
                     lr_k.fit(F_cal_oof[tr_k], y_c[tr_k])
                     p_orth_cal_oof[va_k] = lr_k.predict_proba(F_cal_oof[va_k])[:, 1]
             else:
                 p_orth_cal_oof = self._predict_orth_proba(X_base_cal, Z_channels_cal)
 
-            llr_orth_c = logit(np.clip(p_orth_cal_oof, 1e-6, 1.0 - 1e-6))
-            llr_coup_c = logit(np.clip(p_coup_cal_oof, 1e-6, 1.0 - 1e-6))
+            llr_orth_c = logit(np.clip(p_orth_cal_oof, _LOGIT_EPS, 1.0 - _LOGIT_EPS))
+            llr_coup_c = logit(np.clip(p_coup_cal_oof, _LOGIT_EPS, 1.0 - _LOGIT_EPS))
 
             # Prior weight on orth lattice: ~0.85 when kappa_0 <= 1.1, ~0.15 when kappa_0 >= 2.5
             prior_w_orth = float(
@@ -298,20 +336,24 @@ class ConfirmRescueLattice:
             best_obj = -1e9
             best_w = prior_w_orth
             if int(y_c.sum()) >= 6 and int((1 - y_c).sum()) >= 20:
+                # Empirical-Bayes shrinkage scales inversely with calibration positives n_+^cal
+                # preventing meta-selection overfitting on small calibration folds!
+                shrink_strength = max(0.03, 3.0 / max(6.0, float(y_c.sum())))
                 for cand_w in (0.0, 0.20, 0.40, 0.60, 0.80, 1.0):
                     blend_p = expit(cand_w * llr_orth_c + (1.0 - cand_w) * llr_coup_c)
                     ap = float(average_precision_score(y_c, blend_p))
                     tau_np = select_neyman_pearson_threshold(y_c, blend_p, self.max_fpr_budget)
                     np_tpr = float(np.mean(blend_p[y_c == 1] >= tau_np))
-                    prior_pen = 0.02 * ((cand_w - prior_w_orth) ** 2)
+                    prior_pen = shrink_strength * ((cand_w - prior_w_orth) ** 2)
                     obj = 0.55 * ap + 0.45 * np_tpr - prior_pen
                     if obj > best_obj:
                         best_obj = obj
                         best_w = cand_w
 
             self.orthogonal_lattice_weight_ = best_w
-            raw_blend_cal = expit(best_w * llr_orth_c + (1.0 - best_w) * llr_coup_c)
-            self._hybrid_calibrator = PlattLogitCalibrator().fit(raw_blend_cal, y_c)
+            # Do NOT refit a 3rd post-selection Platt calibrator on the same y_c fold:
+            # convex log-odds blend of two calibrated models stays calibrated!
+            self._hybrid_calibrator = None
 
         self._fitted = True
         return self
@@ -323,21 +365,21 @@ class ConfirmRescueLattice:
         c_prob_list: list[np.ndarray],
     ) -> np.ndarray:
         pi_logit = float(logit(self._prevalence))
-        ps = np.clip(p_scout, 1e-6, 1.0 - 1e-6)
+        ps = np.clip(p_scout, _LOGIT_EPS, 1.0 - _LOGIT_EPS)
         llr_scout = logit(ps) - pi_logit
 
         confirm_sum = np.zeros(ps.size, dtype=float)
-        rescue_max = np.full(ps.size, -10.0, dtype=float)
+        rescue_max = np.full(ps.size, -30.0, dtype=float)
         and_synergy = np.zeros(ps.size, dtype=float)
 
         for br, pb_raw, pc_raw in zip(self.branches_, b_prob_list, c_prob_list, strict=True):
-            pb = np.clip(pb_raw, 1e-6, 1.0 - 1e-6)
+            pb = np.clip(pb_raw, _LOGIT_EPS, 1.0 - _LOGIT_EPS)
             llr_b = logit(pb) - pi_logit
             confirm_sum += br.orthogonality_weight * llr_b
             and_synergy += (
                 br.orthogonality_weight * np.maximum(0.0, llr_scout) * np.maximum(0.0, llr_b)
             )
-            pc = np.clip(pc_raw, 1e-6, 1.0 - 1e-6)
+            pc = np.clip(pc_raw, _LOGIT_EPS, 1.0 - _LOGIT_EPS)
             llr_c = logit(pc) - pi_logit
             rescue_max = np.maximum(rescue_max, llr_c)
 
@@ -502,8 +544,8 @@ class ConfirmRescueLattice:
         else:
             p_coup = self.coupled_arm_.predict_proba(self._concat_all(X_base, Z_channels))
             raw_blend = expit(
-                w * logit(np.clip(p_orth, 1e-6, 1.0 - 1e-6))
-                + (1.0 - w) * logit(np.clip(p_coup, 1e-6, 1.0 - 1e-6))
+                w * logit(np.clip(p_orth, _LOGIT_EPS, 1.0 - _LOGIT_EPS))
+                + (1.0 - w) * logit(np.clip(p_coup, _LOGIT_EPS, 1.0 - _LOGIT_EPS))
             )
 
         if self._hybrid_calibrator is not None:

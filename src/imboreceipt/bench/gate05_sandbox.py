@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,6 +42,29 @@ class MultiChannelCohort:
     competing_censor_mask: np.ndarray | None = None
     receipt_cols: list[str] | None = None
     mechanism_subtype: np.ndarray | None = None
+    raw_aux_df: pd.DataFrame | None = None
+    compiler_factories: list[Callable[[], Any]] | None = None
+    disjoint_test_blocks: bool = False
+
+    def materialize_z_splits(
+        self,
+        train_idx: np.ndarray,
+        *other_idxs: np.ndarray,
+    ) -> list[pd.DataFrame]:
+        """Fit stateful compilers strictly on ``train_idx`` and return materialized Z splits."""
+        all_idxs = (train_idx, *other_idxs)
+        base_parts = [self.Z_pool.iloc[idx].reset_index(drop=True) for idx in all_idxs]
+        if self.raw_aux_df is None or not self.compiler_factories:
+            return base_parts
+
+        aux_tr = self.raw_aux_df.iloc[train_idx].reset_index(drop=True)
+        fitted_compilers = [fac().fit(aux_tr) for fac in self.compiler_factories]
+        out: list[pd.DataFrame] = []
+        for base_df, idx in zip(base_parts, all_idxs, strict=True):
+            aux_sub = self.raw_aux_df.iloc[idx].reset_index(drop=True)
+            comp_dfs = [comp.transform(aux_sub) for comp in fitted_compilers]
+            out.append(pd.concat([base_df, *comp_dfs], axis=1))
+        return out
 
 
 def generate_gate05_cohort(
@@ -138,7 +163,7 @@ def generate_gate05_cohort(
     miss_m = rng.uniform(size=n_samples) < expit(-2.2 - 0.8 * stress_load)
     X_base.loc[miss_m, "scout_signal"] = np.nan
 
-    # Construct raw longitudinal & auxiliary columns to feed mechanistic compilers cleanly
+    # Raw longitudinal & auxiliary columns; stateful compilers MUST be fit strictly on train!
     raw_aux = pd.DataFrame(
         {
             **{f"traj_t{t}": traj[:, t] for t in range(6)},
@@ -147,23 +172,24 @@ def generate_gate05_cohort(
             "flow_out": observed_outflow,
         }
     )
-    # CriticalSlowingDownCompiler is row-wise stateless; expose modular channels in Z_pool:
-    csd_feats = (
-        CriticalSlowingDownCompiler({"vital": [f"traj_t{t}" for t in range(6)]})
-        .fit(raw_aux)
-        .transform(raw_aux)
-    )
-    eesh_feats = (
-        MissingLineSilenceCompiler({"heartbeat": [f"cad_t{t}" for t in range(6)]})
-        .fit(raw_aux)
-        .transform(raw_aux)
-    )
-    inv_feats = (
-        ConservationMismatchCompiler(
+    compiler_factories: list[Callable[[], Any]] = [
+        lambda: CriticalSlowingDownCompiler({"vital": [f"traj_t{t}" for t in range(6)]}),
+        lambda: MissingLineSilenceCompiler({"heartbeat": [f"cad_t{t}" for t in range(6)]}),
+        lambda: ConservationMismatchCompiler(
             [ConservationRule("ledger", "flow_balance", ("flow_in",), ("flow_out",))]
-        )
-        .fit(raw_aux)
-        .transform(raw_aux)
+        ),
+    ]
+    csd_cols = (
+        "csd__vital__diff_base",
+        "csd__vital__log_var_inflation",
+        "csd__vital__ac1",
+        "csd__vital__slope",
+    )
+    eesh_inv_cols = (
+        "eesh__heartbeat__silence_streak",
+        "eesh__heartbeat__silence_hazard",
+        "inv__ledger__signed_z",
+        "inv__ledger__violation_abs",
     )
 
     # Orthogonal confirmation channel (independent of u_fp) vs Confounded channel (shares u_fp)
@@ -174,23 +200,15 @@ def generate_gate05_cohort(
     # stress_load, PLUS shares u_fp with X_base so its false positives collide (kappa_0 >> 1)!
     z_confounded = 1.1 * stress_load + 2.1 * u_fp + 0.35 * y_orth + rng.normal(0, 0.7, n_samples)
 
-    Z_pool = pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "z_orth_bio1": z_orth_1,
-                    "z_orth_bio2": z_orth_2,
-                    "z_confounded_fp": z_confounded,
-                    "z_global_weak": 0.45 * stress_load + rng.normal(0, 1.0, n_samples),
-                    "z_decoy_noise1": rng.normal(0, 1.0, n_samples),
-                    "z_decoy_noise2": rng.laplace(0, 1.0, n_samples),
-                }
-            ),
-            csd_feats,
-            eesh_feats,
-            inv_feats,
-        ],
-        axis=1,
+    Z_pool = pd.DataFrame(
+        {
+            "z_orth_bio1": z_orth_1,
+            "z_orth_bio2": z_orth_2,
+            "z_confounded_fp": z_confounded,
+            "z_global_weak": 0.45 * stress_load + rng.normal(0, 1.0, n_samples),
+            "z_decoy_noise1": rng.normal(0, 1.0, n_samples),
+            "z_decoy_noise2": rng.laplace(0, 1.0, n_samples),
+        }
     )
 
     candidates = [
@@ -202,13 +220,13 @@ def generate_gate05_cohort(
         ),
         CandidateChannelSpec(
             "ch_csd_dynamics",
-            tuple(csd_feats.columns),
+            csd_cols,
             acquisition_cost=1.0,
             mechanism_tag="critical_slowing_down",
         ),
         CandidateChannelSpec(
             "ch_conservation_silence",
-            tuple(eesh_feats.columns) + tuple(inv_feats.columns),
+            eesh_inv_cols,
             acquisition_cost=1.0,
             mechanism_tag="conservation_and_missing_line",
         ),
@@ -296,4 +314,6 @@ def generate_gate05_cohort(
         competing_censor_mask=comp_censor,
         receipt_cols=["monitoring_orders"],
         mechanism_subtype=subtype,
+        raw_aux_df=raw_aux,
+        compiler_factories=compiler_factories,
     )

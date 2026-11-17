@@ -14,7 +14,11 @@ from sklearn.linear_model import LogisticRegression
 
 from imboreceipt.contract.decision import DecisionContract, instance_evidence_deficit
 from imboreceipt.core.types import SemanticType
-from imboreceipt.discover.strata import CaseCohortPilot, ConsensusResidualStrata
+from imboreceipt.discover.strata import (
+    CaseCohortPilot,
+    ConsensusResidualStrata,
+    make_leak_free_cv_splits,
+)
 from imboreceipt.frontier.baselines import TabularPreprocessor
 
 
@@ -65,23 +69,25 @@ def _fit_channel_oof_signal(
     Z_df: pd.DataFrame,
     y: np.ndarray,
     sample_weight: np.ndarray | None = None,
+    *,
+    groups: np.ndarray | None = None,
+    time_order: np.ndarray | None = None,
     seed: int = 42,
 ) -> np.ndarray:
-    """Compute cross-validated channel probability score on the pilot sample."""
+    """Compute leak-free (group/time-respecting) cross-validated channel score on pilot."""
     n = y.size
     n_pos = int(y.sum())
     if n_pos < 4 or (n - n_pos) < 4:
         return np.full(n, float(y.mean()), dtype=float)
 
-    from sklearn.model_selection import StratifiedKFold
-
-    k = min(4, n_pos, n - n_pos)
-    skf = StratifiedKFold(n_splits=k, shuffle=True, random_state=seed)
-    oof = np.zeros(n, dtype=float)
+    cv_splits = make_leak_free_cv_splits(
+        y, n_folds=4, groups=groups, time_order=time_order, seed=seed
+    )
+    oof = np.full(n, float(y.mean()), dtype=float)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        for tr, va in skf.split(np.zeros(n), y):
+        for tr, va in cv_splits:
             prep = TabularPreprocessor().fit(Z_df.iloc[tr])
             X_tr = prep.transform(Z_df.iloc[tr])
             X_va = prep.transform(Z_df.iloc[va])
@@ -95,6 +101,7 @@ def _fit_channel_oof_signal(
                     learning_rate=0.05,
                     num_leaves=15,
                     min_child_samples=10,
+                    max_delta_step=1.0,
                     random_state=seed,
                     n_jobs=1,
                     verbose=-1,
@@ -113,6 +120,8 @@ def score_channels_credo_reg(
     pilot: CaseCohortPilot,
     contract: DecisionContract,
     *,
+    groups_train: np.ndarray | None = None,
+    time_order_train: np.ndarray | None = None,
     fdr_q: float = 0.10,
     seed: int = 42,
 ) -> list[ChannelScoreRecord]:
@@ -122,7 +131,8 @@ def score_channels_credo_reg(
     1. Computes conditional ``REG(B | A) = P(B=1 | A, Y=1) / P(B=1 | A, Y=0)`` inside the
        score-matched alert/residual stratum ``A`` PLUS rescue gain on baseline false negatives.
     2. Penalizes channels whose false positives coincide strongly with the baseline channel
-       among true negatives (high ``kappa_0``).
+       among true negatives (high ``kappa_0``) or merely echo ``X_base`` without incremental
+       conditional log-likelihood gain beyond ``base_p``.
     3. Measures covered Base-Rate Evidence Deficit ``D_q(x)`` per unit acquisition cost,
        subject to Benjamini-Hochberg FDR control.
     """
@@ -133,6 +143,8 @@ def score_channels_credo_reg(
     y_p = y_full[idx]
     w_p = pilot.sampling_weights
     base_p = strata.oof_consensus_prob[idx]
+    grp_p = groups_train[idx] if groups_train is not None else None
+    time_p = time_order_train[idx] if time_order_train is not None else None
     deficits = instance_evidence_deficit(base_p, prev, contract.target_precision)
 
     # Alert/ambiguous stratum A on pilot + missed FN rescue stratum
@@ -143,13 +155,40 @@ def score_channels_credo_reg(
     raw_records: list[tuple[CandidateChannelSpec, float, float, float, float, float]] = []
 
     for cand in candidates:
-        Z_sub = Z_pool_train.iloc[idx][list(cand.columns)]
-        z_prob = _fit_channel_oof_signal(Z_sub, y_p, sample_weight=w_p, seed=seed)
+        Z_sub = Z_pool_train.iloc[idx][list(cand.columns)].reset_index(drop=True)
+        z_prob = _fit_channel_oof_signal(
+            Z_sub,
+            y_p,
+            sample_weight=w_p,
+            groups=grp_p,
+            time_order=time_p,
+            seed=seed,
+        )
+        # Incremental residualized signal: fit OOF model on [base_logit, Z_sub] vs base_logit
+        # so redundant baseline-proxy channels (Z = f(X_base) + noise) receive zero spurious lift!
+        base_logit_col = np.log(
+            np.clip(base_p, 1e-6, 1.0 - 1e-6) / np.clip(1.0 - base_p, 1e-6, 1.0)
+        )
+        joint_pilot_df = Z_sub.copy()
+        joint_pilot_df["__base_logit__"] = base_logit_col
+        joint_prob = _fit_channel_oof_signal(
+            joint_pilot_df,
+            y_p,
+            sample_weight=w_p,
+            groups=grp_p,
+            time_order=time_p,
+            seed=seed + 13,
+        )
+        # Excess log-odds impulse attributable to Z beyond X_base on the pilot
+        joint_logit = np.log(
+            np.clip(joint_prob, 1e-6, 1.0 - 1e-6) / np.clip(1.0 - joint_prob, 1e-6, 1.0)
+        )
+        delta_llr = joint_logit - base_logit_col
 
-        # Evaluate binary confirmation event B at upper-tail specificity (90th pct of pilot negs)
-        neg_z = z_prob[y_p == 0]
-        tau_b = float(np.quantile(neg_z, 0.88)) if neg_z.size > 0 else 0.5
-        B_event = z_prob >= tau_b
+        # Evaluate binary confirmation event B on incremental residual impulse delta_llr
+        neg_d = delta_llr[y_p == 0]
+        tau_b = float(np.quantile(neg_d, 0.88)) if neg_d.size > 0 else 0.0
+        B_event = delta_llr >= tau_b
 
         # 1. Conditional REG(B | A) inside matched high-score stratum A
         a_pos = in_alert & (y_p == 1)
@@ -171,11 +210,11 @@ def score_channels_credo_reg(
             [[int(tp_ab), int(fn_ab)], [raw_fp, raw_tn]], alternative="greater"
         )
 
-        # 2. Rescue REG on baseline misses (~A)
+        # 2. Rescue REG on baseline misses (~A) using incremental impulse delta_llr
         r_pos = in_fn_zone & (y_p == 1)
         r_neg = in_fn_zone & (y_p == 0)
-        tau_rescue = float(np.quantile(neg_z, 0.95)) if neg_z.size > 0 else 0.5
-        R_event = z_prob >= tau_rescue
+        tau_rescue = float(np.quantile(neg_d, 0.94)) if neg_d.size > 0 else 0.0
+        R_event = delta_llr >= tau_rescue
         tp_r = float(np.sum(R_event & r_pos))
         fn_r = float(np.sum((~R_event) & r_pos))
         fp_r = float(np.sum(w_p[r_neg] * R_event[r_neg]))
@@ -193,14 +232,16 @@ def score_channels_credo_reg(
         )
         p_best = float(min(1.0, 2.0 * min(p_confirm, p_rescue)))
 
-        # 3. Negative-tail coincidence ratio kappa_0(A, B) among pilot negatives
+        # 3. Negative-tail coincidence ratio kappa_0(A, B_standalone) among pilot negatives
         neg_only = y_p == 0
+        neg_z = z_prob[neg_only]
+        tau_z_raw = float(np.quantile(neg_z, 0.88)) if neg_z.size > 0 else 0.5
+        B_raw_neg = neg_z >= tau_z_raw
         w_neg = w_p[neg_only]
         p_a_neg = float(np.sum(w_neg * in_alert[neg_only]) / np.maximum(1e-9, np.sum(w_neg)))
-        p_b_neg = float(np.sum(w_neg * B_event[neg_only]) / np.maximum(1e-9, np.sum(w_neg)))
+        p_b_neg = float(np.sum(w_neg * B_raw_neg) / np.maximum(1e-9, np.sum(w_neg)))
         p_ab_neg = float(
-            np.sum(w_neg * (in_alert[neg_only] & B_event[neg_only]))
-            / np.maximum(1e-9, np.sum(w_neg))
+            np.sum(w_neg * (in_alert[neg_only] & B_raw_neg)) / np.maximum(1e-9, np.sum(w_neg))
         )
         kappa_0 = float((p_ab_neg + 1e-4) / (p_a_neg * p_b_neg + 1e-4))
 
@@ -246,6 +287,8 @@ def score_channels_baseline_strategy(
     candidates: list[CandidateChannelSpec],
     strata: ConsensusResidualStrata,
     *,
+    groups_train: np.ndarray | None = None,
+    time_order_train: np.ndarray | None = None,
     seed: int = 42,
 ) -> list[ChannelScoreRecord]:
     """Baseline channel-ranking strategies for CREDO-Bench Predictions 2 & 3 comparisons.
@@ -262,7 +305,10 @@ def score_channels_baseline_strategy(
 
     if strategy == "global_shap_gain":
         all_z_cols = [c for cand in candidates for c in cand.columns]
-        joint_df = pd.concat([X_base_train, Z_pool_train[all_z_cols]], axis=1)
+        joint_df = pd.concat(
+            [X_base_train.reset_index(drop=True), Z_pool_train[all_z_cols].reset_index(drop=True)],
+            axis=1,
+        )
         prep = TabularPreprocessor().fit(joint_df)
         X_j = prep.transform(joint_df)
         with warnings.catch_warnings():
@@ -271,6 +317,7 @@ def score_channels_baseline_strategy(
                 n_estimators=100,
                 learning_rate=0.05,
                 num_leaves=23,
+                max_delta_step=1.0,
                 importance_type="gain",
                 random_state=seed,
                 n_jobs=1,
@@ -319,7 +366,13 @@ def score_channels_baseline_strategy(
     elif strategy == "global_residual":
         resid = y.astype(float) - strata.oof_consensus_prob
         for cand in candidates:
-            z_prob = _fit_channel_oof_signal(Z_pool_train[list(cand.columns)], y, seed=seed)
+            z_prob = _fit_channel_oof_signal(
+                Z_pool_train[list(cand.columns)],
+                y,
+                groups=groups_train,
+                time_order=time_order_train,
+                seed=seed,
+            )
             # Global residual covariance without local tail matching or negative-orthogonality check
             cov = float(abs(np.corrcoef(resid, z_prob)[0, 1]))
             if not np.isfinite(cov):

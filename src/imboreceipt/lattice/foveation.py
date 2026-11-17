@@ -19,6 +19,7 @@ class ConformalFoveationReport(BaseModel):
     alpha_pos: float
     stage1_class0_coverage: float
     stage1_class1_coverage: float
+    stage1_class1_coverage_gap: float = 0.0
     stage1_passive_abstention_rate: float
     foveated_stage2_query_rate: float
     stage2_sensor_savings_fraction: float
@@ -136,12 +137,13 @@ class BinaryConformalFoveator:
             else p_hard
         )
 
-        # Arm A: Stage-1 only (acts only on confident {1} or p1 >= p_hard)
+        # Arm A: Stage-1 only WITH identical graded-action rights (no unfair handicap!)
         s1_hard = (only_1 | (p1 >= p_hard)).astype(int)
-        util_s1 = expected_net_utility_per_1k(yt, s1_hard, contract, None)
+        s1_graded = ((s1_hard == 0) & (p1 >= p_graded)).astype(int)
+        util_s1 = expected_net_utility_per_1k(yt, s1_hard, contract, s1_graded)
 
-        # Arm B: Two-Stage Conformal Foveation (queries Stage 2 only in ambiguous/borderline zone)
-        query_mask = ambiguous | (only_1 & (p1 < max(p_hard * 2.0, 0.35)))
+        # Arm B: Two-Stage Conformal Foveation (queries Stage 2 STRICTLY on |C_1(x)| != 1!)
+        query_mask = ambiguous
         query_rate = float(np.mean(query_mask))
         savings_frac = 1.0 - query_rate
 
@@ -151,6 +153,7 @@ class BinaryConformalFoveator:
         fov_hard[query_mask & (fov_probs >= tau_2_hard)] = 1
 
         fov_graded = np.zeros(yt.size, dtype=int)
+        fov_graded[(~query_mask) & (fov_hard == 0) & (p1 >= p_graded)] = 1
         fov_graded[query_mask & (fov_hard == 0) & (fov_probs >= p_graded)] = 1
 
         unresolved_after = (
@@ -179,6 +182,7 @@ class BinaryConformalFoveator:
             alpha_pos=self.alpha_pos,
             stage1_class0_coverage=cov_0,
             stage1_class1_coverage=cov_1,
+            stage1_class1_coverage_gap=max(0.0, (1.0 - self.alpha_pos) - cov_1),
             stage1_passive_abstention_rate=abstention_rate,
             foveated_stage2_query_rate=query_rate,
             stage2_sensor_savings_fraction=savings_frac,
