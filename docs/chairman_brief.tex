@@ -25,11 +25,11 @@
 \vspace{-3pt}
 \noindent\rule{\textwidth}{0.6pt}
 
-\textbf{The Thought Experiment Setup: Why Basic Intake Data Stalls}\\
-Imagine a patient is being discharged, and we want to predict if they will suffer an unplanned \textbf{30-day readmission} ($11.2\%$ base rate) so our care-transition team can intervene.
+\textbf{The Setup: Why Isn't Everything in the Stage-1 Intake Screen from Day 1?}
 \begin{itemize}
-  \item \textbf{What we have for free on every patient (``Stage-1 Intake Table''):} Just \textbf{7 basic registration fields}: \texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type}, \texttt{Admission Source}, \texttt{Length of Stay}, and \texttt{Total Lab Count}.
-  \item \textbf{The Bottleneck:} Using only those 7 basic fields, even our best calibrated gradient-boosted tree (\texttt{LightGBM}) achieves a Precision--Recall score (\texttt{AUPRC}) of just \textbf{\texttt{0.1305}} (barely above random guessing at \texttt{0.112}). Why? Because thousands of patients look \textbf{identical} on those 7 basic numbers.
+  \item \textbf{What if you DO put 100\% of columns into Stage 1?} We tested that first across \textbf{10 full-feature benchmarks (50 splits)}: even with $100\%$ of columns included upfront, once a table's information is exhausted, \texttt{SMOTE}, \texttt{ADASYN}, \texttt{EasyEnsemble}, and \texttt{RUSBoost} achieve \textbf{0 out of 10 statistically significant AUPRC wins} over calibrated \texttt{LightGBM}.
+  \item \textbf{Why Stage 1 vs.\ Stage 2 exists in real life:} In hospitals, banks, and fleets, data does not arrive in one free spreadsheet. \textbf{Stage 1} is what is free and instant at arrival (7 basic registration fields, a 1-page loan form, or a card-swipe header), whereas \textbf{Stage-2 channels} live in separate EHR modules, lab orders, or paid external Credit/Identity APIs (\texttt{Home Credit}'s 7 tables; \texttt{IEEE-CIS}'s identity table) that cost money, latency, or workups to pull.
+  \item \textbf{UCI Readmission Setup ($101,766$ stays, $11.2\%$ readmitted):} Using only the \textbf{7 free Stage-1 registration fields} (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type/Source}, \texttt{Length of Stay}, \texttt{Lab Count}), calibrated \texttt{LightGBM} gets just \textbf{\texttt{0.1305} AUPRC} (barely above random \texttt{0.112}) because thousands of patients look \textbf{identical} on those 7 numbers.
 \end{itemize}
 
 \textbf{Step 1: Why \texttt{SMOTE} \& Algorithm Tweaking Fail (\emph{Principle 1: You Can't Re-Sort a Tie})}\\[1pt]

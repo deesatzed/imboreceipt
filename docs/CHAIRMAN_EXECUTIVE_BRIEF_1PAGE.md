@@ -5,10 +5,10 @@
 
 ---
 
-### The Thought Experiment Setup: Why Basic Intake Data Stalls
-Imagine a patient is being discharged, and we want to predict if they will suffer an unplanned **30-day readmission** ($11.2\%$ base rate) so our care-transition team can intervene.
-* **What we have for free on every patient ("Stage-1 Intake Table"):** Just **7 basic registration fields**: `Age`, `Gender`, `Race`, `Admission Type`, `Admission Source`, `Length of Stay`, and `Total Lab Count`.
-* **The Bottleneck:** Using only those 7 basic fields, even our best calibrated gradient-boosted tree (`LightGBM`) achieves a Precision–Recall score (`AUPRC`) of just **`0.1305`** (barely above random guessing at `0.112`). Why? Because thousands of patients look **identical** on those 7 basic numbers.
+### The Thought Experiment Setup: Why Isn't Everything in the Stage-1 Intake Screen from Day 1?
+* **First, what if you DO put 100% of available columns into Stage 1?** We tested that across **10 full-feature benchmarks (50 splits)** in Table 1 of the paper: even with 100% of columns included upfront, once a table's information is exhausted, `SMOTE`, `ADASYN`, `EasyEnsemble`, and `RUSBoost` achieve **0 out of 10 statistically significant wins** over a calibrated `LightGBM` model.
+* **Why real-world systems split features into "Stage-1 (Free Intake)" vs. "Stage-2 (Costly Secondary Lookups)":** In medicine, banking, and industry, data does not arrive in one free spreadsheet. **Stage-1** is what you have for free in milliseconds at the front door (7 basic registration fields, a 1-page loan form, or a card-swipe header), whereas **Stage-2 channels** live in separate EHR modules, lab orders, or paid external Credit/Identity APIs (`Home Credit`'s 7 relational tables; `IEEE-CIS`'s identity table) that cost money, time, or compute to pull.
+* **Our UCI Hospital Readmission Setup ($101,766$ stays, $11.2\%$ 30-day readmission):** At admission (**Stage 1**), we have **7 free registration fields** (`Age`, `Gender`, `Race`, `Admission Type`, `Admission Source`, `Length of Stay`, `Total Lab Count`). Using only those 7 fields, our best calibrated `LightGBM` model gets an `AUPRC` of just **`0.1305`** (barely above random guessing at `0.112`) because thousands of patients look **identical** on those 7 basic numbers.
 
 ---
 
