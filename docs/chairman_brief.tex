@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage[margin=0.31in,top=0.17in,bottom=0.17in]{geometry}
+\usepackage[margin=0.30in,top=0.16in,bottom=0.16in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
@@ -9,15 +9,15 @@
 \usepackage{enumitem}
 
 \pagestyle{empty}
-\linespread{0.82}
+\linespread{0.78}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{1.0pt}
+\setlength{\parskip}{0.8pt}
 \setlist[itemize]{leftmargin=1.1em,itemsep=0pt,topsep=0pt,parsep=0pt}
 
 \begin{document}
 \small
-\setlength{\abovedisplayskip}{2pt}
-\setlength{\belowdisplayskip}{2pt}
+\setlength{\abovedisplayskip}{1.8pt}
+\setlength{\belowdisplayskip}{1.8pt}
 \setlength{\abovedisplayshortskip}{1pt}
 \setlength{\belowdisplayshortskip}{1pt}
 
@@ -26,56 +26,55 @@
 \vspace{-3pt}
 \noindent\rule{\textwidth}{0.6pt}
 
+\textbf{The Three Predicates of Our Thought Experiment:}
+Instead of treating rare-event prediction as an \textbf{algorithmic} problem (\texttt{SMOTE}, reweighting), we frame it around three information predicates: \textbf{(1) Define the Latent-Space Information Gap} between the current feature space and the target decision threshold; \textbf{(2) Exploit ``High-Signal False Positives''}---recognizing that aside from the rare True Positives themselves, the richest information about what the current model is missing lives in the High-Signal False Positives (look-alike false alarms that max out the baseline score); and \textbf{(3) Use a Two-Stage Process to Rescue Signal ``Lost in True-Negative Abundance''}---sweeping away the overwhelming sea of easy True Negatives ($89\%\text{--}99\%$ of rows) at Stage 1, then focusing Stage-2 features specifically on the upper-tail screening set where True Positives and High-Signal False Positives collide.
+
 \textbf{The Setup: Why Isn't Everything in the Stage-1 Intake Screen from Day 1?}
 \begin{itemize}
   \item \textbf{What if you DO put 100\% of columns into Stage 1?} We tested that first across \textbf{10 full-feature benchmarks (50 splits)}: even with $100\%$ of columns included upfront, once a table's information is exhausted, \texttt{SMOTE}, \texttt{ADASYN}, \texttt{EasyEnsemble}, and \texttt{RUSBoost} achieve \textbf{0 out of 10 statistically significant AUPRC wins} over calibrated \texttt{LightGBM}.
-  \item \textbf{Why Stage 1 vs.\ Stage 2 exists in real life:} In hospitals, banks, and fleets, data does not arrive in one free spreadsheet. \textbf{Stage 1} is what is free and instant at arrival (7 basic registration fields, a 1-page loan form, or a card-swipe header), whereas \textbf{Stage-2 channels} live in separate EHR modules, lab orders, or paid external Credit/Identity APIs (\texttt{Home Credit}'s 7 tables; \texttt{IEEE-CIS}'s identity table) that cost money, latency, or workups to pull.
-  \item \textbf{UCI Readmission Setup ($101,766$ stays, $11.2\%$ readmitted):} Using only the \textbf{7 free Stage-1 registration fields} (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type/Source}, \texttt{Length of Stay}, \texttt{Lab Count}), calibrated \texttt{LightGBM} gets just \textbf{\texttt{0.1305} AUPRC} (barely above random \texttt{0.112}) because thousands of patients look \textbf{identical} on those 7 numbers.
+  \item \textbf{Why Stage 1 vs.\ Stage 2 exists in real life:} In hospitals, banks, and fleets, \textbf{Stage 1} is what is free and instant at arrival (7 basic registration fields, a 1-page loan form, or a card-swipe header), whereas \textbf{Stage-2 channels} live in separate EHR modules, lab orders, or paid external Credit/Identity APIs (\texttt{Home Credit}'s 7 tables; \texttt{IEEE-CIS}'s identity table). Using only the \textbf{7 free Stage-1 registration fields} on UCI Readmission (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type/Source}, \texttt{Length of Stay}, \texttt{Lab Count}), calibrated \texttt{LightGBM} gets just \textbf{\texttt{0.1305} AUPRC} (barely above random \texttt{0.112}) because thousands of patients look \textbf{identical} on those 7 numbers.
 \end{itemize}
 
-\textbf{Step 1: Why \texttt{SMOTE} \& Algorithm Tweaking Fail (\emph{Principle 1: You Can't Re-Sort a Tie})}\\[1pt]
-\textbf{What a standard data science team tries first:} \emph{``Our score is only \texttt{0.1305} because readmissions are the minority class ($11.2\%$). Let's run \texttt{SMOTE} (synthetic minority oversampling) or increase the loss weight on readmitted patients!''}\\[1pt]
-\textbf{Watch what happens:} Picture \textbf{100 patients} who share the \textbf{exact same 7 intake numbers} (e.g., 65-year-old female, 4-day stay, 45 labs). In reality, \textbf{15 of them will be readmitted ($15\%$ true risk)} and \textbf{85 will recover fine ($85\%$ false alarms)}. Suppose our care team requires at least \textbf{$28\%$ confidence (precision)} before paying for a home-health nurse:
-\vspace{-4pt}
+\textbf{Step 1: Defining the Information Gap (\emph{Principle 1: You Can't Re-Sort a Tie})}\\[0.5pt]
+Picture \textbf{100 patients} who share the \textbf{exact same 7 intake numbers} (e.g., 65-year-old female, 4-day stay, 45 labs). In reality, \textbf{15 will be readmitted ($15\%$ true risk)} and \textbf{85 will recover fine ($85\%$ High-Signal False Positives)}. Suppose our care team requires at least \textbf{$28\%$ confidence (precision)} before paying for a home-health nurse:
+\vspace{-3pt}
 \[
-  \text{Information Gap} = \text{Target Confidence Needed } (28\%) \;-\; \text{Intake Confidence } (15\%) \;=\; +13\% \text{ gap}
+  \text{Information Gap} = \text{Target Confidence Needed } (28\%) \;-\; \text{Current Space Confidence } (15\%) \;=\; +13\% \text{ gap}
 \]
-\vspace{-6pt}
+\vspace{-5pt}
 \begin{itemize}
-  \item \textbf{Why \texttt{SMOTE} Hits a Brick Wall:} If you generate fake copies of the 15 readmitted patients (\texttt{SMOTE}) or multiply their training weight by $3\times$, the algorithm simply inflates the predicted score of \textbf{all 100 identical-looking patients together} from $15\%$ to $35\%$. It \textbf{never changes who ranks above whom}---the 85 false alarms stay mixed right in with the 15 true readmissions! Sure enough, \texttt{SMOTE} gets \textbf{\texttt{0.1295} AUPRC} (zero gain over \texttt{0.1305}; and across 10 standard benchmarks in our paper, \texttt{SMOTE}, \texttt{EasyEnsemble}, and \texttt{RUSBoost} win \textbf{0 out of 10 times}).
-  \item \textbf{Rule 1:} When $\text{Information Gap} > 0$, \textbf{stop tweaking the algorithm on the intake table}. The only way to separate the 15 true readmissions from the 85 look-alike false alarms is to pull a \textbf{second, independent data source (``Stage-2 data'')}.
+  \item \textbf{Why \texttt{SMOTE} Hits a Brick Wall:} Generating fake copies of the 15 readmitted patients (\texttt{SMOTE}) or multiplying their weight by $3\times$ simply inflates \textbf{all 100 identical-looking patients together} from $15\%$ to $35\%$. It \textbf{never changes who ranks above whom}---the 85 High-Signal False Positives stay mixed right in with the 15 True Positives (\texttt{SMOTE} gets \textbf{\texttt{0.1295} AUPRC}).
+  \item \textbf{Rule 1:} When $\text{Information Gap} > 0$, stop tweaking the algorithm on the intake space; you must bring in \textbf{Stage-2 features} to break the tie.
 \end{itemize}
 
-\textbf{Step 2: Picking Stage-2 Data Without Buying a ``Copycat'' (\emph{Principle 2: The Look-Alike Stress Test})}\\
-\textbf{The Choice:} Suppose the hospital EHR has \textbf{7 candidate Stage-2 data feeds} we could extract (\emph{1: Prior 12-Month Inpatient/ER Visits}, \emph{2: Discharge Disposition \& Specialty}, \emph{3: Diagnosis Count}, \emph{4: Medication Changes}, \emph{5: HbA1c/Glucose}, \emph{6: A ``Hospital Acuity Index'' that secretly just repackages Length-of-Stay + Lab Count}, and \emph{7: Random Ward Codes}). Our budget allows \textbf{2 channels}.
+\textbf{Step 2: Using ``High-Signal False Positives'' to Pick Stage-2 Features (\emph{Principle 2: Rescuing Signal Lost in True-Negative Abundance})}\\[0.5pt]
+\textbf{The Choice:} The hospital EHR has \textbf{7 candidate Stage-2 modules} (\emph{1: Prior Inpatient/ER Visits}, \emph{2: Discharge Disposition \& Specialty}, \emph{3: Diagnosis Count}, \emph{4: Medication Changes}, \emph{5: HbA1c/Glucose}, \emph{6: A ``Copycat Acuity Index'' that secretly repackages Length-of-Stay + Lab Count}, and \emph{7: Ward Noise}). Our budget allows \textbf{2 modules}.
 \begin{itemize}
-  \item \textbf{Why Standard Selection Gets Tricked:} If you compare readmitted patients against \textbf{random non-readmitted patients} (Unmatched Case-Control Mutual Information), a ``Copycat'' or general-illness channel looks great---because readmitted patients had longer stays than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at \textbf{\texttt{0.1979} AUPRC}.
-  \item \textbf{What \texttt{CREDO} Does Instead:} We match every true readmission against \textbf{4 ``Look-Alike False Alarms''}---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
+  \item \textbf{Why Global Selection Fails (Drowned in True-Negative Abundance):} If you score features globally or against random healthy patients (Unmatched Case-Control MI), the $89\%$ sea of easy True Negatives dominates the math---making a ``Copycat'' or general-illness feature look great because readmitted patients stayed longer than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at \textbf{\texttt{0.1979} AUPRC}.
+  \item \textbf{What \texttt{CREDO} Does Instead:} We pit every True Positive directly against \textbf{4 ``High-Signal False Positives''}---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
 \end{itemize}
-\vspace{-4pt}
+\vspace{-3pt}
 \[
-  \text{Relative Evidence Gain (REG)} = \tfrac{\text{\% of True Readmissions flagged by the candidate Stage-2 channel}}{\text{\% of Look-Alike False Alarms flagged by the candidate Stage-2 channel}}
+  \text{Relative Evidence Gain (REG)} = \tfrac{\text{\% of True Positives flagged by the Stage-2 feature}}{\text{\% of High-Signal False Positives flagged by the Stage-2 feature}}
 \]
-\vspace{-6pt}
+\vspace{-5pt}
 \begin{itemize}
-  \item \textbf{Watch the Look-Alike Stress Test:} (1) \textbf{Channel 6 (``Copycat Acuity Index''):} Because True Readmissions and Look-Alike False Alarms \emph{already} have the exact same Length-of-Stay and Lab Count, the Copycat Index flags both equally: $\text{REG} = \tfrac{30\%}{30\%} = \mathbf{1.0}$ (\textbf{Zero new info $\to$ Rejected!}). (2) \textbf{Channels 1 \& 2 (\emph{Prior Inpatient/ER Visits} + \emph{Discharge Routing}):} Among patients who looked identical at admission, those with prior hospitalizations and facility discharges bounce back far more often than their look-alikes: $\text{REG} \gg \mathbf{1.0}$ (\textbf{Selected on 5 / 5 splits!}).
-  \item \textbf{Result:} Testing only the matched pilot ($55.9\%$ of patients---saving $44.1\%$ of queries on Diabetes, and saving \textbf{82\%--99\%} on rarer $0.2\%\text{--}3.5\%$ cohorts), \texttt{CREDO} lifts AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$ vs.\ Unmatched MI, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
+  \item \textbf{Result:} Inside this matched upper-tail set, the ``Copycat Index'' flags both groups equally ($\text{REG} = \tfrac{30\%}{30\%} = \mathbf{1.0} \to \text{Rejected}$), while \emph{Prior Visits} + \emph{Discharge Routing} rescue the signal that was lost in True-Negative abundance ($\text{REG} \gg \mathbf{1.0} \to \text{Selected on 5 / 5 splits}$), lifting AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
 \end{itemize}
 
-\textbf{Step 3: At Discharge, Who Needs the Stage-2 Lookup? (\emph{Principle 3: Double-Checking the Red Bucket})}\\
-\textbf{The Live Triage Problem:} Now our system is live. Every patient gets the free 7-variable \textbf{Stage-1 Intake Screen} instantly. Pulling \textbf{Stage-2 Channels} on $100\%$ of patients is wasteful, so standard two-stage ``Conformal Prediction'' splits patients into three buckets based on their Stage-1 score: \textbf{Green $\{0\}$} (low score $\to$ skip Stage-2), \textbf{Yellow $\{0,1\}$} (middle score $\to$ pull Stage-2), and \textbf{Red $\{1\}$} (highest intake score $\to$ standard methods call this \emph{``Confident Positive''} and \textbf{skip Stage-2}).
+\textbf{Step 3: Two-Stage Screening at Discharge (\emph{Principle 3: Focusing Stage-2 on the Upper-Tail Screening Set})}\\[0.5pt]
+\textbf{The Live Triage Problem:} Standard two-stage ``Conformal Prediction'' splits Stage-1 predictions into \textbf{Green $\{0\}$} (easy True Negatives $\to$ skip Stage-2), \textbf{Yellow $\{0,1\}$} (uncertain middle $\to$ pull Stage-2), and \textbf{Red $\{1\}$} (top alerts $\to$ standard methods call this \emph{``Confident Positive''} and \textbf{skip Stage-2}).
 \begin{itemize}
   \item \textbf{Why Skipping the Red Bucket Fails (The Base-Rate Trap):} Look inside that Stage-1 \textbf{Red Bucket $\{1\}$}:
 \end{itemize}
-\vspace{-4pt}
+\vspace{-3pt}
 \[
-  \text{True Precision Inside the Red Bucket} = \tfrac{\text{Caught Readmissions}}{\text{Caught Readmissions} + \text{False Alarms}}
+  \text{True Precision Inside the Red Bucket} = \tfrac{\text{True Positives}}{\text{True Positives} + \text{High-Signal False Positives}}
 \]
-\vspace{-6pt}
+\vspace{-5pt}
 \begin{itemize}
-  \item Because readmission is only $11.2\%$ overall---and the 7 intake fields are weak (\texttt{0.1305})---\textbf{roughly 80\% of the patients in the Stage-1 Red Bucket are actually False Alarms} (patients who had a 6-day stay and 50 labs, but have \emph{zero} prior hospitalizations and are going home healthy)!
-  \item \textbf{Standard Conformal Routing (Yellow Bucket Only):} Skips the Red Bucket, leaving all those unverified Stage-1 false alarms sitting at the very top of the final risk list $\to$ drops to \textbf{\texttt{0.1981} AUPRC}.
-  \item \textbf{Our Fix (\texttt{CREDO} Red + Yellow Verification):} Safely skips the Green Bucket ($26.0\%$ of discharges saved on Diabetes; \textbf{41\%--79\% saved} on rarer cohorts) and \textbf{uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket}. Checking the Red Bucket weeds out the false alarms with zero prior hospitalizations and confirms the true high-risk patients, lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (and winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
+  \item Because readmission is $11.2\%$ overall and the 7 intake fields are weak, \textbf{roughly 80\% of the Stage-1 Red Bucket are High-Signal False Positives}! Standard Yellow-Only routing leaves those unverified false alarms at the top of the list (\textbf{\texttt{0.1981} AUPRC}).
+  \item \textbf{Our Fix (\texttt{CREDO} Two-Stage Foveation):} Sweeps away the Green Bucket of easy True Negatives ($26.0\%$ saved on Diabetes; \textbf{41\%--79\% saved} on rarer cohorts) and \textbf{applies Stage-2 features directly to the Red + Yellow upper-tail screening set}, weeding out the High-Signal False Positives and lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
 \end{itemize}
 
 \end{document}
