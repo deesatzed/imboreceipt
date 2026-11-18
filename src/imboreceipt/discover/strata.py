@@ -184,19 +184,46 @@ def build_consensus_residual_strata(
     )
 
 
+def adaptive_controls_per_positive(prevalence: float) -> int:
+    """Proposition 1 prevalence-adaptive case-cohort matching ratio m(pi).
+
+    - Regime I (moderate imbalance, pi >= 10%): m = 2 (avoids exhausting high-signal FPs
+      and cuts pilot measurement from 5*pi to 3*pi).
+    - Regime II (classic rare events, 0.5% <= pi < 10%): m = 4 (80% ARE knee at 5*pi).
+    - Regime III (ultra-rare events, pi < 0.5%): m = 8 (88.9% ARE, stabilizes denominator
+      while keeping pilot size (1+m)*pi < 4.5%).
+    """
+    pi = float(prevalence)
+    if pi >= 0.10:
+        return 2
+    if pi < 0.005:
+        return 8
+    return 4
+
+
 def sample_case_cohort_pilot(
     y_train: np.ndarray,
     oof_scores: np.ndarray,
     *,
-    controls_per_positive: int = 4,
+    controls_per_positive: int | None = 4,
     observation_propensity: np.ndarray | None = None,
     seed: int = 42,
 ) -> CaseCohortPilot:
-    """Sample all positives + score/propensity-matched controls for cheap channel evaluation."""
+    """Sample all positives + score/propensity-matched controls for cheap channel evaluation.
+
+    When ``controls_per_positive=None``, automatically applies Proposition 1's
+    prevalence-adaptive matching ratio ``adaptive_controls_per_positive(mean(y_train))``.
+    """
+    y_arr = np.asarray(y_train, dtype=int).ravel()
+    m_eff = (
+        adaptive_controls_per_positive(float(y_arr.mean()))
+        if controls_per_positive is None
+        else int(controls_per_positive)
+    )
     return _sample_case_cohort_impl(
-        y_train=y_train,
+        y_train=y_arr,
         oof_scores=oof_scores,
-        controls_per_positive=controls_per_positive,
+        controls_per_positive=m_eff,
         observation_propensity=observation_propensity,
         seed=seed,
     )

@@ -18,6 +18,7 @@ from imboreceipt.discover.selector import (
 from imboreceipt.discover.strata import (
     CaseCohortPilot,
     ConsensusResidualStrata,
+    adaptive_controls_per_positive,
     build_consensus_residual_strata,
     sample_case_cohort_pilot,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "CriticalSlowingDownCompiler",
     "MissingLineSilenceCompiler",
     "TypedFeatureDAGCompiler",
+    "adaptive_controls_per_positive",
     "benjamini_hochberg_mask",
     "build_consensus_residual_strata",
     "sample_case_cohort_pilot",

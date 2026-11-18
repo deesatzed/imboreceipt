@@ -8,6 +8,7 @@ import pandas as pd
 from imboreceipt.bench.gate05_sandbox import generate_gate05_cohort
 from imboreceipt.discover import (
     CriticalSlowingDownCompiler,
+    adaptive_controls_per_positive,
     build_consensus_residual_strata,
     sample_case_cohort_pilot,
     score_channels_baseline_strategy,
@@ -87,3 +88,22 @@ def test_prediction8_critical_slowing_down_lifts_transitions_not_memoryless_shoc
     auc_shock = roc_auc_score(y_shock, csd["csd__v__log_var_inflation"])
     assert auc_transition > 0.72
     assert abs(auc_shock - 0.50) < 0.05
+
+
+def test_proposition1_adaptive_controls_per_positive_regimes() -> None:
+    """Verify Proposition 1 prevalence-adaptive matching ratio m(pi) across all 3 regimes."""
+    assert adaptive_controls_per_positive(0.1867) == 2
+    assert adaptive_controls_per_positive(0.1116) == 2
+    assert adaptive_controls_per_positive(0.0350) == 4
+    assert adaptive_controls_per_positive(0.0017) == 8
+
+    rng = np.random.default_rng(7)
+    # Regime I (pi = 15%): adaptive m=2 cuts pilot size from 5*pi (~75%) to 3*pi (~45%)
+    y_mod = np.zeros(1000, dtype=int)
+    y_mod[:150] = 1
+    scores_mod = rng.uniform(0.0, 1.0, 1000)
+    p_m4 = sample_case_cohort_pilot(y_mod, scores_mod, controls_per_positive=4, seed=7)
+    p_adapt = sample_case_cohort_pilot(y_mod, scores_mod, controls_per_positive=None, seed=7)
+    assert abs(p_m4.fraction_of_cohort_measured - 0.75) < 0.01
+    assert abs(p_adapt.fraction_of_cohort_measured - 0.45) < 0.01
+

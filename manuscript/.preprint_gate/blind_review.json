@@ -2,7 +2,7 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent blind screening audit of the updated manuscript (main.tex and references.bib, including Section 1.1 thought experiment, Propositions 1-2, and Appendix A proofs) for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. AI workflow and Google Antigravity for Science program disclosures, computational vs. clinical claim framing, mathematical proof coherence, data/code availability, ethics exemption, and all 20 bibliography citations are complete and internally consistent.",
+  "summary": "The updated manuscript (main.tex and references.bib) passes all five cold-screening audit criteria for arXiv (stat.ME / stat.AP / cs.LG) with zero blockers and zero warnings. Authorship, AI workflow disclosure (Google Antigravity with Gemini 3.1 Pro and Google DeepMind Science Plugin v1.4.0), and Google Antigravity for Science acknowledgments are fully compliant, and the new 5-seed empirical verification of Proposition 1's adaptive matching ratio m(pi) in Section 3.2 and 25/25 unit test suite in Data and Code Availability are internally consistent with all tables, proofs, and retrospective computational scope disclaimers.",
   "blockers": [],
   "warnings": [],
   "checked_files": [
@@ -10,7 +10,7 @@
     "references.bib"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "650a49c49c92604ed8b1fbcc8682890c48cd8548a8d33665f9496d81e77af4c9",
+  "manuscript_sha256": "732bf167d68d9166b037c4900738b651e6c30a9102e314708df81d2dd0ac59c0",
   "file_count": 10,
-  "recorded_at": "2026-11-18T14:17:59.849650+00:00"
+  "recorded_at": "2026-11-18T14:40:09.552798+00:00"
 }
