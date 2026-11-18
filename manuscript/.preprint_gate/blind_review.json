@@ -2,7 +2,7 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Read-only blind preprint screening audit of main.tex and references.bib for arXiv completed with zero blockers and zero warnings. Sole human authorship (Wayne A. Satz, MD), AI workflow disclosure (Google Antigravity, Gemini 3.1 Pro, Science Plugin v1.4.0, and human verification), Google Antigravity for Science acknowledgment, retrospective computational claim grounding, Ethics Statement, Data and Code Availability, Competing Interests, 20/20 BibTeX citation completeness, and internal numerical coherence across Abstract and Table 3 (26.0%--79.0% overall and 41.4%--79.0% low-prevalence Stage-2 savings) are all verified.",
+  "summary": "Independent blind screening audit of the updated manuscript (main.tex and references.bib, including Section 1.1 thought experiment, Propositions 1-2, and Appendix A proofs) for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. AI workflow and Google Antigravity for Science program disclosures, computational vs. clinical claim framing, mathematical proof coherence, data/code availability, ethics exemption, and all 20 bibliography citations are complete and internally consistent.",
   "blockers": [],
   "warnings": [],
   "checked_files": [
@@ -10,7 +10,7 @@
     "references.bib"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "9bfb100ef19374d8f8fe720f6c84f45507740b0c74f531bc35181c1154729fe1",
+  "manuscript_sha256": "650a49c49c92604ed8b1fbcc8682890c48cd8548a8d33665f9496d81e77af4c9",
   "file_count": 10,
-  "recorded_at": "2026-11-18T03:01:43.650737+00:00"
+  "recorded_at": "2026-11-18T14:17:59.849650+00:00"
 }
