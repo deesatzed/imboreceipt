@@ -2,12 +2,12 @@
   "overall_passed": true,
   "sealed_for_submission": true,
   "mode": "reverify",
-  "target_server": "arxiv",
+  "target_server": "medrxiv",
   "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
   "manuscript_file": null,
   "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
-  "manuscript_sha256": "3ea116358ff68cb59abf0a66972a37d4781b5b01afe523de6439c621888c4ccf",
-  "file_count": 8,
+  "manuscript_sha256": "ee51e6af0d834fe5b9f163daea4858571c0442584416c7c73fe322e18f1edec9",
+  "file_count": 10,
   "tracked_files": {
     "fig1_tier1_saturation.pdf": "1eaaef2fd1e5873ed9e7302d0c2fb4d968f0cdf386814e60adaa5de02c255ae5",
     "fig1_tier1_saturation.png": "0723923718991da7a6b325b89f60ab7682dcb6002d67f70ea42212b7cddc584e",
@@ -15,10 +15,12 @@
     "fig2_ablation_ladder.png": "bbf0a488ade31ac81ab3ac529fb1fb58b5061207f5e32c36c95370beefe60dcb",
     "fig3_kappa0_and_foveation.pdf": "70ce02bfcbc6195a9af2ca9d63c0e81598e36d51a7de1de5eaa0294e2aa2e291",
     "fig3_kappa0_and_foveation.png": "43ccc147c4b13f404b947f0c7a8ab56a1bc734edd2c08e3a5a71f1eaaefda494",
-    "main.tex": "236be9784acad799cf467d87448fe0ecd5e39f69f02c8462d81abc20e2b7530c",
+    "main.bbl": "4262ecbfa09cc9059e5f2d0f1c136c067758c7db1843fac3a376cf1b4c8b8c8b",
+    "main.pdf": "5d883a2f103366b8e8346bc987f16b7b200336bf1bcbd67a7abb09ddbba89703",
+    "main.tex": "d8b8122a26d303c47cffd33edabe8caa6f64e2492efa42131714e15ad8b1220e",
     "references.bib": "6564abafc1fb81579066868a3b0e5ed32876c9939b3b2ccd43682c76a12555b9"
   },
-  "evaluated_at": "2026-11-18T01:53:04.586162+00:00",
+  "evaluated_at": "2026-11-18T02:34:27.571362+00:00",
   "gates": {
     "G1_AI_ATTRIBUTION": {
       "gate": "G1_AI_ATTRIBUTION",
@@ -39,7 +41,7 @@
       "citation_summary": {
         "mode": "online",
         "bib_entry_count": 20,
-        "cited_key_count": 19,
+        "cited_key_count": 20,
         "verified_count": 20
       },
       "failures": [],
@@ -47,7 +49,7 @@
     },
     "G4_SERVER_SCREENING": {
       "gate": "G4_SERVER_SCREENING",
-      "server": "arxiv",
+      "server": "medrxiv",
       "passed": true,
       "failures": [],
       "warnings": []
@@ -65,7 +67,7 @@
       "passed": true,
       "sealed": true,
       "status": "SEALED_FOR_SUBMISSION",
-      "seal_id": "63ed15f0e2864535e987b10a",
+      "seal_id": "0f9f9426680ef57749d80c42",
       "seal_path": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate/release_seal.json",
       "failures": [],
       "warnings": []
