@@ -1,47 +1,53 @@
-# 1-Page Executive Summary: Solving Rare-Event Prediction by Fixing the Data Bottleneck (`CREDO`)
+# 1-Page Executive Walkthrough: How `CREDO` Works (A Step-by-Step Thought Experiment on 101,766 Hospital Readmissions)
 
 **Author:** Wayne A. Satz, MD (Department of Emergency Medicine, Temple University)  
-**Scope:** 95 leak-free 4-way split evaluations across 10 standard benchmarks ($N = 1.1\text{k}\text{--}146\text{k}$) and 9 multi-table clinical, industrial, and financial cohorts ($N = 10\text{k}\text{--}1.0\text{M}$ rows).
+**Context:** A plain-English walkthrough of our three statistical principles using a single experiment from our paper (**UCI 30-Day Hospital Readmission**: $101,766$ hospital stays across $71,518$ diabetic patients, where **$11.2\%$** bounce back within 30 days).
 
 ---
 
-### The Big Picture: Why Standard "Imbalanced Data" Tricks Hit a Wall
-When predicting rare events ($\pi = 0.1\%\text{--}10\%$, such as 30-day hospital readmissions, equipment breakdowns, or payment fraud), data science teams almost always try to fix low Precision–Recall (`AUPRC`) by tweaking the **algorithm** on a fixed intake table—generating synthetic minority rows (`SMOTE`, `ADASYN`), training undersampled ensembles (`EasyEnsemble`, `RUSBoost`), or reweighting the loss function.
-
-Across 50 splits on 10 standard benchmarks, we prove that once a modern gradient-boosted tree (`LightGBM`) is properly stabilized and calibrated on real-world prevalence, **every post-hoc resampling and ensemble method achieves 0 out of 10 statistically significant AUPRC wins ($p \ge 0.068$)**—and actively *lowers* accuracy on 4 out of 4 large-scale datasets (`76k` to `1M` rows). Models fail on rare events not because the algorithm is weak, but because **the baseline intake table runs out of information**.
+### The Thought Experiment Setup: Why Basic Intake Data Stalls
+Imagine a patient is being discharged, and we want to predict if they will suffer an unplanned **30-day readmission** ($11.2\%$ base rate) so our care-transition team can intervene.
+* **What we have for free on every patient ("Stage-1 Intake Table"):** Just **7 basic registration fields**: `Age`, `Gender`, `Race`, `Admission Type`, `Admission Source`, `Length of Stay`, and `Total Lab Count`.
+* **The Bottleneck:** Using only those 7 basic fields, even our best calibrated gradient-boosted tree (`LightGBM`) achieves a Precision–Recall score (`AUPRC`) of just **`0.1305`** (barely above random guessing at `0.112`). Why? Because thousands of patients look **identical** on those 7 basic numbers.
 
 ---
 
-### The Three Core Principles (With Plain-English Formulas)
+### Step 1: Why `SMOTE` and Algorithm Tweaking Fail (*Principle 1: You Can't Re-Sort a Tie*)
+* **What a standard data science team tries first:** *"Our score is only `0.1305` because readmissions are the minority class (`11.2%`). Let's run `SMOTE` (synthetic minority oversampling) or increase the loss weight on readmitted patients!"*
+* **Watch what happens in our thought experiment:**  
+  Picture **100 patients** who share the **exact same 7 intake numbers** (e.g., 65-year-old female, 4-day stay, 45 labs). In reality, **15 of them will be readmitted (`15%` true risk)** and **85 will go home and recover fine (`85%` false alarms)**.  
+  Suppose our care-transition team requires at least **$28\%$ confidence (precision)** before paying for a home-health nurse:
 
-#### Principle 1: You Can't Re-Sort a Tie — Why `SMOTE` & Reweighting Cannot Beat the Intake Table
-* **The Plain-English Idea:** Suppose 100 cases look **identical** on your baseline intake table (same initial vitals, demographics, or summary stats), and 15 of them actually experience the rare event ($15\%$ risk). If your operational threshold requires **$50\%$ confidence** to justify an intervention, you have a $35$-point confidence gap.
-* **Why `SMOTE` Fails:** Making synthetic copies of the 15 positive rows (`SMOTE`) or multiplying their weight by $5\times$ simply inflates **all 100 identical-looking rows together** from $15\%$ to $47\%$. Because multiplying everyone's odds by a constant **never changes who ranks above whom**, the 85 false alarms remain mixed right in with the 15 true cases.
-* **The Formula (The Information Gap):**
-  $$\text{Information Gap} = \text{Target Confidence Needed} - \text{Baseline Intake Confidence}$$
-  *(Measured on a log-odds scale so evidence from separate data sources adds together cleanly.)*
-* **Actionable Rule:** When $\text{Information Gap} > 0$, stop tweaking the algorithm on the intake table. The only way to separate the 15 true cases from the 85 look-alike false alarms is to pull a **second, independent data source ("Stage-2 data")**.
+$$\text{Information Gap} = \text{Target Confidence Needed } (28\%) - \text{Intake Confidence } (15\%) = +13\% \text{ gap}$$
 
-#### Principle 2: The "Look-Alike Stress Test" — Picking the Best Stage-2 Data Using Only `5%` of the Cohort
-* **The Plain-English Problem:** Suppose you have 5 candidate Stage-2 data sources (e.g., secondary tables, longitudinal histories, or third-party vendor scores). Pulling all 5 sources on $1,000,000$ rows is too expensive. Worse, standard feature selection (`Global Mutual Information`) gets tricked by **"Copycat Channels"**—sources that simply repackage your intake variables in a new format and score high globally only because they repeat what the intake table already knows.
-* **The Formula (`5\pi` Look-Alike Matching & Relative Evidence Gain `REG`):**
-  $$\text{Pilot Sample Size} = 5 \times \text{Rare Event Rate } (\pi) \quad \text{(100\% of Positives } + 4\text{ "Look-Alike False Alarms" per Positive)}$$
-  $$\text{Relative Evidence Gain (REG)} = \frac{\text{\% of True Positives flagged by the new Stage-2 data}}{\text{\% of Look-Alike False Alarms flagged by the new Stage-2 data}}$$
-* **Why It Works:** Instead of comparing positive cases against obviously low-risk controls, we match every true positive against 4 false alarms that got the **exact same high risk score on the intake table**. Inside this matched group, a "Copycat Channel" flags both groups equally ($\text{REG} = 1.0 \implies \text{reject}$), whereas a genuinely independent data source flags True Positives far more often than Look-Alikes ($\text{REG} \gg 1.0 \implies \text{keep}$).
-* **Result:** Measuring as little as **$0.9\%\text{--}18\%$ of rows**, `CREDO REG` beats equal-size unmatched sampling on **7 / 9 cohorts** ($p \le 0.030$) and beats $100\%$-dataset `Global MI` on **6 / 9 cohorts** ($p \le 0.048$).
+* **Why `SMOTE` hits a brick wall:** If you generate synthetic copies of the 15 readmitted patients (`SMOTE`) or multiply their training weight by $3\times$, the algorithm simply inflates the predicted score of **all 100 identical-looking patients together** from $15\%$ to $35\%$. It **never changes who ranks above whom**—the 85 false alarms are still mixed right in with the 15 true readmissions! Sure enough, `SMOTE` gets **`0.1295` AUPRC** (zero gain over `0.1305`; and across 10 standard benchmarks in our paper, `SMOTE`, `EasyEnsemble`, and `RUSBoost` win **0 out of 10 times**).
+* **Rule 1:** When $\text{Information Gap} > 0$, **stop tweaking the algorithm on the intake table**. The only way to separate the 15 true readmissions from the 85 look-alike false alarms is to pull a **second, independent data source ("Stage-2 data")**.
 
-#### Principle 3: Double-Checking the "Red-Flag" Bucket — Cutting Live Stage-2 Lookups by `41%–79%`
-* **The Plain-English Problem:** Even after you find a great Stage-2 data source, pulling it on $100\%$ of live arrivals is costly. Standard two-stage screening ("Conformal Prediction") splits Stage-1 intake predictions into three buckets: **Green `{0}`** (clearly safe $\to$ skip Stage-2), **Yellow `{0, 1}`** (uncertain middle $\to$ order Stage-2), and **Red `{1}`** (top alerts $\to$ standard methods assume these are "already certain" and **skip Stage-2**).
-* **Why Skipping the Red Bucket Fails in Rare Events (The Base-Rate Trap):**
-  $$\text{True Precision Inside the Red Bucket} = \frac{\text{Caught Positives}}{\text{Caught Positives} + \text{False Alarms}}$$
-  If a rare event occurs in **$1\%$** of arrivals ($10$ per $1,000$), even a strong Stage-1 screen with $90\%$ sensitivity ($9$ caught) and a $5\%$ false-alarm rate ($50$ false alarms) puts **$9$ true cases and $50$ false alarms** into the Red Bucket—meaning **$85\%$ of the "confident" Red Bucket are false alarms ($\frac{9}{9+50} = 15\%$ precision)!**
-* **Our Fix ("Upper-Tail Foveation"):** Leaving those 50 false alarms unverified at the top of the list ruins precision. **CREDO Foveation** safely skips the huge Green Bucket (`60%–80%` of arrivals) and **routes Stage-2 lookups to verify the Red Bucket + top of the Yellow Bucket**.
-* **Result:** At the **exact same Stage-2 lookup budget**, verifying the Red Bucket beats standard Yellow-Bucket conformal routing on **9 / 9 cohorts**, recovering **$95\%\text{--}99\%$ of full Stage-2 accuracy while eliminating $41\%\text{--}79\%$ of lookups on rare events**.
+---
 
-| Representative Cohort ($N$, Rare Event Rate) | Intake Only | `SMOTE` | Global MI (`100%`) | Unmatched (`5π`) | **Full `CREDO` (`5π`)** | Standard Yellow-Only | **`CREDO` Red+Yellow (Saved)** |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **UCI Hospital Readmission** (`101.8k`, `11.2%`) | `0.1305` | `0.1295` | `0.2203` | `0.1979` | **0.2231** | `0.1981` | **0.2091** (`26.0%` saved) |
-| **Scania APS Truck Fleet** (`76.0k`, `1.81%`) | `0.5260` | `0.4978` | `0.8483` | `0.8482` | **0.8937** | `0.5505` | **0.8869** (**78.6%** saved) |
-| **Home Credit 7-Table** (`307.5k`, `8.07%`) | `0.1678` | `0.1394` | `0.2449` | `0.2449` | **0.2591** | `0.2040` | **0.2501** (**41.4%** saved) |
-| **IEEE-CIS Fraud 2-Table** (`590.5k`, `3.50%`) | `0.1974` | `0.1874` | `0.4841` | `0.4798` | **0.5031** | `0.2294` | **0.4783** (**62.0%** saved) |
-| **NeurIPS BAF Onboarding** (`1.00M`, `1.10%`) | `0.0795` | `0.0637` | `0.1101` | `0.1101` | **0.1660** | `0.0850` | **0.1612** (**61.9%** saved) |
+### Step 2: Picking the Right Stage-2 Data Without Buying a "Copycat" (*Principle 2: The Look-Alike Stress Test*)
+* **The Choice:** Suppose the hospital EHR has **7 candidate Stage-2 data feeds** we could extract (e.g., *Channel 1: Prior 12-Month Inpatient/ER Visits*, *Channel 2: Discharge Disposition & Specialty*, *Channel 3: Diagnosis Count*, *Channel 4: Medication Changes*, *Channel 5: HbA1c/Glucose*, *Channel 6: A "Hospital Acuity Index" that secretly just repackages Length-of-Stay + Lab Count*, and *Channel 7: Random Ward Codes*). Our budget allows us to add **2 channels**.
+* **Why Standard Feature Selection Gets Tricked:** If you test candidate channels by comparing readmitted patients against **random non-readmitted patients** (classical Unmatched Case-Control Mutual Information), a "Copycat" or general-illness channel looks great—because readmitted patients had longer stays than random healthy patients! In our experiment, Unmatched Mutual Information picks a suboptimal channel on 4 out of 5 splits and stalls at **`0.1979` AUPRC**.
+* **What `CREDO` Does Instead:** We match every true readmission against **4 "Look-Alike False Alarms"**—patients who got the **exact same high risk score on the 7 intake fields**, but were *not* readmitted:
+
+$$\text{Relative Evidence Gain (REG)} = \frac{\text{\% of True Readmissions flagged by the candidate Stage-2 channel}}{\text{\% of Look-Alike False Alarms flagged by the candidate Stage-2 channel}}$$
+
+* **Watch the Look-Alike Stress Test in action:**
+  1. **Channel 6 ("Copycat Acuity Index"):** Because the True Readmissions and the Look-Alike False Alarms *already* have the exact same Length-of-Stay and Lab Count, the Copycat Index flags both groups at the exact same rate: $\text{REG} = \frac{30\%}{30\%} = \mathbf{1.0}$ (**Zero new information $\to$ Rejected!**).
+  2. **Channels 1 & 2 (*Prior Inpatient/ER Visits* + *Discharge Routing*):** Among patients who looked identical at admission, those with prior hospitalizations and skilled-nursing discharges bounce back far more often than their look-alikes: $\text{REG} \gg \mathbf{1.0}$ (**Selected on 5 out of 5 splits!**).
+* **Result:** Testing only the matched pilot (`55.9%` of patients—saving `44.1%` of discovery queries on Diabetes, and saving **`82%–99%`** on rarer `0.2%–3.5%` cohorts), `CREDO` lifts AUPRC from **`0.1305` $\to$ `0.2231`** ($p = 0.030$ vs. Unmatched MI).
+
+---
+
+### Step 3: At Discharge, Who Actually Needs the Stage-2 Lookup? (*Principle 3: Double-Checking the Red Bucket*)
+* **The Live Triage Problem:** Now our system is live. Every patient gets the free 7-variable **Stage-1 Intake Screen** instantly. Pulling the **Stage-2 Channels** on $100\%$ of patients is wasteful, so standard two-stage "Conformal Prediction" splits patients into three buckets based on their Stage-1 score:
+  * **Green Bucket `{0}` (Low Score):** Clearly safe $\to$ *Skip Stage-2.*
+  * **Yellow Bucket `{0, 1}` (Middle Score):** Uncertain $\to$ *Pull Stage-2 data.*
+  * **Red Bucket `{1}` (Highest Intake Score):** Standard methods call this *"Confident Positive"* and **skip Stage-2**, assuming these patients are guaranteed readmissions.
+* **Why Skipping the Red Bucket Fails (The Base-Rate Trap):** Look inside that Stage-1 **Red Bucket `{1}`**:
+
+$$\text{True Precision Inside the Red Bucket} = \frac{\text{Caught Readmissions}}{\text{Caught Readmissions} + \text{False Alarms}}$$
+
+  Because readmission is only $11.2\%$ overall—and the 7 intake fields are weak (`0.1305`)—**roughly $80\%$ of the patients in the Stage-1 Red Bucket are actually False Alarms** (patients who had a 6-day stay and 50 labs, but have *zero* prior hospitalizations and are going home healthy)!
+  * **Standard Conformal Routing (Yellow Bucket Only):** Skips the Red Bucket, leaving all those unverified Stage-1 false alarms sitting at the very top of the final risk list $\to$ drops to **`0.1981` AUPRC**.
+  * **Our Fix (`CREDO` Red + Yellow Verification):** Safely skips the Green Bucket (`26.0%` of discharges saved on Diabetes; **`41%–79%` saved** on rarer cohorts) and **uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket**, weeding out the Red-Bucket false alarms and lifting AUPRC to **`0.2091`** at the exact same query budget (and winning on **9 out of 9 cohorts** in the paper, including `0.55 -> 0.89` on `76k` trucks and `0.23 -> 0.48` on `590k` transactions).
