@@ -1,25 +1,25 @@
 {
   "status": "SEALED_FOR_SUBMISSION",
   "reverified": true,
-  "seal_id": "bcf085d383c07c5c3ac7c7a5",
+  "seal_id": "3ca16e3b81cd8432318df4d0",
   "target_server": "arxiv",
   "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
   "manuscript_file": null,
-  "manuscript_sha256": "732bf167d68d9166b037c4900738b651e6c30a9102e314708df81d2dd0ac59c0",
+  "manuscript_sha256": "e334d4417c852d8cdf3039ba59f37919e4f0dabd0ea702f81681516ce0980a99",
   "files": {
     "fig1_tier1_saturation.pdf": "1eaaef2fd1e5873ed9e7302d0c2fb4d968f0cdf386814e60adaa5de02c255ae5",
     "fig1_tier1_saturation.png": "0723923718991da7a6b325b89f60ab7682dcb6002d67f70ea42212b7cddc584e",
-    "fig2_ablation_ladder.pdf": "b40768a67563f67656ec51222b6c9bffa0150e7620f31de5c5a165ef96545a28",
-    "fig2_ablation_ladder.png": "bbf0a488ade31ac81ab3ac529fb1fb58b5061207f5e32c36c95370beefe60dcb",
-    "fig3_kappa0_and_foveation.pdf": "70ce02bfcbc6195a9af2ca9d63c0e81598e36d51a7de1de5eaa0294e2aa2e291",
-    "fig3_kappa0_and_foveation.png": "43ccc147c4b13f404b947f0c7a8ab56a1bc734edd2c08e3a5a71f1eaaefda494",
+    "fig2_ablation_ladder.pdf": "419b04a20a2352e028609875e3dfe4dff3a3cb4e0c301bff0f59a9bba6fea606",
+    "fig2_ablation_ladder.png": "75a03434b71c770fb83804cba14af8437e2ad958d013b90352dc24141fc03881",
+    "fig3_kappa0_and_foveation.pdf": "92a1d84c4327315ea33b3baec6486584cd08854274d39595e0413e02804b854e",
+    "fig3_kappa0_and_foveation.png": "02315f78827ff31bf022ae2fdf57a8f80783908460780a3648879c683322778b",
     "main.bbl": "4262ecbfa09cc9059e5f2d0f1c136c067758c7db1843fac3a376cf1b4c8b8c8b",
-    "main.pdf": "d68e8150e9060e78976ef7f25e659f924d09cca0223fc2336604a8c8dc5ff403",
-    "main.tex": "b7f1950f6e8f7e61fddf1b39bf7f38f0fe02d11b703550867339e1d6797c11fc",
+    "main.pdf": "0608594a64599133ffa49f198d73fb35dcaa906222949e42ed1b750c66a9b608",
+    "main.tex": "2d941d77fa7a1ebc5cb7e274264e126d853f0d7d3ce52f2f4b635def8650f124",
     "references.bib": "6564abafc1fb81579066868a3b0e5ed32876c9939b3b2ccd43682c76a12555b9"
   },
-  "pass1_audit_sha256": "732bf167d68d9166b037c4900738b651e6c30a9102e314708df81d2dd0ac59c0",
-  "blind_review_sha256": "732bf167d68d9166b037c4900738b651e6c30a9102e314708df81d2dd0ac59c0",
-  "blind_review_recorded_at": "2026-11-18T14:40:09.552798+00:00",
-  "sealed_at": "2026-11-18T14:41:14.254579+00:00"
+  "pass1_audit_sha256": "e334d4417c852d8cdf3039ba59f37919e4f0dabd0ea702f81681516ce0980a99",
+  "blind_review_sha256": "e334d4417c852d8cdf3039ba59f37919e4f0dabd0ea702f81681516ce0980a99",
+  "blind_review_recorded_at": "2026-11-18T15:38:55.857399+00:00",
+  "sealed_at": "2026-11-18T15:39:46.417995+00:00"
 }

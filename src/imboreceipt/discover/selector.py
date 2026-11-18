@@ -18,6 +18,7 @@ from imboreceipt.core.types import SemanticType
 from imboreceipt.discover.strata import (
     CaseCohortPilot,
     ConsensusResidualStrata,
+    adaptive_controls_per_positive,
     make_leak_free_cv_splits,
 )
 from imboreceipt.frontier.baselines import TabularPreprocessor
@@ -361,9 +362,8 @@ def score_channels_baseline_strategy(
             )
     elif strategy in {"global_mi", "unmatched_case_control_mi"}:
         if strategy == "unmatched_case_control_mi":
-            # Classical Epidemiology Unmatched Case-Control Subsample (Prentice 1986):
-            # Measures the EXACT same 5*pi row count as CREDO REG (100% cases + 4*n_+ random
-            # unmatched controls), isolating the value of score-matching + conditional REG!
+            # Classical Epidemiology 4:1 Unmatched Case-Control Subsample (Prentice 1986):
+            # Uses the standard fixed m=4 (5*pi) unmatched control ratio across all cohorts.
             pos_i = np.flatnonzero(y == 1)
             neg_i = np.flatnonzero(y == 0)
             n_ctrl = min(neg_i.size, pos_i.size * 4)

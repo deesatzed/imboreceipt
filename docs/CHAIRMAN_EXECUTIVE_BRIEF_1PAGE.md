@@ -32,7 +32,7 @@ $$\text{Information Gap} = \text{Target Confidence Needed } (28\%) - \text{Curre
 ### Step 2: Using "High-Signal False Positives" to Pick Stage-2 Features (*Principle 2: Rescuing Signal Lost in True-Negative Abundance*)
 * **The Choice:** The hospital EHR has **7 candidate Stage-2 modules** (*1: Prior Inpatient/ER Visits*, *2: Discharge Disposition & Specialty*, *3: Diagnosis Count*, *4: Medication Changes*, *5: HbA1c/Glucose*, *6: A "Copycat Acuity Index" that secretly repackages Length-of-Stay + Lab Count*, and *7: Ward Noise*). Our budget allows **2 modules**.
 * **Why Global Selection Fails (Drowned in True-Negative Abundance):** If you score features globally or against random healthy patients (Unmatched Case-Control MI), the 89% sea of easy True Negatives dominates the math—making a "Copycat" or general-illness feature look great because readmitted patients stayed longer than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at **`0.1979` AUPRC**.
-* **What `CREDO` Does Instead:** We pit every True Positive directly against **4 "High-Signal False Positives"**—patients who got the **exact same high risk score on the 7 intake fields**, but were *not* readmitted:
+* **What `CREDO` Does Instead:** We pit every True Positive directly against **$m(\pi)$ "High-Signal False Positives"** ($m=2$ at $11.2\%$ prevalence, measuring only $33.5\%$ of charts; $m=4\text{--}8$ for rarer events)—patients who got the **exact same high risk score on the 7 intake fields**, but were *not* readmitted:
 
 $$\text{Relative Evidence Gain (REG)} = \frac{\text{\% of True Positives flagged by the Stage-2 feature}}{\text{\% of High-Signal False Positives flagged by the Stage-2 feature}}$$
 

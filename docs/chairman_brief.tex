@@ -51,7 +51,7 @@ Picture \textbf{100 patients} who share the \textbf{exact same 7 intake numbers}
 \textbf{The Choice:} The hospital EHR has \textbf{7 candidate Stage-2 modules} (\emph{1: Prior Inpatient/ER Visits}, \emph{2: Discharge Disposition \& Specialty}, \emph{3: Diagnosis Count}, \emph{4: Medication Changes}, \emph{5: HbA1c/Glucose}, \emph{6: A ``Copycat Acuity Index'' that secretly repackages Length-of-Stay + Lab Count}, and \emph{7: Ward Noise}). Our budget allows \textbf{2 modules}.
 \begin{itemize}
   \item \textbf{Why Global Selection Fails (Drowned in True-Negative Abundance):} If you score features globally or against random healthy patients (Unmatched Case-Control MI), the $89\%$ sea of easy True Negatives dominates the math---making a ``Copycat'' or general-illness feature look great because readmitted patients stayed longer than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at \textbf{\texttt{0.1979} AUPRC}.
-  \item \textbf{What \texttt{CREDO} Does Instead:} We pit every True Positive directly against \textbf{4 ``High-Signal False Positives''}---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
+  \item \textbf{What \texttt{CREDO} Does Instead:} We pit every True Positive directly against \textbf{$m(\pi)$ ``High-Signal False Positives''} ($m=2$ at $11.2\%$ prevalence, measuring only $33.5\%$ of charts; $m=4\text{--}8$ for rarer events)---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
 \end{itemize}
 \vspace{-3pt}
 \[

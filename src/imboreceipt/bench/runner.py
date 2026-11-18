@@ -247,7 +247,7 @@ def run_multi_channel_cohort_benchmark(
         seed=seed,
     )
     pilot = sample_case_cohort_pilot(
-        yt_tr, strata.oof_consensus_prob, controls_per_positive=4, seed=seed
+        yt_tr, strata.oof_consensus_prob, controls_per_positive=None, seed=seed
     )
     spec_map = {c.channel_id: c for c in cohort.candidates}
 
