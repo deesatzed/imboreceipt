@@ -35,9 +35,11 @@ Imagine a patient is being discharged, and we want to predict if they will suffe
 \textbf{Step 1: Why \texttt{SMOTE} \& Algorithm Tweaking Fail (\emph{Principle 1: You Can't Re-Sort a Tie})}\\[1pt]
 \textbf{What a standard data science team tries first:} \emph{``Our score is only \texttt{0.1305} because readmissions are the minority class ($11.2\%$). Let's run \texttt{SMOTE} (synthetic minority oversampling) or increase the loss weight on readmitted patients!''}\\[1pt]
 \textbf{Watch what happens:} Picture \textbf{100 patients} who share the \textbf{exact same 7 intake numbers} (e.g., 65-year-old female, 4-day stay, 45 labs). In reality, \textbf{15 of them will be readmitted ($15\%$ true risk)} and \textbf{85 will recover fine ($85\%$ false alarms)}. Suppose our care team requires at least \textbf{$28\%$ confidence (precision)} before paying for a home-health nurse:
+\vspace{-4pt}
 \[
   \text{Information Gap} = \text{Target Confidence Needed } (28\%) \;-\; \text{Intake Confidence } (15\%) \;=\; +13\% \text{ gap}
 \]
+\vspace{-6pt}
 \begin{itemize}
   \item \textbf{Why \texttt{SMOTE} Hits a Brick Wall:} If you generate fake copies of the 15 readmitted patients (\texttt{SMOTE}) or multiply their training weight by $3\times$, the algorithm simply inflates the predicted score of \textbf{all 100 identical-looking patients together} from $15\%$ to $35\%$. It \textbf{never changes who ranks above whom}---the 85 false alarms stay mixed right in with the 15 true readmissions! Sure enough, \texttt{SMOTE} gets \textbf{\texttt{0.1295} AUPRC} (zero gain over \texttt{0.1305}; and across 10 standard benchmarks in our paper, \texttt{SMOTE}, \texttt{EasyEnsemble}, and \texttt{RUSBoost} win \textbf{0 out of 10 times}).
   \item \textbf{Rule 1:} When $\text{Information Gap} > 0$, \textbf{stop tweaking the algorithm on the intake table}. The only way to separate the 15 true readmissions from the 85 look-alike false alarms is to pull a \textbf{second, independent data source (``Stage-2 data'')}.
@@ -49,9 +51,11 @@ Imagine a patient is being discharged, and we want to predict if they will suffe
   \item \textbf{Why Standard Selection Gets Tricked:} If you compare readmitted patients against \textbf{random non-readmitted patients} (Unmatched Case-Control Mutual Information), a ``Copycat'' or general-illness channel looks great---because readmitted patients had longer stays than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at \textbf{\texttt{0.1979} AUPRC}.
   \item \textbf{What \texttt{CREDO} Does Instead:} We match every true readmission against \textbf{4 ``Look-Alike False Alarms''}---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
 \end{itemize}
+\vspace{-4pt}
 \[
-  \text{Relative Evidence Gain (REG)} = \frac{\text{\% of True Readmissions flagged by the candidate Stage-2 channel}}{\text{\% of Look-Alike False Alarms flagged by the candidate Stage-2 channel}}
+  \text{Relative Evidence Gain (REG)} = \tfrac{\text{\% of True Readmissions flagged by the candidate Stage-2 channel}}{\text{\% of Look-Alike False Alarms flagged by the candidate Stage-2 channel}}
 \]
+\vspace{-6pt}
 \begin{itemize}
   \item \textbf{Watch the Look-Alike Stress Test:} (1) \textbf{Channel 6 (``Copycat Acuity Index''):} Because True Readmissions and Look-Alike False Alarms \emph{already} have the exact same Length-of-Stay and Lab Count, the Copycat Index flags both equally: $\text{REG} = \tfrac{30\%}{30\%} = \mathbf{1.0}$ (\textbf{Zero new info $\to$ Rejected!}). (2) \textbf{Channels 1 \& 2 (\emph{Prior Inpatient/ER Visits} + \emph{Discharge Routing}):} Among patients who looked identical at admission, those with prior hospitalizations and facility discharges bounce back far more often than their look-alikes: $\text{REG} \gg \mathbf{1.0}$ (\textbf{Selected on 5 / 5 splits!}).
   \item \textbf{Result:} Testing only the matched pilot ($55.9\%$ of patients---saving $44.1\%$ of queries on Diabetes, and saving \textbf{$82\%\text{--}99\%$} on rarer $0.2\%\text{--}3.5\%$ cohorts), \texttt{CREDO} lifts AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$ vs.\ Unmatched MI, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
@@ -62,13 +66,15 @@ Imagine a patient is being discharged, and we want to predict if they will suffe
 \begin{itemize}
   \item \textbf{Why Skipping the Red Bucket Fails (The Base-Rate Trap):} Look inside that Stage-1 \textbf{Red Bucket $\{1\}$}:
 \end{itemize}
+\vspace{-4pt}
 \[
-  \text{True Precision Inside the Red Bucket} = \frac{\text{Caught Readmissions}}{\text{Caught Readmissions} + \text{False Alarms}}
+  \text{True Precision Inside the Red Bucket} = \tfrac{\text{Caught Readmissions}}{\text{Caught Readmissions} + \text{False Alarms}}
 \]
+\vspace{-6pt}
 \begin{itemize}
   \item Because readmission is only $11.2\%$ overall---and the 7 intake fields are weak (\texttt{0.1305})---\textbf{roughly $80\%$ of the patients in the Stage-1 Red Bucket are actually False Alarms} (patients who had a 6-day stay and 50 labs, but have \emph{zero} prior hospitalizations and are going home healthy)!
   \item \textbf{Standard Conformal Routing (Yellow Bucket Only):} Skips the Red Bucket, leaving all those unverified Stage-1 false alarms sitting at the very top of the final risk list $\to$ drops to \textbf{\texttt{0.1981} AUPRC}.
-  \item \textbf{Our Fix (\texttt{CREDO} Red + Yellow Verification):} Safely skips the Green Bucket ($26.0\%$ of discharges saved on Diabetes; \textbf{$41\%\text{--}79\%$ saved} on rarer cohorts) and \textbf{uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket}. When Stage-2 checks the Red Bucket, it immediately weeds out the false alarms with zero prior hospitalizations and confirms the true high-risk patients, lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget---and beating standard conformal routing on \textbf{9 out of 9 cohorts} (including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ payment transactions).
+  \item \textbf{Our Fix (\texttt{CREDO} Red + Yellow Verification):} Safely skips the Green Bucket ($26.0\%$ of discharges saved on Diabetes; \textbf{$41\%\text{--}79\%$ saved} on rarer cohorts) and \textbf{uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket}. Checking the Red Bucket weeds out the false alarms with zero prior hospitalizations and confirms the true high-risk patients, lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (and winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
 \end{itemize}
 
 \end{document}
