@@ -9,12 +9,13 @@
 \usepackage{enumitem}
 
 \pagestyle{empty}
-\linespread{0.66}
+\linespread{0.82}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{0pt}
+\setlength{\parskip}{1.0pt}
 \setlist[itemize]{leftmargin=1.1em,itemsep=0pt,topsep=0pt,parsep=0pt}
 
 \begin{document}
+\small
 \setlength{\abovedisplayskip}{2pt}
 \setlength{\belowdisplayskip}{2pt}
 \setlength{\abovedisplayshortskip}{1pt}
@@ -58,7 +59,7 @@
 \vspace{-6pt}
 \begin{itemize}
   \item \textbf{Watch the Look-Alike Stress Test:} (1) \textbf{Channel 6 (``Copycat Acuity Index''):} Because True Readmissions and Look-Alike False Alarms \emph{already} have the exact same Length-of-Stay and Lab Count, the Copycat Index flags both equally: $\text{REG} = \tfrac{30\%}{30\%} = \mathbf{1.0}$ (\textbf{Zero new info $\to$ Rejected!}). (2) \textbf{Channels 1 \& 2 (\emph{Prior Inpatient/ER Visits} + \emph{Discharge Routing}):} Among patients who looked identical at admission, those with prior hospitalizations and facility discharges bounce back far more often than their look-alikes: $\text{REG} \gg \mathbf{1.0}$ (\textbf{Selected on 5 / 5 splits!}).
-  \item \textbf{Result:} Testing only the matched pilot ($55.9\%$ of patients---saving $44.1\%$ of queries on Diabetes, and saving \textbf{$82\%\text{--}99\%$} on rarer $0.2\%\text{--}3.5\%$ cohorts), \texttt{CREDO} lifts AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$ vs.\ Unmatched MI, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
+  \item \textbf{Result:} Testing only the matched pilot ($55.9\%$ of patients---saving $44.1\%$ of queries on Diabetes, and saving \textbf{82\%--99\%} on rarer $0.2\%\text{--}3.5\%$ cohorts), \texttt{CREDO} lifts AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$ vs.\ Unmatched MI, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
 \end{itemize}
 
 \textbf{Step 3: At Discharge, Who Needs the Stage-2 Lookup? (\emph{Principle 3: Double-Checking the Red Bucket})}\\
@@ -72,9 +73,9 @@
 \]
 \vspace{-6pt}
 \begin{itemize}
-  \item Because readmission is only $11.2\%$ overall---and the 7 intake fields are weak (\texttt{0.1305})---\textbf{roughly $80\%$ of the patients in the Stage-1 Red Bucket are actually False Alarms} (patients who had a 6-day stay and 50 labs, but have \emph{zero} prior hospitalizations and are going home healthy)!
+  \item Because readmission is only $11.2\%$ overall---and the 7 intake fields are weak (\texttt{0.1305})---\textbf{roughly 80\% of the patients in the Stage-1 Red Bucket are actually False Alarms} (patients who had a 6-day stay and 50 labs, but have \emph{zero} prior hospitalizations and are going home healthy)!
   \item \textbf{Standard Conformal Routing (Yellow Bucket Only):} Skips the Red Bucket, leaving all those unverified Stage-1 false alarms sitting at the very top of the final risk list $\to$ drops to \textbf{\texttt{0.1981} AUPRC}.
-  \item \textbf{Our Fix (\texttt{CREDO} Red + Yellow Verification):} Safely skips the Green Bucket ($26.0\%$ of discharges saved on Diabetes; \textbf{$41\%\text{--}79\%$ saved} on rarer cohorts) and \textbf{uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket}. Checking the Red Bucket weeds out the false alarms with zero prior hospitalizations and confirms the true high-risk patients, lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (and winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
+  \item \textbf{Our Fix (\texttt{CREDO} Red + Yellow Verification):} Safely skips the Green Bucket ($26.0\%$ of discharges saved on Diabetes; \textbf{41\%--79\% saved} on rarer cohorts) and \textbf{uses Stage-2 data to double-check the Red Bucket + top of the Yellow Bucket}. Checking the Red Bucket weeds out the false alarms with zero prior hospitalizations and confirms the true high-risk patients, lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (and winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
 \end{itemize}
 
 \end{document}
