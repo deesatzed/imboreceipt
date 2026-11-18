@@ -1,5 +1,10 @@
 \documentclass[11pt]{article}
 
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T1]{fontenc}
+\fi
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
@@ -354,17 +359,29 @@ By definition of $\gamma_1 = \mathbb{P}(X \in \mathcal{S}_{\{1\}} \mid Y=1)$ and
 After Stage 1 prunes fraction $1 - r_1$ of the cohort, only fraction $r_1$ enters Stage 2; any subsequent pruning at Stage 2 can save at most $r_1(1 - r_2)$ of total cohort lookups. By Boole's inequality across $S-1$ pruning stages with events $E_s = \{1 \notin \mathcal{C}_s(X)\}$, the cumulative positive miscoverage satisfies $\mathbb{P}(\bigcup_{s=1}^{S-1} E_s \mid Y=1) \le \sum_{s=1}^{S-1} \alpha_{1,s}$, and equals $1 - \prod_{s=1}^{S-1}(1 - \alpha_{1,s})$ when stages are conditionally independent given $Y=1$. Finally, splitting $\mathcal{D}_{\text{cal}}$ of $n_{+,\text{cal}}$ positives into $S-1$ equal disjoint calibration folds leaves $n_{+,\text{cal}}/(S-1)$ positives per stage, scaling the Binomial standard error $\sqrt{\hat{p}(1-\hat{p})/[n_{+,\text{cal}}/(S-1)]}$ by $\sqrt{S-1}$.
 \end{proof}
 
+\section*{Author Contributions}
+
+Conceptualization, methodology, software, validation, formal statistical analysis, investigation, writing---original draft, and writing---review and editing: W.A.S. The author has read and agreed to the published version of the manuscript.
+
+\section*{Funding}
+
+This research received no external grant funding. Computational and agentic research platform access was supported by the Google Antigravity for Science program.
+
+\section*{Institutional Review Board and Informed Consent Statement}
+
+Ethical review and approval and patient informed consent were not required for this study under 45 CFR 46.104(d)(4) because all analyses were conducted exclusively on publicly available, fully de-identified, and anonymized benchmark datasets with zero human subject recruitment, intervention, or private health information access.
+
 \section*{Data and Code Availability}
 
-{\sloppy All source code (\texttt{imboreceipt} Python package), deterministic benchmark runners, unit and regression test suites (\texttt{25/25} passing tests), SHA-256 split manifests, and campaign JSON receipts supporting the findings of this study are provided in the accompanying open-source reproducibility archive (\texttt{credo\_reproducibility\_code.zip}, MIT License) and at \url{https://github.com/o2satz/imboreceipt}. All 19 benchmark datasets are publicly accessible through the UCI Machine Learning Repository (\url{https://archive.ics.uci.edu/dataset/296}, \url{https://archive.ics.uci.edu/dataset/350}, \url{https://archive.ics.uci.edu/dataset/601}), OpenML (\url{https://www.openml.org/d/310}, \url{https://www.openml.org/d/1068}, \url{https://www.openml.org/d/1597}), and the NeurIPS Bank Account Fraud archive (\url{https://doi.org/10.48550/arXiv.2211.13358}).\par}
-
-\section*{Competing Interests}
-
-The author declares no competing financial or commercial interests.
+{\raggedright All source code (\texttt{imboreceipt} Python package), deterministic benchmark runners, unit and regression test suites (\texttt{25/25} passing tests), SHA-256 split manifests, and campaign JSON receipts supporting the findings of this study are publicly available under the MIT License at \url{https://github.com/deesatzed/imboreceipt} and in the accompanying reproducibility archive (\texttt{credo\_reproducibility\_code.zip}). All 19 benchmark datasets are publicly accessible through the UCI Machine Learning Repository (\url{https://archive.ics.uci.edu/dataset/296}, \url{https://archive.ics.uci.edu/dataset/350}, \url{https://archive.ics.uci.edu/dataset/601}), OpenML (\url{https://www.openml.org/d/310}, \url{https://www.openml.org/d/1068}, \url{https://www.openml.org/d/1597}), and the NeurIPS Bank Account Fraud archive (\url{https://doi.org/10.48550/arXiv.2211.13358}).\par}
 
 \section*{Acknowledgments}
 
 Computational and agentic research platform access was supported by the Google Antigravity for Science program.
+
+\section*{Conflicts of Interest}
+
+The author declares no competing financial or commercial interests.
 
 \bibliographystyle{plainnat}
 \bibliography{references}

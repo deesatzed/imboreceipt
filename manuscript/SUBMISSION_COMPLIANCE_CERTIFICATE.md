@@ -1,11 +1,11 @@
 # Preprint Submission Compliance Certificate
 
 - **Status**: `SEALED_FOR_SUBMISSION`
-- **Seal ID**: `0efada9729da78e6d65fc268`
+- **Seal ID**: `f79e2da948a44d4389160333`
 - **Target Preprint Server**: `arxiv`
-- **Manuscript Merkle SHA-256**: `f003f4b3d5c64e19700245c4d9603504bad5d00d976831f77f7bb3b4d463d2fc`
-- **Blind Review Attestation SHA-256**: `f003f4b3d5c64e19700245c4d9603504bad5d00d976831f77f7bb3b4d463d2fc`
-- **Sealed Timestamp (UTC)**: `2026-11-18T16:37:08.498496+00:00`
+- **Manuscript Merkle SHA-256**: `d9a38176163bb83559f0f9a87eecce5a381b3ca91bd885983e4c8dec5039c00f`
+- **Blind Review Attestation SHA-256**: `d9a38176163bb83559f0f9a87eecce5a381b3ca91bd885983e4c8dec5039c00f`
+- **Sealed Timestamp (UTC)**: `2026-11-18T17:08:25.660760+00:00`
 
 ## Verified Hard Gates
 
@@ -27,6 +27,6 @@
 | `fig3_kappa0_and_foveation.pdf` | `92a1d84c4327315ea33b3baec6486584cd08854274d39595e0413e02804b854e` |
 | `fig3_kappa0_and_foveation.png` | `02315f78827ff31bf022ae2fdf57a8f80783908460780a3648879c683322778b` |
 | `main.bbl` | `9ef87d9591471196c890af63006146f65e380398d7c8183e36eb9af4f7d24173` |
-| `main.pdf` | `40a395c78ff1649fbe1f06a1223dbc500c32952356b3241953f3884156d2fa82` |
-| `main.tex` | `85711ef1622eeb76d04d70d8457dc8026c3838488a983821ef2b5e3a0262326a` |
+| `main.pdf` | `5c4f32948a8a7210743df1ddd85da66a7c468260ebad0333e34f03662fa85390` |
+| `main.tex` | `e1ee3d2a9cc485eaef5c02af84284ccdd06084980292bcc637dc2384f57fe551` |
 | `references.bib` | `834ee62fa31302c38b9b97acbbf8f4bb1b91f3ba5e93c84e7c6b35a8223c9d9b` |
