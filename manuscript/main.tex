@@ -9,6 +9,7 @@
 \usepackage{natbib}
 \usepackage{microtype}
 \usepackage{array}
+\emergencystretch=1.5em
 
 \hypersetup{
   colorlinks=true,
@@ -26,8 +27,8 @@
 
 \author{
   Wayne A. Satz, MD\\
-  \small Department of Emergency Medicine, Lewis Katz School of Medicine at Temple University, Philadelphia, PA, USA\\
-  \small \texttt{satzwa@temple.edu}
+  \small Department of Emergency Medicine, Lewis Katz School of Medicine at Temple University,\\
+  \small Philadelphia, PA, USA \quad (\texttt{satzwa@temple.edu})
 }
 
 \date{November 2026}
@@ -39,6 +40,9 @@
 \begin{abstract}
 Rare-event prediction under severe class imbalance is routinely treated as an algorithmic decoding problem via synthetic oversampling, undersampled ensembles, or cost-sensitive reweighting on a fixed feature matrix. Across 95 leak-free four-way split evaluations spanning 10 fixed-table benchmarks ($N = 1,109$ to $145,751$) and 9 multi-channel cohorts ($N = 10,000$ to $1,000,000$), we establish three statistical principles that reframe rare-event screening as active evidence acquisition. First, once gradient-boosted trees are Newton-stabilized ($\texttt{max\_delta\_step}=1.0$) and calibrated on natural prevalence, post-hoc resampling (SMOTE, ADASYN, copulas) and undersampled ensembles (EasyEnsemble, RUSBoost) yield $0/10$ statistically significant AUPRC gains ($p_{\text{NB}} \ge 0.068$) and degrade performance on 4/4 large-scale flagships. Second, to acquire orthogonal Stage-2 channels without querying $100\%$ of rows or purchasing collinear echoes, we introduce a prevalence-adaptive score-matched case-cohort Relative Evidence Gain (CREDO REG) estimator ($m(\pi) \in \{2,4,8\}$ matched controls per case). CREDO REG achieves higher or equal mean AUPRC on 9/9 cohorts against both $4:1$ unmatched case-control mutual information ($p_{\text{NB}} \le 0.030$ on 7/9) and $100\%$-row global mutual information ($p_{\text{NB}} \le 0.048$ on 6/9) while cutting pilot measurement by up to $98.4\%$. Third, we prove the Rare-Event Conformal Singleton Paradox: when $\pi \ll q_{\text{target}}$, Stage-1 Mondrian $\{1\}$ singletons retain high false-positive rates that $\{0,1\}$ mid-band abstention leaves unverified. Routing Stage-2 queries to the Evidence-Deficit Upper Tail beats mid-band routing on 9/9 cohorts at equal query budgets, recovering $94\%$--$99\%$ of full Stage-2 AUPRC while saving $26.0\%$--$79.0\%$ of runtime lookups ($41.4\%$--$79.0\%$ when $\pi \le 8\%$).
 \end{abstract}
+
+\vspace{4pt}
+\noindent\textbf{Keywords:} Rare-event screening; class imbalance; case-cohort design; active feature acquisition; Mondrian conformal prediction; gradient-boosted decision trees.
 
 \section{Introduction}
 
@@ -66,7 +70,7 @@ Before presenting our formal theorems, it is instructive to state the three intu
 \begin{enumerate}
   \item \textbf{Predicate 1 (Defining the Latent-Space Information Gap):} Imbalanced learning failure is rarely caused by an inability of modern gradient-boosted trees to fit the training table; rather, it arises from a measurable \emph{information gap} $D_q(x) > 0$ between the current baseline representation $X_{\text{base}}$ and an ideal latent space capable of certifying target precision $q_{\text{target}}$. Imagine a miniature hospital cohort of $100$ discharged patients ($11$ true 30-day readmissions and $89$ non-readmissions). Suppose every arrival is screened using $7$ cheap admission intake fields $X_{\text{base}}$ (age, admission source, insurance payer, race, gender, weight flag, and admission type). Within a high-risk intake profile consisting of $20$ elderly emergency-admitted patients ($10$ true readmissions and $10$ non-readmissions), all $20$ patients share the exact same intake covariates $X_{\text{base}} = x$. Their true conditional risk on $X_{\text{base}}$ is $10/20 = 50\%$, leaving a strict information gap whenever the clinical action contract requires $q_{\text{target}} = 65\%$ precision. Resampling or reweighting those $20$ identical baseline rows via SMOTE or RUSBoost cannot separate the $10$ readmissions from the $10$ non-readmissions.
   \item \textbf{Predicate 2 (High-Signal False Positives as the Contrastive Leverage Set):} Outside the true positives themselves, where does the sharpest contrastive information reside in an imbalanced dataset? Not in the $79$ obvious low-risk true negatives (such as healthy elective admissions), which any baseline screener already separates from cases, but in the \emph{High-Signal False Positives}---the $10$ non-readmitted patients who scored just as high on $X_{\text{base}}$ as the $10$ true readmissions. If we evaluate candidate Stage-2 variables across the entire cohort ($100\%$ of rows) or against random unmatched controls, a redundant collinear summary of the $7$ intake fields ($Z_{\text{red}} \approx g(X_{\text{base}})$) exhibits strong marginal separation simply because it distinguishes the $20$ high-risk intake patients from the $80$ low-risk patients. By instead matching each true positive strictly against $m$ High-Signal False Positives from the \emph{same} cross-fitted baseline risk stratum $S(X_{\text{base}})$, baseline variation is held constant: $Z_{\text{red}}$ collapses to zero incremental signal ($\text{REG} \approx 1$), while truly orthogonal clinical histories (such as prior inpatient utilization and discharge care-transition disposition) stand out cleanly.
-  \item \textbf{Predicate 3 (Two-Stage Screening to Rescue Signal Lost in True-Negative Abundance):} Why not simply dump all $47$ available EHR columns into a single 1-stage model for $100\%$ of patients? First, operationally, specialized labs or longitudinal chart reviews carry real acquisition latency and cost per patient. Second, statistically, when a single global tree splits on $100\%$ of rows ($89\%$ true negatives), split gain is dominated by the $79\%$ obvious true negatives; secondary confirmation features that only resolve ambiguity inside the top high-risk decile have their conditional signal diluted across the $89\%$ negative majority---effectively \emph{lost in true-negative abundance}. A two-stage architecture uses Stage 1 ($X_{\text{base}}$) to prune the obvious true-negative majority (`Green Bucket`) and focuses Stage-2 measurement and confirmation modeling strictly on the upper-tail evidence-deficit cohort where secondary features have high conditional leverage.
+  \item \textbf{Predicate 3 (Two-Stage Screening to Rescue Signal Lost in True-Negative Abundance):} Why not simply dump all $47$ available EHR columns into a single 1-stage model for $100\%$ of patients? First, operationally, specialized labs or longitudinal chart reviews carry real acquisition latency and cost per patient. Second, statistically, when a single global tree splits on $100\%$ of rows ($89\%$ true negatives), split gain is dominated by the $79\%$ obvious true negatives; secondary confirmation features that only resolve ambiguity inside the top high-risk decile have their conditional signal diluted across the $89\%$ negative majority---effectively \emph{lost in true-negative abundance}. A two-stage architecture uses Stage 1 ($X_{\text{base}}$) to prune the obvious true-negative majority (``Green Bucket'') and focuses Stage-2 measurement and confirmation modeling strictly on the upper-tail evidence-deficit cohort where secondary features have high conditional leverage.
 \end{enumerate}
 
 \section{Biostatistical Framework and Methodology}
@@ -94,9 +98,9 @@ Because $u \mapsto \gamma u / (\gamma u + 1 - u)$ is strictly increasing on $[0,
 Whenever $\operatorname{ess\,sup}_{x \in \mathcal{X}} \eta_{\text{base}}(x) < q_{\text{target}}$, $D_q(x) > 0$ almost everywhere on $\mathcal{X}$, and no decoder on $X_{\text{base}}$ can achieve non-zero recall at precision $q_{\text{target}}$.
 \end{theorem}
 
-To diagnose why a rare-event pipeline stalls prior to acquiring new data, CREDO computes a \textbf{Four-Ceiling Thermometer}: (i) the finite-sample Binomial Wilson $95\%$ confidence half-width on test recall (`Gate C`), (ii) the Ascertainment Distortion Index (ADI) from dual-trap capture--recapture or competing-risk censoring on $\mathcal{D}_{\text{train}}$, (iii) decoder calibration distortion (ECE before vs.\ after Platt logit calibration), and (iv) the out-of-sample $k$-nearest-neighbor upper bound on fixed-table separability (fitting nearest neighbors strictly on $\mathcal{D}_{\text{train}}$ and querying out-of-sample on $\mathcal{D}_{\text{val}}$).
+To diagnose why a rare-event pipeline stalls prior to acquiring new data, CREDO computes a \textbf{Four-Ceiling Thermometer}: (i) the finite-sample Binomial Wilson $95\%$ confidence half-width on test recall (Gate~C), (ii) the Ascertainment Distortion Index (ADI) from dual-trap capture--recapture or competing-risk censoring on $\mathcal{D}_{\text{train}}$, (iii) decoder calibration distortion (ECE before vs.\ after Platt logit calibration), and (iv) the out-of-sample $k$-nearest-neighbor upper bound on fixed-table separability (fitting nearest neighbors strictly on $\mathcal{D}_{\text{train}}$ and querying out-of-sample on $\mathcal{D}_{\text{val}}$).
 
-\subsection{Theorem 2: Score-Matched Case-Cohort Relative Evidence Gain and Prevalence-Adaptive $m(\pi)$}
+\subsection{Theorem 2: Case-Cohort REG and Adaptive Matching Ratio \texorpdfstring{$m(\pi)$}{m(pi)}}
 
 When Theorem~\ref{thm:saturation} diagnoses fixed-channel saturation ($D_q(x) > 0$), we must select a subset of candidate Stage-2 channels $\mathcal{S} \subseteq \{1,\dots,M\}$ within budget $\sum_{m \in \mathcal{S}} c_m \le B$. Let $S(x) = \hat{\eta}_{\text{cons}}(x)$ denote the out-of-fold baseline consensus probability on $\mathcal{D}_{\text{train}}$ (fit via entity-grouped or causal expanding-block cross-validation). Extending \citet{prentice1986casecohort}, CREDO constructs a \textbf{Score-Matched Case-Cohort Pilot} $\mathcal{P} \subset \mathcal{D}_{\text{train}}$ containing $100\%$ of training cases ($n_+ = \sum_{i \in \mathcal{D}_{\text{train}}} Y_i$) and $m(\pi)\, n_+$ controls (total pilot fraction $\approx (1+m(\pi))\pi$, with $m(\pi)=4$ in the classic rare-event regime $\pi \in [0.5\%, 10\%]$) sampled without replacement from baseline score strata matched to the empirical distribution of $S(X_{\text{base}})$ among cases.
 
@@ -156,7 +160,7 @@ Consider an $S$-stage sequential conformal screening cascade ($S \ge 2$) where S
 \begin{enumerate}
   \item \textbf{Geometric Exhaustion of Negative Pruning:} Because Stage 1 removes $1 - r_1 \in [61.9\%, 79.0\%]$ of instances on low-prevalence cohorts ($\pi \le 8\%$, Table~\ref{tab:foveation}), the marginal lookup savings of adding a third stage is bounded by $r_1(1 - r_2) \ll 1 - r_1$.
   \item \textbf{Additive False-Negative Leakage:} Total positive recall loss across $S-1$ pruning gates accumulates additively up to $\alpha_{1,\text{total}} \le \sum_{s=1}^{S-1} \alpha_{1,s}$ (missing $1 - \prod_{s=1}^{S-1}(1 - \alpha_{1,s})$ of cases under conditional independence).
-  \item \textbf{Calibration-Fold Positive Starvation:} Partitioning $\mathcal{D}_{\text{cal}}$ into $S-1$ disjoint calibration subsets to guarantee finite-sample validity at each stage reduces the positive sample size per threshold from $n_{+,\text{cal}}$ to $n_{+,\text{cal}}/(S-1)$, inflating the Binomial Wilson $95\%$ recall half-width (`Gate C`) by $\sqrt{S-1}$.
+  \item \textbf{Calibration-Fold Positive Starvation:} Partitioning $\mathcal{D}_{\text{cal}}$ into $S-1$ disjoint calibration subsets to guarantee finite-sample validity at each stage reduces the positive sample size per threshold from $n_{+,\text{cal}}$ to $n_{+,\text{cal}}/(S-1)$, inflating the Binomial Wilson $95\%$ recall half-width (Gate~C) by $\sqrt{S-1}$.
 \end{enumerate}
 \end{proposition}
 
@@ -180,43 +184,45 @@ Portions of the computational workflow---specifically Python benchmark scaffoldi
 
 \subsection{Verification of Theorem 1: Fixed-Table Decoder Saturation Across 10 Benchmarks}
 
-Table~\ref{tab:tier1} and Figure~\ref{fig:tier1} report test-fold AUPRC across 10 canonical OpenML and \texttt{imbalanced-learn} benchmarks ($5$ seeds each $= 50$ four-way splits), including four biomedical and biological cohorts (\texttt{Mammography} breast cancer screening, $N=11,183$; \texttt{Thyroid Sick} clinical endocrinology, $N=3,772$; \texttt{Yeast ME2} protein localization, $N=1,484$; \texttt{Abalone 19}, $N=4,177$; and \texttt{KDD Protein Homology}, $N=145,751$) alongside five physical and operational benchmarks. Across all 10 datasets, \textbf{0 out of 10} show a statistically significant AUPRC improvement over natural-prevalence calibrated LightGBM ($\texttt{max\_delta\_step}=1.0$) for SMOTE+GBDT ($p_{\text{NB}} \in [0.088, 0.961]$), EasyEnsemble ($p_{\text{NB}} \in [0.068, 1.000]$), RUSBoost ($0/10$), ADASYN, Cost-Sensitive GBDT, or Gaussian Copula augmentation. On the two largest fixed-table benchmarks (\texttt{Webpage 35k} and \texttt{KDD Protein Homology 146k}), both SMOTE and undersampled ensembles actively degrade AUPRC ($0.8165 \to 0.7704$ SMOTE and $0.3675$ EasyEnsemble on \texttt{Webpage}; $0.8951 \to 0.8849$ SMOTE and $0.8513$ EasyEnsemble on \texttt{Protein Homology}).
+Table~\ref{tab:tier1} and Figure~\ref{fig:tier1} report test-fold AUPRC across 10 canonical OpenML and \texttt{imbalanced}-\texttt{learn} benchmarks ($5$ seeds each $= 50$ four-way splits), including four biomedical and biological cohorts (\texttt{Mammography} breast cancer screening, $N=11,183$; \texttt{Thyroid Sick} clinical endocrinology, $N=3,772$; \texttt{Yeast ME2} protein localization, $N=1,484$; \texttt{Abalone 19}, $N=4,177$; and \texttt{KDD Protein Homology}, $N=145,751$) alongside five physical and operational benchmarks. Across all 10 datasets, \textbf{0 out of 10} show a statistically significant AUPRC improvement over natural-prevalence calibrated LightGBM ($\texttt{max\_delta\_step}=1.0$) for SMOTE+GBDT ($p_{\text{NB}} \in [0.088, 0.961]$), EasyEnsemble ($p_{\text{NB}} \in [0.068, 1.000]$), RUSBoost ($0/10$), ADASYN, Cost-Sensitive GBDT, or Gaussian Copula augmentation. On the two largest fixed-table benchmarks (\texttt{Webpage 35k} and \texttt{KDD Protein Homology 146k}), both SMOTE and undersampled ensembles actively degrade AUPRC ($0.8165 \to 0.7704$ SMOTE and $0.3675$ EasyEnsemble on \texttt{Webpage}; $0.8951 \to 0.8849$ SMOTE and $0.8513$ EasyEnsemble on \texttt{Protein Homology}).
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Verification of Theorem 1 across 10 canonical biomedical, biological, and operational fixed-table benchmarks ($5$ four-way splits each $= 50$ runs). Neither SMOTE \citep{chawla2002smote}, EasyEnsemble \citep{liu2009exploratory}, nor RUSBoost \citep{seiffert2010rusboost} achieves a statistically significant AUPRC gain ($p_{\text{NB}} < 0.05$) on any dataset ($0/10$).}
 \label{tab:tier1}
 \vspace{2pt}
 \resizebox{\textwidth}{!}{%
+\small
+\setlength{\tabcolsep}{4.0pt}
 \begin{tabular}{lrrrccccc}
 \toprule
-\textbf{Dataset} & $N$ & \textbf{Test} $n_+$ & \textbf{Recall 95\% HW} & \textbf{Calibrated GBDT} & \textbf{SMOTE+GBDT} & \textbf{EasyEnsemble} & \textbf{RUSBoost} & \textbf{NB $p$ (SMOTE / EEC)} \\
+\textbf{Dataset} & $N$ & \textbf{Test} $n_+$ & \textbf{95\% HW} & \textbf{Cal.\ GBDT} & \textbf{SMOTE} & \textbf{EasyEns} & \textbf{RUSBoost} & \textbf{NB $p$ (SM/EE)} \\
 \midrule
-Mammography & 11,183 & 39 & $\pm 0.126$ & $\mathbf{0.7172 \pm 0.0510}$ & $0.7049 \pm 0.0282$ & $0.6366 \pm 0.0663$ & $0.5922 \pm 0.1107$ & $0.738$ / $0.994$ \\
-COIL 2000 Insurance & 9,822 & 88 & $\pm 0.084$ & $0.1489 \pm 0.0173$ & $0.1454 \pm 0.0209$ & $0.1642 \pm 0.0074$ & $0.1312 \pm 0.0169$ & $0.708$ / $0.068$ \\
-Satimage & 6,435 & 94 & $\pm 0.081$ & $0.7664 \pm 0.0222$ & $0.7777 \pm 0.0266$ & $0.6323 \pm 0.0445$ & $0.4315 \pm 0.1601$ & $0.088$ / $0.997$ \\
-Thyroid Sick & 3,772 & 35 & $\pm 0.133$ & $0.9273 \pm 0.0242$ & $0.9380 \pm 0.0209$ & $0.6915 \pm 0.1019$ & $0.6794 \pm 0.1862$ & $0.177$ / $0.992$ \\
-Ozone Level & 2,536 & 11 & $\pm 0.236$ & $\mathbf{0.3558 \pm 0.1212}$ & $0.3501 \pm 0.1382$ & $0.3034 \pm 0.1181$ & $0.2041 \pm 0.1471$ & $0.550$ / $0.769$ \\
-PC1 Software Defects & 1,109 & 12 & $\pm 0.226$ & $0.4843 \pm 0.0843$ & $0.5117 \pm 0.0943$ & $0.3361 \pm 0.1196$ & $0.1880 \pm 0.0163$ & $0.246$ / $0.848$ \\
-Yeast ME2 & 1,484 & 8 & $\pm 0.277$ & $0.4590 \pm 0.1300$ & $0.4909 \pm 0.1487$ & $0.4553 \pm 0.1666$ & $0.2843 \pm 0.0761$ & $0.305$ / $0.528$ \\
-Abalone 19 & 4,177 & 5 & $\pm 0.351$ & $0.0450 \pm 0.0227$ & $0.0502 \pm 0.0285$ & $0.0483 \pm 0.0243$ & $0.0167 \pm 0.0036$ & $0.378$ / $0.445$ \\
-Webpage (35k) & 34,780 & 147 & $\pm 0.065$ & $\mathbf{0.8165 \pm 0.0155}$ & $0.7704 \pm 0.0345$ & $0.3675 \pm 0.0384$ & $0.1007 \pm 0.0479$ & $0.961$ / $1.000$ \\
-KDD Protein Homology & 145,751 & 194 & $\pm 0.056$ & $\mathbf{0.8951 \pm 0.0236}$ & $0.8849 \pm 0.0207$ & $0.8513 \pm 0.0242$ & $0.7772 \pm 0.0419$ & $0.894$ / $0.995$ \\
+Mammography & 11,183 & 39 & $\pm 0.126$ & $\mathbf{0.717 \pm 0.051}$ & $0.705 \pm 0.028$ & $0.637 \pm 0.066$ & $0.592 \pm 0.111$ & $0.738$ / $0.994$ \\
+COIL 2000 & 9,822 & 88 & $\pm 0.084$ & $0.149 \pm 0.017$ & $0.145 \pm 0.021$ & $0.164 \pm 0.007$ & $0.131 \pm 0.017$ & $0.708$ / $0.068$ \\
+Satimage & 6,435 & 94 & $\pm 0.081$ & $0.766 \pm 0.022$ & $0.778 \pm 0.027$ & $0.632 \pm 0.045$ & $0.432 \pm 0.160$ & $0.088$ / $0.997$ \\
+Thyroid Sick & 3,772 & 35 & $\pm 0.133$ & $0.927 \pm 0.024$ & $0.938 \pm 0.021$ & $0.692 \pm 0.102$ & $0.679 \pm 0.186$ & $0.177$ / $0.992$ \\
+Ozone Level & 2,536 & 11 & $\pm 0.236$ & $\mathbf{0.356 \pm 0.121}$ & $0.350 \pm 0.138$ & $0.303 \pm 0.118$ & $0.204 \pm 0.147$ & $0.550$ / $0.769$ \\
+PC1 Defects & 1,109 & 12 & $\pm 0.226$ & $0.484 \pm 0.084$ & $0.512 \pm 0.094$ & $0.336 \pm 0.120$ & $0.188 \pm 0.016$ & $0.246$ / $0.848$ \\
+Yeast ME2 & 1,484 & 8 & $\pm 0.277$ & $0.459 \pm 0.130$ & $0.491 \pm 0.149$ & $0.455 \pm 0.167$ & $0.284 \pm 0.076$ & $0.305$ / $0.528$ \\
+Abalone 19 & 4,177 & 5 & $\pm 0.351$ & $0.045 \pm 0.023$ & $0.050 \pm 0.029$ & $0.048 \pm 0.024$ & $0.017 \pm 0.004$ & $0.378$ / $0.445$ \\
+Webpage (35k) & 34,780 & 147 & $\pm 0.065$ & $\mathbf{0.817 \pm 0.016}$ & $0.770 \pm 0.035$ & $0.368 \pm 0.038$ & $0.101 \pm 0.048$ & $0.961$ / $1.000$ \\
+Protein Homol. & 145,751 & 194 & $\pm 0.056$ & $\mathbf{0.895 \pm 0.024}$ & $0.885 \pm 0.021$ & $0.851 \pm 0.024$ & $0.777 \pm 0.042$ & $0.894$ / $0.995$ \\
 \bottomrule
 \end{tabular}%
 }
-\end{table*}
+\end{table}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{fig1_tier1_saturation.pdf}
-\caption{Fixed-table decoder saturation across 10 canonical OpenML / \texttt{imbalanced-learn} datasets ($50$ splits). Left: Test AUPRC of SMOTE+GBDT minus calibrated GBDT with $95\%$ Nadeau--Bengio intervals ($0/10$ significant gains). Right: Expected Calibration Error (ECE) distortion induced by uncalibrated oversampling vs.\ natural-prevalence Platt logit calibration.}
+\caption{Fixed-table decoder saturation across 10 canonical OpenML / \texttt{imbalanced-learn} datasets ($50$ splits). Left (A): Test AUPRC delta of SMOTE+GBDT minus natural-prevalence calibrated GBDT across 5 stratified splits ($0/10$ significant gains). Right (B): Gate~C Binomial $95\%$ recall confidence half-width versus independent test positives per split ($n_+$).}
 \label{fig:tier1}
 \end{figure}
 
 \subsection{Verification of Theorem 2: Score-Matched Case-Cohort Discovery Across Clinical and Multi-Table Cohorts}
 
-Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} evaluate our controlled 9-arm single-factor knockout ablation ladder across 9 multi-channel and multi-table cohorts ($45$ four-way split runs), headed by our primary clinical hospital readmission cohort and eight synthetic, industrial, and relational stress tests:
+Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} evaluate our controlled single-factor knockout ablation ladder across 9 multi-channel and multi-table cohorts ($45$ four-way split runs), headed by our primary clinical hospital readmission cohort and eight synthetic, industrial, and relational stress tests:
 \begin{enumerate}
   \item \textbf{UCI Diabetes 130-US Hospitals ($N=101,766$ encounters across $71,518$ patients, $\pi=11.16\%$)} \citep{strack2014impact}: Patient-grouped splits predicting $<30$-day unplanned hospital readmission from baseline admission demographics ($X_{\text{base}}$) vs.\ candidate clinical channels (prior inpatient/emergency/outpatient utilization, care-transition discharge disposition and specialty, comorbidity burden, medication intensification, glycemic biomarkers HbA1c/glucose, and a collinear intake risk index proxy) with competing-risk mortality/hospice de-censoring.
   \item \textbf{Gate 0.5 Synthetic Multi-Mechanism Benchmark ($N=12,000$, $\pi=4.1\%$):} Known ground-truth dynamical transition (Critical Slowing Down), accounting conservation/silence, orthogonal coincidence, and selective dual-trap receipt censoring.
@@ -228,79 +234,83 @@ Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} evaluate our controlled 9
   \item \textbf{UCI Taiwan Credit 6-Month Panel ($N=26,921$ baseline-current accounts, $\pi=18.67\%$)} \citep{yeh2009comparisons} and \textbf{ULB Credit Card ($N=284,807$, $\pi=0.172\%$)} \citep{dalpozzolo2014learned}: Included as explicit boundary-regime benchmarks testing Proposition~\ref{prop:matching_ratio}'s moderate-imbalance regime ($\pi \ge 10\% \implies m(\pi)=2$, cutting pilot measurement on \texttt{Taiwan} from $93.3\%$ to $56.0\%$) and ultra-rare pre-orthogonalized PCA regime ($\pi < 0.5\% \implies m(\pi)=8$, measuring $1.6\%$ of rows on \texttt{ULB}).
 \end{enumerate}
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Verification of Theorem 2 and Proposition 1 across 9 clinical, physical, and relational multi-channel cohorts ($5$ splits or disjoint future eras each $= 45$ runs). Single-factor knockout comparison of baseline GBDT (A0), SMOTE (A1), $100\%$-row Global MI (A4), classical $4:1$ ($5\pi$) Unmatched Case-Control MI (A4b) \citep{prentice1986casecohort}, Score-Matched CREDO REG with a single GBDT using prevalence-adaptive $m(\pi) \in \{2,4,8\}$ (A5), Equal-Capacity 6-Learner Ensemble (A5b), Pure Orthogonal Lattice (A6), and Full CREDO $\kappa_0$-Gated Hybrid Lattice (A7).}
 \label{tab:ablation}
 \vspace{2pt}
 \resizebox{\textwidth}{!}{%
+\small
+\setlength{\tabcolsep}{4.0pt}
 \begin{tabular}{lccccccccc}
 \toprule
-\textbf{Cohort} & \textbf{A0: Base} & \textbf{A1: SMOTE} & \textbf{A4: Global MI} & \textbf{A4b: UnmCC MI} & \textbf{A5: CREDO REG} & \textbf{A5b: 6-Ens} & \textbf{A6: Orth} & \textbf{A7: Full CREDO} & \textbf{NB $p$ (REG vs MI/Unm)} \\
- & ($X_{\text{base}}$) & ($X_{\text{base}}$) & ($100\%$ rows) & ($5\pi$ rows) & ($(1+m(\pi))\pi$) & ($(1+m(\pi))\pi$) & ($(1+m(\pi))\pi$) & ($(1+m(\pi))\pi$) & \\
+\textbf{Cohort} & \textbf{A0: Base} & \textbf{A1: SMOTE} & \textbf{A4: Glob MI} & \textbf{A4b: UnmCC} & \textbf{A5: REG} & \textbf{A5b: 6-Ens} & \textbf{A6: Orth} & \textbf{A7: CREDO} & \textbf{NB $p$} \\
+ & ($X_{\text{base}}$) & ($X_{\text{base}}$) & ($100\%$) & ($5\pi$) & (Adapt.\ $m$) & (Adapt.\ $m$) & (Adapt.\ $m$) & (Adapt.\ $m$) & (MI / Unm) \\
 \midrule
-Gate 0.5 Ground Truth & $0.2104$ & $0.1553$ & $0.6469$ & $0.5188$ & $\mathbf{0.7869}$ & $0.8106$ & $0.7917$ & $\mathbf{0.8143}$ & $\mathbf{0.017}$ / $\mathbf{0.002}$ \\
-UCI AI4I Maintenance & $0.3606$ & $0.3552$ & $0.5125$ & $0.5125$ & $\mathbf{0.7433}$ & $0.7250$ & $0.6964$ & $0.7230$ & $\mathbf{0.000}$ / $\mathbf{0.000}$ \\
+Gate 0.5 Truth & $0.2104$ & $0.1553$ & $0.6469$ & $0.5188$ & $\mathbf{0.7869}$ & $0.8106$ & $0.7917$ & $\mathbf{0.8143}$ & $\mathbf{0.017}$ / $\mathbf{0.002}$ \\
+UCI AI4I Maint. & $0.3606$ & $0.3552$ & $0.5125$ & $0.5125$ & $\mathbf{0.7433}$ & $0.7250$ & $0.6964$ & $0.7230$ & $\mathbf{0.000}$ / $\mathbf{0.000}$ \\
 UCI Taiwan Credit & $0.2474$ & $0.2468$ & $0.4453$ & $0.4453$ & $\mathbf{0.4499}$ & $0.4504$ & $0.4508$ & $\mathbf{0.4524}$ & $0.275$ / $0.275$ \\
-UCI Diabetes 130-US & $0.1305$ & $0.1295$ & $0.2203$ & $0.1979$ & $\mathbf{0.2203}$ & $0.2226$ & $0.2211$ & $\mathbf{0.2231}$ & $1.000$ / $\mathbf{0.030}$ \\
-ULB Credit Card (PCA) & $0.4821$ & $0.5150$ & $0.7348$ & $0.7288$ & $\mathbf{0.7554}$ & $0.7542$ & $\mathbf{0.7614}$ & $\mathbf{0.7538}$ & $0.315$ / $0.271$ \\
+UCI Diabetes 130 & $0.1305$ & $0.1295$ & $0.2203$ & $0.1979$ & $\mathbf{0.2203}$ & $0.2226$ & $0.2211$ & $\mathbf{0.2231}$ & $1.000$ / $\mathbf{0.030}$ \\
+ULB Credit (PCA) & $0.4821$ & $0.5150$ & $0.7348$ & $0.7288$ & $\mathbf{0.7554}$ & $0.7542$ & $\mathbf{0.7614}$ & $\mathbf{0.7538}$ & $0.315$ / $0.271$ \\
 Scania APS (76k) & $0.5260$ & $0.4978$ & $0.8483$ & $0.8482$ & $\mathbf{0.8930}$ & $\mathbf{0.8939}$ & $0.8701$ & $\mathbf{0.8937}$ & $\mathbf{0.001}$ / $\mathbf{0.001}$ \\
-Home Credit (7-Table) & $0.1678$ & $0.1394$ & $0.2449$ & $0.2449$ & $\mathbf{0.2557}$ & $0.2586$ & $0.2477$ & $\mathbf{0.2591}$ & $\mathbf{0.003}$ / $\mathbf{0.003}$ \\
-IEEE-CIS Fraud (590k) & $0.1974$ & $0.1874$ & $0.4841$ & $0.4798$ & $\mathbf{0.5015}$ & $0.5021$ & $0.4759$ & $\mathbf{0.5031}$ & $\mathbf{0.048}$ / $\mathbf{0.012}$ \\
-NeurIPS BAF (1.00M) & $0.0795$ & $0.0637$ & $0.1101$ & $0.1101$ & $\mathbf{0.1574}$ & $0.1638$ & $0.1572$ & $\mathbf{0.1660}$ & $\mathbf{0.010}$ / $\mathbf{0.010}$ \\
+Home Credit (7T) & $0.1678$ & $0.1394$ & $0.2449$ & $0.2449$ & $\mathbf{0.2557}$ & $0.2586$ & $0.2477$ & $\mathbf{0.2591}$ & $\mathbf{0.003}$ / $\mathbf{0.003}$ \\
+IEEE-CIS (590k) & $0.1974$ & $0.1874$ & $0.4841$ & $0.4798$ & $\mathbf{0.5015}$ & $0.5021$ & $0.4759$ & $\mathbf{0.5031}$ & $\mathbf{0.048}$ / $\mathbf{0.012}$ \\
+NeurIPS BAF (1M) & $0.0795$ & $0.0637$ & $0.1101$ & $0.1101$ & $\mathbf{0.1574}$ & $0.1638$ & $0.1572$ & $\mathbf{0.1660}$ & $\mathbf{0.010}$ / $\mathbf{0.010}$ \\
 \bottomrule
 \end{tabular}%
 }
-\end{table*}
+\end{table}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{fig2_ablation_ladder.pdf}
-\caption{Single-factor knockout ablation ladder across all 9 multi-channel / multi-table cohorts ($45$ splits). Comparing identical single-GBDT decoders trained on channels chosen by $100\%$-row Global MI (A4), classical $5\pi$ Unmatched Case-Control MI (A4b), and Score-Matched CREDO REG (A5), alongside Equal-Capacity 6-Learner Ensemble (A5b), Pure Orthogonal Lattice (A6), and Full CREDO Hybrid Lattice (A7).}
+\caption{Representative multi-channel knockout ablation arms across all 9 cohorts ($45$ splits), comparing baseline GBDT (A0), SMOTE+GBDT (A1), $100\%$-row Global MI (A4), Pure Orthogonal Lattice (A6), and Full CREDO $\kappa_0$-Hybrid Lattice (A7) on Test AUPRC (Left, A) and certified Neyman--Pearson sensitivity at strict FPR budget (Right, B); complete numerical results including A4b, A5, and A5b are reported in Table~\ref{tab:ablation}.}
 \label{fig:ablation}
 \end{figure}
 
 Table~\ref{tab:ablation} establishes four key findings:
 \begin{enumerate}
-  \item \textbf{Head-to-Head Superiority Over Unmatched Case-Control MI (`A5` vs.\ `A4b`):} Single-GBDT score-matched CREDO REG (`A5`) achieves a \textbf{strictly higher mean test AUPRC than classical $4:1$ Unmatched Case-Control MI (`A4b`) on 9 out of 9 cohorts} and achieves statistically significant one-sided Nadeau--Bengio wins on \textbf{7 out of 9 cohorts} ($p_{\text{NB}} \le 0.030$), lifting single-tree AUPRC from $0.1979 \to 0.2203$ on \texttt{UCI Diabetes 130-US} ($p_{\text{NB}} = 0.030$, even while measuring only $33.5\%$ vs.\ $55.9\%$ of patient encounters), $0.5188 \to 0.7869$ on \texttt{Gate 0.5}, $0.5125 \to 0.7433$ on \texttt{UCI AI4I}, $0.8482 \to 0.8930$ on \texttt{Scania APS}, $0.2449 \to 0.2557$ on \texttt{Home Credit}, $0.4798 \to 0.5015$ on \texttt{IEEE-CIS}, and $0.1101 \to 0.1574$ on \texttt{NeurIPS BAF 1M} (as well as $0.4453 \to 0.4499$ on \texttt{UCI Taiwan Credit} and $0.7288 \to 0.7554$ on \texttt{ULB Credit Card}).
-  \item \textbf{Superiority Over $100\%$-Row Global MI While Slashing Pilot Volume (`A5` vs.\ `A4`):} Even when `Global MI` (`A4`) is granted access to $100\%$ of training rows, single-GBDT CREDO REG (`A5`) achieves \textbf{higher or equal mean test AUPRC on 9 out of 9 cohorts} (`8/9` strictly higher + `1/9` exact tie on \texttt{UCI Diabetes} at $0.2203$, where `Full CREDO` reaches $0.2231$) and statistically significant wins on \textbf{6 out of 9 cohorts} ($p_{\text{NB}} \le 0.048$) because `A4` wastes half of its acquisition budget on the baseline-repackaging proxy channel. Meanwhile, CREDO cuts pilot measurement to $33.5\%$ of encounters on \texttt{UCI Diabetes}, $4.9\%$ on \texttt{NeurIPS BAF 1M}, and $1.6\%$ on \texttt{ULB Credit Card} ($62\times$ reduction in pilot measurement volume).
-  \item \textbf{Empirical Gains From Proposition~\ref{prop:matching_ratio}'s Adaptive $m(\pi) \in \{2,4,8\}$:} Comparing Proposition~\ref{prop:matching_ratio}'s prevalence-adaptive rule against a rigid $m=4$ ($5\pi$) pilot across the three boundary cohorts confirms both tails: in Regime~I ($\pi \ge 10\%$), reducing $m$ from $4 \to 2$ ($3\pi$) on \texttt{UCI Diabetes 130-US} ($\pi=11.16\%$) selects the \emph{exact same} clinical channels on $5/5$ splits (`0.2203` AUPRC) while cutting pilot chart-review volume by $40\%$ ($55.9\% \to 33.5\%$), and on \texttt{UCI Taiwan Credit} ($\pi=18.67\%$) cuts pilot volume from $93.3\% \to 56.0\%$ while lifting `A5` AUPRC from $0.4445 \to 0.4499$ (`A7` $0.4504 \to 0.4524$) by avoiding exhaustion of High-Signal False Positives. In Regime~III ($\pi < 0.5\%$), increasing $m$ from $4 \to 8$ ($9\pi$) on ultra-rare \texttt{ULB Credit Card} ($\pi=0.172\%$) stabilizes the false-alarm denominator across the 5 chronological windows and lifts `A5` AUPRC from $0.6977 \to 0.7554$ (`A7` $0.7374 \to 0.7538$) while still measuring only $1.6\%$ of transactions.
-  \item \textbf{Adaptive $\kappa_0$ Routing (`A7` vs.\ `A6` and `A5b`):} On cohorts where Stage-2 channels share common-mode negative confounders (\texttt{Scania APS} $\kappa_0 = 6.26$, \texttt{UCI AI4I} $\kappa_0 = 3.89$, \texttt{IEEE-CIS} $\kappa_0 = 2.51$), separate-branch orthogonal fusion (`A6`) suffers false-alarm coincidence inflation ($0.8701$, $0.6964$, $0.4759$). The LIGO shift-surrogate $\kappa_0$ gate automatically shifts log-odds weight toward the 6-learner coupled fusion arm, lifting `A7` (`Full CREDO`) to $0.8937$, $0.7230$, and $0.5031$.
+  \item \textbf{Head-to-Head Superiority Over Unmatched Case-Control MI (A5 vs.\ A4b):} Single-GBDT score-matched CREDO REG (A5) achieves a \textbf{strictly higher mean test AUPRC than classical $4:1$ Unmatched Case-Control MI (A4b) on 9 out of 9 cohorts} and achieves statistically significant one-sided Nadeau--Bengio wins on \textbf{7 out of 9 cohorts} ($p_{\text{NB}} \le 0.030$), lifting single-tree AUPRC from $0.1979 \to 0.2203$ on \texttt{UCI Diabetes 130-US} ($p_{\text{NB}} = 0.030$, even while measuring only $33.5\%$ vs.\ $55.9\%$ of patient encounters), $0.5188 \to 0.7869$ on \texttt{Gate 0.5}, $0.5125 \to 0.7433$ on \texttt{UCI AI4I}, $0.8482 \to 0.8930$ on \texttt{Scania APS}, $0.2449 \to 0.2557$ on \texttt{Home Credit}, $0.4798 \to 0.5015$ on \texttt{IEEE-CIS}, and $0.1101 \to 0.1574$ on \texttt{NeurIPS BAF 1M} (as well as $0.4453 \to 0.4499$ on \texttt{UCI Taiwan Credit} and $0.7288 \to 0.7554$ on \texttt{ULB Credit Card}).
+  \item \textbf{Superiority Over $100\%$-Row Global MI While Slashing Pilot Volume (A5 vs.\ A4):} Even when Global MI (A4) is granted access to $100\%$ of training rows, single-GBDT CREDO REG (A5) achieves \textbf{higher or equal mean test AUPRC on 9 out of 9 cohorts} ($8/9$ strictly higher plus $1/9$ exact tie on \texttt{UCI Diabetes} at $0.2203$, where Full CREDO reaches $0.2231$) and statistically significant wins on \textbf{6 out of 9 cohorts} ($p_{\text{NB}} \le 0.048$) because A4 wastes half of its acquisition budget on the baseline-repackaging proxy channel. Meanwhile, CREDO cuts pilot measurement to $33.5\%$ of encounters on \texttt{UCI Diabetes}, $4.9\%$ on \texttt{NeurIPS BAF 1M}, and $1.6\%$ on \texttt{ULB Credit Card} ($62\times$ reduction in pilot measurement volume).
+  \item \textbf{Empirical Gains From Proposition~\ref{prop:matching_ratio}'s Adaptive $m(\pi) \in \{2,4,8\}$:} Comparing Proposition~\ref{prop:matching_ratio}'s prevalence-adaptive rule against a rigid $m=4$ ($5\pi$) pilot across the three boundary cohorts confirms both tails: in Regime~I ($\pi \ge 10\%$), reducing $m$ from $4 \to 2$ ($3\pi$) on \texttt{UCI Diabetes 130-US} ($\pi=11.16\%$) selects the \emph{exact same} clinical channels on $5/5$ splits ($0.2203$ AUPRC) while cutting pilot chart-review volume by $40\%$ ($55.9\% \to 33.5\%$), and on \texttt{UCI Taiwan Credit} ($\pi=18.67\%$) cuts pilot volume from $93.3\% \to 56.0\%$ while lifting A5 AUPRC from $0.4445 \to 0.4499$ (A7 $0.4504 \to 0.4524$) by avoiding exhaustion of High-Signal False Positives. In Regime~III ($\pi < 0.5\%$), increasing $m$ from $4 \to 8$ ($9\pi$) on ultra-rare \texttt{ULB Credit Card} ($\pi=0.172\%$) stabilizes the false-alarm denominator across the 5 chronological windows and lifts A5 AUPRC from $0.6977 \to 0.7554$ (A7 $0.7374 \to 0.7538$) while still measuring only $1.6\%$ of transactions.
+  \item \textbf{Adaptive $\kappa_0$ Routing (A7 vs.\ A6 and A5b):} On cohorts where Stage-2 channels share common-mode negative confounders (\texttt{Scania APS} $\kappa_0 = 6.26$, \texttt{UCI AI4I} $\kappa_0 = 3.89$, \texttt{IEEE-CIS} $\kappa_0 = 2.51$), separate-branch orthogonal fusion (A6) suffers false-alarm coincidence inflation ($0.8701$, $0.6964$, $0.4759$). The LIGO shift-surrogate $\kappa_0$ gate automatically shifts log-odds weight toward the 6-learner coupled fusion arm, lifting A7 (Full CREDO) to $0.8937$, $0.7230$, and $0.5031$.
 \end{enumerate}
 
 \subsection{Verification of Theorem 3: Evidence-Deficit Foveation vs.\ Classical Mid-Band Conformal Routing}
 
 Table~\ref{tab:foveation} and Figure~\ref{fig:foveation} test Theorem~\ref{thm:foveation} by comparing CREDO Evidence-Deficit Upper-Tail Foveation ($\mathcal{Q}_{\text{CREDO}} = \{1 \in \mathcal{C}_1(x)\} \cap \{D_q(x) > 0\}$) head-to-head against Classical Mid-Band Conformal routing ($\mathcal{M}_{\text{mid}} = \{\mathcal{C}_1(x) = \{0,1\}\}$, padded at the boundary to the \textbf{exact same Stage-2 query count $K$}) across all 9 cohorts.
 
-\begin{table*}[t]
+\begin{table}[t]
 \centering
 \caption{Verification of Theorem 3 (Rare-Event Conformal Singleton Paradox) across all 9 cohorts ($45$ splits). At the exact same Stage-2 query budget, CREDO Evidence-Deficit Foveation outperforms Classical Mid-Band Conformal $\{0,1\}$ abstention on 9/9 cohorts while eliminating $26.0\%$ to $79.0\%$ of runtime Stage-2 lookups ($41.4\%$ to $79.0\%$ on low-prevalence cohorts with $\pi \le 8\%$).}
 \label{tab:foveation}
 \vspace{2pt}
 \resizebox{\textwidth}{!}{%
+\small
+\setlength{\tabcolsep}{4.2pt}
 \begin{tabular}{lccccccc}
 \toprule
-\textbf{Cohort} & \textbf{Pilot Rows} & \textbf{Stage-2} & \textbf{Stage-1 Only} & \textbf{Classical Mid-Band} & \textbf{CREDO Deficit Foveation} & \textbf{100\% Stage-2} & \textbf{Fov vs.\ Mid-Band} \\
- & \textbf{Measured} & \textbf{Saved} & \textbf{AUPRC} & \textbf{Conformal $\{0,1\}$} & ($\hat{Y}\in\mathcal{C}_1 \cap D_q>0$) & \textbf{AUPRC} & \textbf{Holm $p_{\text{FWER}}$} \\
+\textbf{Cohort} & \textbf{Pilot} & \textbf{Stage-2} & \textbf{Stage-1} & \textbf{Mid-Band} & \textbf{CREDO Foveation} & \textbf{100\% S2} & \textbf{Holm} \\
+ & \textbf{Rows} & \textbf{Saved} & \textbf{AUPRC} & \textbf{Conf.\ $\{0,1\}$} & ($1\in\mathcal{C}_1 \cap D_q>0$) & \textbf{AUPRC} & $p_{\text{FWER}}$ \\
 \midrule
-Gate 0.5 Ground Truth & $20.5\%$ & $\mathbf{62.9\%}$ & $0.2104$ & $0.4623$ & $\mathbf{0.6785}$ ($+0.2162$) & $0.8143$ & $\mathbf{0.00249}$ \\
-UCI AI4I Maintenance & $16.9\%$ & $\mathbf{77.1\%}$ & $0.3606$ & $0.4508$ & $\mathbf{0.6335}$ ($+0.1827$) & $0.7230$ & $0.07098$ \\
+Gate 0.5 Truth & $20.5\%$ & $\mathbf{62.9\%}$ & $0.2104$ & $0.4623$ & $\mathbf{0.6785}$ ($+0.2162$) & $0.8143$ & $\mathbf{0.00249}$ \\
+UCI AI4I Maint. & $16.9\%$ & $\mathbf{77.1\%}$ & $0.3606$ & $0.4508$ & $\mathbf{0.6335}$ ($+0.1827$) & $0.7230$ & $0.07098$ \\
 UCI Taiwan Credit & $56.0\%$ & $\mathbf{34.6\%}$ & $0.2474$ & $0.3966$ & $\mathbf{0.4226}$ ($+0.0260$) & $0.4524$ & $0.12457$ \\
-UCI Diabetes 130-US & $33.5\%$ & $\mathbf{26.0\%}$ & $0.1305$ & $0.1981$ & $\mathbf{0.2091}$ ($+0.0110$) & $0.2231$ & $0.13691$ \\
-ULB Credit Card Fraud & $1.6\%$ & $\mathbf{79.0\%}$ & $0.4821$ & $0.4877$ & $\mathbf{0.7087}$ ($+0.2210$) & $0.7538$ & $0.05652$ \\
+UCI Diabetes 130 & $33.5\%$ & $\mathbf{26.0\%}$ & $0.1305$ & $0.1981$ & $\mathbf{0.2091}$ ($+0.0110$) & $0.2231$ & $0.13691$ \\
+ULB Credit Fraud & $1.6\%$ & $\mathbf{79.0\%}$ & $0.4821$ & $0.4877$ & $\mathbf{0.7087}$ ($+0.2210$) & $0.7538$ & $0.05652$ \\
 Scania APS (76k) & $9.0\%$ & $\mathbf{78.6\%}$ & $0.5260$ & $0.5505$ & $\mathbf{0.8869}$ ($+0.3364$) & $0.8937$ & $\mathbf{0.00241}$ \\
-Home Credit (7-Table) & $40.4\%$ & $\mathbf{41.4\%}$ & $0.1678$ & $0.2040$ & $\mathbf{0.2501}$ ($+0.0461$) & $0.2591$ & $\mathbf{0.00227}$ \\
-IEEE-CIS Fraud (590k) & $18.0\%$ & $\mathbf{62.0\%}$ & $0.1974$ & $0.2294$ & $\mathbf{0.4783}$ ($+0.2489$) & $0.5031$ & $\mathbf{0.00014}$ \\
-NeurIPS BAF (1.00M) & $4.9\%$ & $\mathbf{61.9\%}$ & $0.0795$ & $0.0850$ & $\mathbf{0.1612}$ ($+0.0762$) & $0.1660$ & $\mathbf{0.00241}$ \\
+Home Credit (7T) & $40.4\%$ & $\mathbf{41.4\%}$ & $0.1678$ & $0.2040$ & $\mathbf{0.2501}$ ($+0.0461$) & $0.2591$ & $\mathbf{0.00227}$ \\
+IEEE-CIS (590k) & $18.0\%$ & $\mathbf{62.0\%}$ & $0.1974$ & $0.2294$ & $\mathbf{0.4783}$ ($+0.2489$) & $0.5031$ & $\mathbf{0.00014}$ \\
+NeurIPS BAF (1M) & $4.9\%$ & $\mathbf{61.9\%}$ & $0.0795$ & $0.0850$ & $\mathbf{0.1612}$ ($+0.0762$) & $0.1660$ & $\mathbf{0.00241}$ \\
 \bottomrule
 \end{tabular}%
 }
-\end{table*}
+\end{table}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.96\textwidth]{fig3_kappa0_and_foveation.pdf}
-\caption{Left: LIGO negative-tail coincidence diagnostic $\kappa_0$ vs.\ empirical-Bayes orthogonal lattice weight $w_{\text{orth}}$. Right: Verification of Theorem 3 across all 9 cohorts, comparing Stage-1 Only, Classical Mid-Band Conformal $\{0,1\}$, CREDO Evidence-Deficit Foveation at identical Stage-2 query budgets, and $100\%$ Stage-2 evaluation.}
+\caption{Left (A): Calibration negative-tail coincidence ratio $\kappa_0$ versus Test AUPRC delta of Pure Orthogonal Lattice and $\kappa_0$-Hybrid Lattice relative to a monolithic GBDT across all 9 cohorts. Right (B): End-to-end measurement budget saved during training-time case-cohort channel discovery ($(1+m(\pi))\pi$ pilot) and runtime Stage-2 Evidence-Deficit Conformal Foveation.}
 \label{fig:foveation}
 \end{figure}
 
@@ -308,13 +318,13 @@ As predicted by Theorem~\ref{thm:foveation}, on every rare-event benchmark ($\pi
 
 \section{Discussion, Limitations, and Conclusions}
 
-Our theoretical and empirical results resolve a longstanding tension between biostatistical theory and applied machine learning in rare-event screening. When practitioners observe low AUPRC on an imbalanced clinical or biological dataset, the standard workflow applies SMOTE, ADASYN, or undersampled boosting ensembles to the existing feature table. Theorem~\ref{thm:saturation} and Table~\ref{tab:tier1} demonstrate that once gradient-boosted trees are regularized against small-Hessian step divergence ($\texttt{max\_delta\_step}=1.0$) and calibrated on natural prevalence, fixed-table resampling offers zero statistically significant AUPRC benefit ($0/10$ datasets) and degrades performance on all four large-scale multi-table cohorts.
+Our theoretical and empirical results resolve a longstanding tension between biostatistical theory and applied machine learning in rare-event screening. When practitioners observe low AUPRC on an imbalanced clinical or biological dataset, the standard workflow applies SMOTE, ADASYN, or undersampled boosting ensembles to the existing feature table. Theorem~\ref{thm:saturation} and Table~\ref{tab:tier1} demonstrate that once gradient-boosted trees are regularized against small-Hessian step divergence (\texttt{max\_delta\_step}$=1.0$) and calibrated on natural prevalence, fixed-table resampling offers zero statistically significant AUPRC benefit ($0/10$ datasets) and degrades performance on all four large-scale multi-table cohorts.
 
 Conversely, when performance is limited by fixed-channel information saturation ($D_q(x) > 0$), CREDO provides a budget-disciplined biostatistical framework: (1) sample a prevalence-adaptive $(1+m(\pi))\pi$ baseline-score-matched case-cohort pilot to reject collinear baseline echoes and acquire orthogonal Stage-2 diagnostic channels (Theorem~\ref{thm:reg} and Proposition~\ref{prop:matching_ratio}), and (2) deploy Evidence-Deficit Upper-Tail Conformal Foveation at runtime to verify Stage-1 $\{1\}$ false positives while pruning confident negatives (Theorem~\ref{thm:foveation} and Proposition~\ref{prop:two_stage}).
 
-\textbf{Operational Design Guidelines ($m(\pi)$ Matching Ratio and Two-Stage Sufficiency):} Propositions~\ref{prop:matching_ratio} and~\ref{prop:two_stage} clarify two practical design questions. First, while $m = 4$ ($5\pi$ total pilot size, $\operatorname{ARE} = 80\%$) is the canonical sweet spot for classic rare events with continuous channels ($\pi \in [0.5\%, 10\%]$), adapting $m(\pi)$ across prevalence regimes prevents both high-prevalence saturation and ultra-rare denominator instability: under moderate imbalance ($\pi \ge 10\%$, such as \texttt{UCI Diabetes} at $11.2\%$ or \texttt{UCI Taiwan Credit} at $18.7\%$), setting $m(\pi) = 2$ cuts pilot measurement to $33.5\%$ and $56.0\%$ while preventing exhaustion of High-Signal False Positives in the upper risk strata, whereas under ultra-rare prevalence ($\pi < 0.5\%$, such as \texttt{ULB} at $0.172\%$) or sparse binary trigger channels, setting $m(\pi) = 8$ reaches $88.9\%$ efficiency and lifts single-GBDT test AUPRC from $0.6977 \to 0.7554$ while still sampling only $1.6\%$ of the cohort. Second, Proposition~\ref{prop:two_stage} explains why two stages ($S=2$) suffice on large rare-event cohorts: Stage 1 already prunes $61.9\%$--$79.0\%$ of obvious true negatives on low-prevalence cohorts ($\pi \le 8\%$), leaving a compact upper-tail candidate pool where secondary features that were diluted across the global negative majority regain full conditional leverage, whereas $S \ge 3$ stages incur additive false-negative leakage ($\sum_{s=1}^{S-1}\alpha_{1,s}$) and $\sqrt{S-1}$ calibration-fold positive starvation (`Gate C`) for negligible additional lookup savings.
+\textbf{Operational Design Guidelines ($m(\pi)$ Matching Ratio and Two-Stage Sufficiency):} Propositions~\ref{prop:matching_ratio} and~\ref{prop:two_stage} clarify two practical design questions. First, while $m = 4$ ($5\pi$ total pilot size, $\operatorname{ARE} = 80\%$) is the canonical sweet spot for classic rare events with continuous channels ($\pi \in [0.5\%, 10\%]$), adapting $m(\pi)$ across prevalence regimes prevents both high-prevalence saturation and ultra-rare denominator instability: under moderate imbalance ($\pi \ge 10\%$, such as \texttt{UCI Diabetes} at $11.2\%$ or \texttt{UCI Taiwan Credit} at $18.7\%$), setting $m(\pi) = 2$ cuts pilot measurement to $33.5\%$ and $56.0\%$ while preventing exhaustion of High-Signal False Positives in the upper risk strata, whereas under ultra-rare prevalence ($\pi < 0.5\%$, such as \texttt{ULB} at $0.172\%$) or sparse binary trigger channels, setting $m(\pi) = 8$ reaches $88.9\%$ efficiency and lifts single-GBDT test AUPRC from $0.6977 \to 0.7554$ while still sampling only $1.6\%$ of the cohort. Second, Proposition~\ref{prop:two_stage} explains why two stages ($S=2$) suffice on large rare-event cohorts: Stage 1 already prunes $61.9\%$--$79.0\%$ of obvious true negatives on low-prevalence cohorts ($\pi \le 8\%$), leaving a compact upper-tail candidate pool where secondary features that were diluted across the global negative majority regain full conditional leverage, whereas $S \ge 3$ stages incur additive false-negative leakage ($\sum_{s=1}^{S-1}\alpha_{1,s}$) and $\sqrt{S-1}$ calibration-fold positive starvation (Gate~C) for negligible additional lookup savings.
 
-\textbf{Limitations and Scope Conditions:} Two explicit boundary conditions govern our method. First, when baseline prevalence $\pi$ approaches $20\%$ (as in \texttt{UCI Taiwan Credit}, $\pi = 18.67\%$), even a reduced $m(\pi)=2$ ($3\pi$) case-cohort pilot encompasses $56.0\%$ of the training cohort, so case-cohort sampling provides more modest pilot savings ($44.0\%$ saved) than in rare-event regimes ($\pi \le 8\%$, where $59.6\%$--$98.4\%$ of pilot rows are saved). Second, when candidate channels have already been pre-orthogonalized via principal component analysis (as in \texttt{ULB Credit Card}, where features \texttt{V1}--\texttt{V28} are orthogonal PCA eigenvectors), marginal mutual information is less confounded by collinear baseline echoes, though score-matched CREDO REG with $m(\pi)=8$ still improves mean AUPRC ($0.7554$ vs.\ $0.7348$ for $100\%$-row `Global MI`) while measuring $62\times$ fewer pilot rows and $79.0\%$ fewer runtime Stage-2 queries. Finally, all empirical evaluations in this study are retrospective computational benchmarks on de-identified public datasets; prospective clinical deployment requires institutional regulatory and safety validation.
+\textbf{Limitations and Scope Conditions:} Two explicit boundary conditions govern our method. First, when baseline prevalence $\pi$ approaches $20\%$ (as in \texttt{UCI Taiwan Credit}, $\pi = 18.67\%$), even a reduced $m(\pi)=2$ ($3\pi$) case-cohort pilot encompasses $56.0\%$ of the training cohort, so case-cohort sampling provides more modest pilot savings ($44.0\%$ saved) than in rare-event regimes ($\pi \le 8\%$, where $59.6\%$--$98.4\%$ of pilot rows are saved). Second, when candidate channels have already been pre-orthogonalized via principal component analysis (as in \texttt{ULB Credit Card}, where features \texttt{V1}--\texttt{V28} are orthogonal PCA eigenvectors), marginal mutual information is less confounded by collinear baseline echoes, though score-matched CREDO REG with $m(\pi)=8$ still improves mean AUPRC ($0.7554$ vs.\ $0.7348$ for $100\%$-row Global MI) while measuring $62\times$ fewer pilot rows and $79.0\%$ fewer runtime Stage-2 queries. Finally, all empirical evaluations in this study are retrospective computational benchmarks on de-identified public datasets; prospective clinical deployment requires institutional regulatory and safety validation.
 
 \appendix
 \section{Mathematical Proofs of Theorems 1--3 and Propositions 1--2}

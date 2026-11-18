@@ -1463,7 +1463,7 @@ def _plot_multiseed_fig2_ablations(cohorts: list[dict[str, Any]], stem: Path) ->
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(short_names, rotation=16, ha="right", fontsize=8.5)
     axes[0].set_ylabel("Test AUPRC (Mean ± SD Across 5 Splits)")
-    axes[0].set_title("A. 8-Arm Knockout Ablation: Test AUPRC")
+    axes[0].set_title("A. Multi-Channel Knockout Ablation: Test AUPRC")
     axes[0].legend(fontsize=7.8)
     axes[0].grid(axis="y", alpha=0.3)
 

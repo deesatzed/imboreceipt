@@ -2,7 +2,7 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent blind screening audit of main.tex and references.bib for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. The abstract is within arXiv's 1,920-character limit (1,885 characters), line 122 now uses the general (1+m(pi))pi notation, and all AI/program attribution, ethics exemption, data/code availability, citation integrity, and numerical consistency checks across all 10 fixed-table benchmarks and 9 multi-channel cohorts are fully satisfied.",
+  "summary": "Independent blind screening audit of the polished main.tex and references.bib for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. All typography, figure/table captions, BibTeX acronym bracing, AI/program attribution, ethics exemption, data/code availability, citation integrity, and numerical consistency checks across all 10 fixed-table benchmarks and 9 multi-channel cohorts are verified and compliant.",
   "blockers": [],
   "warnings": [],
   "checked_files": [
@@ -10,7 +10,7 @@
     "references.bib"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "e334d4417c852d8cdf3039ba59f37919e4f0dabd0ea702f81681516ce0980a99",
+  "manuscript_sha256": "40be8ba0f8529756ddfb8e3115faaf74b9c89b2784ba20f12cd1ce083434aa52",
   "file_count": 10,
-  "recorded_at": "2026-11-18T15:38:55.857399+00:00"
+  "recorded_at": "2026-11-18T16:09:06.741542+00:00"
 }

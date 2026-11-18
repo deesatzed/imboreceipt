@@ -25,7 +25,7 @@ Yoav Benjamini and Yosef Hochberg.
 \bibitem[Chawla et~al.(2002)Chawla, Bowyer, Hall, and
   Kegelmeyer]{chawla2002smote}
 Nitesh~V. Chawla, Kevin~W. Bowyer, Lawrence~O. Hall, and W.~Philip Kegelmeyer.
-\newblock Smote: Synthetic minority over-sampling technique.
+\newblock {SMOTE}: Synthetic minority over-sampling technique.
 \newblock \emph{Journal of Artificial Intelligence Research}, 16:\penalty0
   321--357, 2002.
 \newblock \doi{10.1613/jair.953}.
@@ -42,7 +42,7 @@ Andrea Dal~Pozzolo, Olivier Caelen, Yann-Ael Le~Borgne, Serge Waterschoot, and
 
 \bibitem[Davis and Goadrich(2006)]{davis2006relationship}
 Jesse Davis and Mark Goadrich.
-\newblock The relationship between precision-recall and roc curves.
+\newblock The relationship between {Precision-Recall} and {ROC} curves.
 \newblock In \emph{Proceedings of the 23rd International Conference on Machine
   Learning}, pages 233--240, 2006.
 \newblock \doi{10.1145/1143844.1143874}.
@@ -56,7 +56,8 @@ Charles Elkan and Keith Noto.
 
 \bibitem[He et~al.(2008)He, Bai, Garcia, and Li]{he2008adasyn}
 Haibo He, Yang Bai, Edwardo~A. Garcia, and Shutao Li.
-\newblock Adasyn: Adaptive synthetic sampling approach for imbalanced learning.
+\newblock {ADASYN}: Adaptive synthetic sampling approach for imbalanced
+  learning.
 \newblock In \emph{2008 IEEE International Joint Conference on Neural Networks
   (IEEE World Congress on Computational Intelligence)}, pages 1322--1328, 2008.
 \newblock \doi{10.1109/IJCNN.2008.4633969}.
@@ -66,7 +67,7 @@ Haibo He, Yang Bai, Edwardo~A. Garcia, and Shutao Li.
 Sergio Jesus, Jose Pombal, Duarte Alves, Andre Cruz, Pedro Saleiro, Rita~P.
   Ribeiro, Joao Gama, and Pedro Bizarro.
 \newblock Turning the tables: Biased, imbalanced, dynamic tabular datasets for
-  ml evaluation.
+  {ML} evaluation.
 \newblock \emph{Advances in Neural Information Processing Systems},
   35:\penalty0 33563--33575, 2022.
 \newblock \doi{10.48550/arXiv.2211.13358}.
@@ -127,8 +128,8 @@ Mauricio Sadinle, Jing Lei, and Larry Wasserman.
 
 \bibitem[Saito and Rehmsmeier(2015)]{saito2015precision}
 Takaya Saito and Marc Rehmsmeier.
-\newblock The precision-recall plot is more informative than the roc plot when
-  evaluating binary classifiers on imbalanced datasets.
+\newblock The precision-recall plot is more informative than the {ROC} plot
+  when evaluating binary classifiers on imbalanced datasets.
 \newblock \emph{PLOS ONE}, 10\penalty0 (3):\penalty0 e0118432, 2015.
 \newblock \doi{10.1371/journal.pone.0118432}.
 
@@ -144,7 +145,7 @@ Marten Scheffer, Jordi Bascompte, William~A. Brock, Victor Brovkin, Stephen~R.
 \bibitem[Seiffert et~al.(2010)Seiffert, Khoshgoftaar, Van~Hulse, and
   Napolitano]{seiffert2010rusboost}
 Chris Seiffert, Taghi~M. Khoshgoftaar, Jason Van~Hulse, and Amri Napolitano.
-\newblock Rusboost: A hybrid approach to alleviating class imbalance.
+\newblock {RUSBoost}: A hybrid approach to alleviating class imbalance.
 \newblock \emph{IEEE Transactions on Systems, Man, and Cybernetics - Part A:
   Systems and Humans}, 40\penalty0 (1):\penalty0 185--197, 2010.
 \newblock \doi{10.1109/TSMCA.2009.2029559}.
@@ -153,7 +154,7 @@ Chris Seiffert, Taghi~M. Khoshgoftaar, Jason Van~Hulse, and Amri Napolitano.
   Clore]{strack2014impact}
 Beata Strack, Jonathan~P. DeShazo, Chris Gennings, Juan~L. Olmo, Sebastian
   Ventura, Krzysztof~J. Cios, and John~N. Clore.
-\newblock Impact of hba1c measurement on hospital readmission rates: Analysis
+\newblock Impact of {HbA1c} measurement on hospital readmission rates: Analysis
   of 70,000 clinical database patient records.
 \newblock \emph{BioMed Research International}, 2014:\penalty0 781670, 2014.
 \newblock \doi{10.1155/2014/781670}.
