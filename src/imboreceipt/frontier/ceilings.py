@@ -202,49 +202,47 @@ def estimate_observed_channel_ceiling_bound(
     with achieved model score (respecting the Asymmetry of Proof: true ceiling >= achieved).
     """
     prep = TabularPreprocessor(semantic_types=semantic_types).fit(X_train)
-    X_all = np.vstack([prep.transform(X_train), prep.transform(X_eval)])
-    y_all = np.concatenate([np.asarray(y_train, dtype=int), np.asarray(y_eval, dtype=int)])
+    X_tr_m = prep.transform(X_train)
+    X_ev_m = prep.transform(X_eval)
+    y_tr_arr = np.asarray(y_train, dtype=int)
 
-    n = X_all.shape[0]
+    n = X_tr_m.shape[0]
     if n > 8000:
         rng = np.random.default_rng(42)
-        pos_i = np.flatnonzero(y_all == 1)
-        neg_i = np.flatnonzero(y_all == 0)
+        pos_i = np.flatnonzero(y_tr_arr == 1)
+        neg_i = np.flatnonzero(y_tr_arr == 0)
         keep_pos = rng.choice(pos_i, size=2500, replace=False) if pos_i.size > 2500 else pos_i
         keep_neg = rng.choice(
             neg_i, size=min(neg_i.size, 9500, max(4000, keep_pos.size * 5)), replace=False
         )
         sub = np.concatenate([keep_pos, keep_neg])
-        # Reweight back to exact natural prevalence when computing local posterior eta(x)
         w_pos = float(pos_i.size) / max(1.0, float(keep_pos.size))
         w_neg = float(neg_i.size) / max(1.0, float(keep_neg.size))
-        X_sub = X_all[sub]
-        y_sub = y_all[sub]
+        X_ref = X_tr_m[sub]
+        y_ref = y_tr_arr[sub]
     else:
         w_pos = 1.0
         w_neg = 1.0
-        X_sub = X_all
-        y_sub = y_all
+        X_ref = X_tr_m
+        y_ref = y_tr_arr
 
-    k = min(21, max(5, int(np.sqrt(X_sub.shape[0]) // 2)))
+    k = min(21, max(5, int(np.sqrt(X_ref.shape[0]) // 2)))
     nn = NearestNeighbors(n_neighbors=k, metric="euclidean", n_jobs=4)
-    nn.fit(X_sub)
-    _, idx = nn.kneighbors(X_sub)
-    # Leave-one-out local posterior estimate eta_hat(x_i)
-    nbr_y = y_sub[idx[:, 1:]]
+    nn.fit(X_ref)
+    # Out-of-sample kNN query on X_eval against training reference X_ref
+    _, idx = nn.kneighbors(X_ev_m)
+    nbr_y = y_ref[idx]
     pos_counts = np.sum(nbr_y == 1, axis=1).astype(float) * w_pos
     neg_counts = np.sum(nbr_y == 0, axis=1).astype(float) * w_neg
     eta_local = pos_counts / np.maximum(1e-9, pos_counts + neg_counts)
 
-    # Under Bayes oracle with true posterior eta(X), expected AUPRC is computed by sorting eta
     order = np.argsort(-eta_local, kind="mergesort")
     eta_sorted = eta_local[order]
-    row_weights = np.where(y_sub[order] == 1, w_pos, w_neg)
-    expected_tp = np.cumsum(eta_sorted * row_weights)
-    expected_alerts = np.cumsum(row_weights)
+    expected_tp = np.cumsum(eta_sorted)
+    expected_alerts = np.arange(1.0, len(eta_sorted) + 1.0)
     total_expected_pos = max(1e-9, float(expected_tp[-1]))
-    prec_curve = expected_tp / np.maximum(1e-9, expected_alerts)
-    delta_rec = (eta_sorted * row_weights) / total_expected_pos
+    prec_curve = expected_tp / expected_alerts
+    delta_rec = eta_sorted / total_expected_pos
     knn_bayes_auprc = float(np.sum(prec_curve * delta_rec))
 
     # Bound above achieved score and clip to [achieved, 0.999]

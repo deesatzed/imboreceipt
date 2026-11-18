@@ -68,8 +68,12 @@ ABLATION_LADDER_ORDER: tuple[tuple[str, str], ...] = (
     ("smote_gbdt", "A1: SMOTE + GBDT (X_base)"),
     ("receipt_repaired_xbase", "A2: Receipt Repair Only (X_base)"),
     ("monolithic_random", "A3: Random Channels + Monolithic GBDT"),
-    ("monolithic_global_mi", "A4: Full-Cohort Global MI + Monolithic GBDT"),
-    ("monolithic_credo_reg", "A5: Case-Cohort CREDO REG + Monolithic GBDT"),
+    ("monolithic_global_mi", "A4: Full-Cohort Global MI (100% rows) + GBDT"),
+    (
+        "monolithic_unmatched_case_control_mi",
+        "A4b: Equal-Size 5*pi Unmatched Case-Control MI + GBDT",
+    ),
+    ("monolithic_credo_reg", "A5: Case-Cohort CREDO REG (5*pi rows) + GBDT"),
     ("monolithic_credo_ensemble", "A5b: CREDO REG + Equal-Capacity 6-Model Ensemble"),
     ("pure_orthogonal_lattice", "A6: CREDO Pure Orthogonal Lattice"),
     ("full_credo_lattice", "A7: Full CREDO (kappa_0-Gated Hybrid Lattice)"),
@@ -115,13 +119,20 @@ def run_multi_channel_cohort_benchmark(
     time_cal = cohort.time_order[cal_i] if cohort.time_order is not None else None
 
     yt_tr = cohort.y_tilde[tr_i]
-    yt_cal = cohort.y_tilde[cal_i]
-    # Evaluation targets: true event Y on val/test (de-censored when competing censoring exists)
+    # Evaluation & calibration targets: de-censored when known competing censoring exists
+    eval_cal_mask = np.ones(cal_i.size, dtype=bool)
     eval_val_mask = np.ones(val_i.size, dtype=bool)
     eval_tst_mask = np.ones(tst_i.size, dtype=bool)
     if cohort.competing_censor_mask is not None:
+        eval_cal_mask = ~(cohort.competing_censor_mask[cal_i] & (cohort.y_true[cal_i] == 0))
         eval_val_mask = ~(cohort.competing_censor_mask[val_i] & (cohort.y_true[val_i] == 0))
         eval_tst_mask = ~(cohort.competing_censor_mask[tst_i] & (cohort.y_true[tst_i] == 0))
+
+    Xb_cal = Xb_cal.iloc[eval_cal_mask]
+    Zp_cal = Zp_cal.iloc[eval_cal_mask]
+    yt_cal = cohort.y_tilde[cal_i][eval_cal_mask]
+    grp_cal = grp_cal[eval_cal_mask] if grp_cal is not None else None
+    time_cal = time_cal[eval_cal_mask] if time_cal is not None else None
 
     Xb_val_e = Xb_val.iloc[eval_val_mask]
     Zp_val_e = Zp_val.iloc[eval_val_mask]
@@ -263,7 +274,14 @@ def run_multi_channel_cohort_benchmark(
     sw_rep = repaired.sample_weight
 
     discovery_comparisons: dict[str, dict[str, Any]] = {}
-    for strat in ("credo_reg", "global_mi", "global_shap_gain", "global_residual", "random"):
+    for strat in (
+        "credo_reg",
+        "global_mi",
+        "unmatched_case_control_mi",
+        "global_shap_gain",
+        "global_residual",
+        "random",
+    ):
         if strat == "credo_reg":
             chosen = chosen_credo
         else:
@@ -322,11 +340,19 @@ def run_multi_channel_cohort_benchmark(
             "chosen_channels": chosen_ids,
             "hidden_channel_precision": precision_at_budget,
             "pilot_fraction_measured": (
-                pilot.fraction_of_cohort_measured if strat == "credo_reg" else 1.0
+                pilot.fraction_of_cohort_measured
+                if strat in {"credo_reg", "unmatched_case_control_mi"}
+                else 1.0
             ),
             "metrics": f_m.model_dump(),
         }
-        if strat in {"credo_reg", "global_mi", "global_residual", "random"}:
+        if strat in {
+            "credo_reg",
+            "global_mi",
+            "unmatched_case_control_mi",
+            "global_residual",
+            "random",
+        }:
             arm_test_probs[f"monolithic_{strat}"] = tp_m
             arm_metrics[f"monolithic_{strat}"] = f_m.model_dump()
 
@@ -908,6 +934,16 @@ def _summarize_multi_cohort_runs(
             r["arms"]["monolithic_credo_reg"]["auprc"] - r["arms"]["monolithic_global_mi"]["auprc"]
             for r in runs
         ]
+        credo_minus_unmatched = [
+            r["arms"]["monolithic_credo_reg"]["auprc"]
+            - r["arms"]["monolithic_unmatched_case_control_mi"]["auprc"]
+            for r in runs
+        ]
+        fov_minus_midband = [
+            r["conformal_foveation"]["credo_deficit_foveated_auprc"]
+            - r["conformal_foveation"]["classical_midband_conformal_auprc"]
+            for r in runs
+        ]
         credo_minus_ens = [
             r["arms"]["full_credo_lattice"]["auprc"]
             - r["arms"]["monolithic_credo_ensemble"]["auprc"]
@@ -917,10 +953,30 @@ def _summarize_multi_cohort_runs(
             runs[0].get("disjoint_test_blocks", False)
             or c_name == "Gate05_Synthetic_MultiMechanism"
         )
+        n_tst_m = int(np.mean([r["n_test_evaluated"] for r in runs]))
+        n_trn_m = int(np.mean([r["n_train"] for r in runs]))
         nb_credo = nadeau_bengio_ttest(
             credo_minus_base,
-            n_test=int(np.mean([r["n_test_evaluated"] for r in runs])),
-            n_train=int(np.mean([r["n_train"] for r in runs])),
+            n_test=n_tst_m,
+            n_train=n_trn_m,
+            disjoint_test_blocks=is_indep,
+        )
+        nb_reg_vs_mi = nadeau_bengio_ttest(
+            credo_minus_mi,
+            n_test=n_tst_m,
+            n_train=n_trn_m,
+            disjoint_test_blocks=is_indep,
+        )
+        nb_reg_vs_unm = nadeau_bengio_ttest(
+            credo_minus_unmatched,
+            n_test=n_tst_m,
+            n_train=n_trn_m,
+            disjoint_test_blocks=is_indep,
+        )
+        nb_fov_vs_mid = nadeau_bengio_ttest(
+            fov_minus_midband,
+            n_test=n_tst_m,
+            n_train=n_trn_m,
             disjoint_test_blocks=is_indep,
         )
         reg_prec = _agg_mean_sd(
@@ -928,6 +984,12 @@ def _summarize_multi_cohort_runs(
         )
         mi_prec = _agg_mean_sd(
             [r["discovery_strategies"]["global_mi"]["hidden_channel_precision"] for r in runs]
+        )
+        unm_prec = _agg_mean_sd(
+            [
+                r["discovery_strategies"]["unmatched_case_control_mi"]["hidden_channel_precision"]
+                for r in runs
+            ]
         )
 
         try:
@@ -1001,15 +1063,36 @@ def _summarize_multi_cohort_runs(
                         for r in runs
                     ]
                 ),
+                "stage1_only_auprc": _agg_mean_sd(
+                    [r["conformal_foveation"]["stage1_only_auprc"] for r in runs]
+                ),
+                "classical_midband_conformal_auprc": _agg_mean_sd(
+                    [r["conformal_foveation"]["classical_midband_conformal_auprc"] for r in runs]
+                ),
+                "random_routing_auprc": _agg_mean_sd(
+                    [r["conformal_foveation"]["random_routing_auprc"] for r in runs]
+                ),
+                "credo_deficit_foveated_auprc": _agg_mean_sd(
+                    [r["conformal_foveation"]["credo_deficit_foveated_auprc"] for r in runs]
+                ),
+                "full_stage2_auprc": _agg_mean_sd(
+                    [r["conformal_foveation"]["full_stage2_auprc"] for r in runs]
+                ),
                 "ablation_ladder": ablation_table,
                 "credo_relevant_channel_precision": reg_prec,
                 "global_mi_relevant_channel_precision": mi_prec,
+                "unmatched_cc_relevant_channel_precision": unm_prec,
                 "credo_minus_base_auprc": _agg_mean_sd(credo_minus_base),
                 "credo_minus_equal_ensemble_auprc": _agg_mean_sd(credo_minus_ens),
                 "hybrid_minus_pure_orth_auprc": _agg_mean_sd(hybrid_minus_orth),
                 "credo_reg_minus_global_mi_auprc": _agg_mean_sd(credo_minus_mi),
+                "credo_reg_minus_unmatched_cc_auprc": _agg_mean_sd(credo_minus_unmatched),
+                "foveated_credo_minus_midband_auprc": _agg_mean_sd(fov_minus_midband),
                 "wilcoxon_credo_vs_base_p": p_credo_f,
                 "nadeau_bengio_credo_vs_base_p": nb_credo.p_value_one_sided,
+                "nb_reg_vs_mi_p": nb_reg_vs_mi.p_value_one_sided,
+                "nb_reg_vs_unmatched_p": nb_reg_vs_unm.p_value_one_sided,
+                "nb_foveation_vs_midband_p": nb_fov_vs_mid.p_value_one_sided,
                 "nadeau_bengio_ci95": [nb_credo.ci95_low, nb_credo.ci95_high],
                 "subtype_recall": subtype_agg,
             }
@@ -1017,8 +1100,11 @@ def _summarize_multi_cohort_runs(
 
     raw_nb_ps = [c["nadeau_bengio_credo_vs_base_p"] for c in cohort_summaries]
     holm_ps = holm_bonferroni_adjust(raw_nb_ps)
-    for c, hp in zip(cohort_summaries, holm_ps, strict=True):
+    raw_fov_ps = [c["nb_foveation_vs_midband_p"] for c in cohort_summaries]
+    holm_fov_ps = holm_bonferroni_adjust(raw_fov_ps)
+    for c, hp, hfp in zip(cohort_summaries, holm_ps, holm_fov_ps, strict=True):
         c["holm_bonferroni_fwer_p"] = hp
+        c["holm_foveation_vs_midband_fwer_p"] = hfp
     return cohort_summaries
 
 
@@ -1123,6 +1209,11 @@ def run_wave2_paper_campaign(
         )
 
     wave2_runs: dict[str, list[dict[str, Any]]] = {
+        "Gate05_Synthetic_MultiMechanism": [],
+        "UCI_AI4I_2020_Maintenance": [],
+        "UCI_Taiwan_Credit_6m_Panel": [],
+        "UCI_Diabetes_130US_Hospitals": [],
+        "ULB_CreditCard_Fraud_Chronological": [],
         "Scania_APS_76k_Fleet": [],
         "Home_Credit_307k_7Table_Relational": [],
         "IEEE_CIS_590k_MultiTable": [],
@@ -1142,13 +1233,64 @@ def run_wave2_paper_campaign(
             f"  [Done] {c_key} seed={s_val}: "
             f"Base={res_obj['arms']['calibrated_gbdt']['auprc']:.4f} | "
             f"MI={res_obj['arms']['monolithic_global_mi']['auprc']:.4f} | "
-            f"6-Ens={res_obj['arms']['monolithic_credo_ensemble']['auprc']:.4f} | "
-            f"CREDO={res_obj['arms']['full_credo_lattice']['auprc']:.4f}",
+            f"UnmCC={res_obj['arms']['monolithic_unmatched_case_control_mi']['auprc']:.4f} | "
+            f"REG={res_obj['arms']['monolithic_credo_reg']['auprc']:.4f} | "
+            f"CREDO={res_obj['arms']['full_credo_lattice']['auprc']:.4f} | "
+            f"Fov={res_obj['conformal_foveation']['credo_deficit_foveated_auprc']:.4f} vs "
+            f"Mid={res_obj['conformal_foveation']['classical_midband_conformal_auprc']:.4f}",
             flush=True,
         )
         del coh_obj
         gc.collect()
         return res_obj
+
+    print("[Wave-2] Running Wave-1 5 Cohorts under Journal-Ready Protocol...", flush=True)
+    for w_idx, s in enumerate(seeds):
+        wave2_runs["Gate05_Synthetic_MultiMechanism"].append(
+            _run_or_load_ckpt(
+                "Gate05_Synthetic_MultiMechanism",
+                s,
+                lambda s=s: generate_gate05_cohort(
+                    n_samples=12000, seed=s, selective_receipts=True
+                ),
+            )
+        )
+        wave2_runs["UCI_AI4I_2020_Maintenance"].append(
+            _run_or_load_ckpt(
+                "UCI_AI4I_2020_Maintenance",
+                s,
+                lambda s=s: load_tier2_ai4i_maintenance(cache_dir=cache_dir, seed=s),
+            )
+        )
+        wave2_runs["UCI_Taiwan_Credit_6m_Panel"].append(
+            _run_or_load_ckpt(
+                "UCI_Taiwan_Credit_6m_Panel",
+                s,
+                lambda s=s: load_tier2_taiwan_credit_panel(cache_dir=cache_dir, seed=s),
+            )
+        )
+        wave2_runs["UCI_Diabetes_130US_Hospitals"].append(
+            _run_or_load_ckpt(
+                "UCI_Diabetes_130US_Hospitals",
+                s,
+                lambda s=s: load_tier2_diabetes130(
+                    cache_dir=cache_dir, max_patients=None if uncapped else 25000, seed=s
+                ),
+            )
+        )
+        wave2_runs["ULB_CreditCard_Fraud_Chronological"].append(
+            _run_or_load_ckpt(
+                "ULB_CreditCard_Fraud_Chronological",
+                s,
+                lambda w_idx=w_idx, s=s: load_tier2_credit_card_fraud(
+                    cache_dir=cache_dir,
+                    max_negatives=None if uncapped else 60000,
+                    window_idx=w_idx if uncapped else None,
+                    n_windows=n_seeds,
+                    seed=s,
+                ),
+            )
+        )
 
     print("[Wave-2] Step 2/5: Running Scania APS 76k Fleet across seeds...", flush=True)
     for s in seeds:
@@ -1208,25 +1350,13 @@ def run_wave2_paper_campaign(
             )
         )
 
-    wave2_only_summaries = _summarize_multi_cohort_runs(wave2_runs, n_seeds)
-
-    # Combine Wave-1 Hardened + Wave-2 Flagships and re-compute joint 9-Cohort Holm-Bonferroni FWER!
-    combined_summaries: list[dict[str, Any]] = []
-    if wave1_summary_path.exists():
-        w1_data = json.loads(wave1_summary_path.read_text())
-        combined_summaries.extend(w1_data.get("multi_channel_summary", []))
-    combined_summaries.extend(wave2_only_summaries)
-
-    joint_raw_ps = [c["nadeau_bengio_credo_vs_base_p"] for c in combined_summaries]
-    joint_holm_ps = holm_bonferroni_adjust(joint_raw_ps)
-    for c, hp in zip(combined_summaries, joint_holm_ps, strict=True):
-        c["holm_bonferroni_fwer_p"] = hp
+    combined_summaries = _summarize_multi_cohort_runs(wave2_runs, n_seeds)
 
     payload = {
         "seeds": list(seeds),
         "uncapped": uncapped,
         "tier1_summary": tier1_summary,
-        "wave2_only_summary": wave2_only_summaries,
+        "wave2_only_summary": combined_summaries[5:],
         "multi_channel_summary": combined_summaries,
     }
     (out_dir / "campaign_summary.json").write_text(json.dumps(payload, indent=2))
@@ -1485,14 +1615,14 @@ def _write_latex_and_markdown_tables(
     md_lines.extend(
         [
             "",
-            "## Table 2: Multi-Channel 9-Arm Knockout Ablation Matrix (Test AUPRC, Mean $\\pm$ SD)",
+            "## Table 2: Multi-Channel Knockout Ablation Matrix (Test AUPRC, Mean $\\pm$ SD)",
             "",
             (
-                "| Cohort | A0: Base GBDT | A1: SMOTE | A2: Receipt Only | A3: Random Ch | "
-                "A4: Global MI | A5: CREDO REG Mono | A5b: 6-Model Ens | A6: Pure Orth Lattice | "
-                "A7: Full CREDO ($\\kappa_0$ Hybrid) | Holm-Bonferroni $p$ |"
+                "| Cohort | A0: Base | A1: SMOTE | A2: Receipt | A3: Random | "
+                "A4: Global MI (100%) | A4b: Unm CC MI (5$\\pi$) | A5: CREDO REG (5$\\pi$) | "
+                "A5b: 6-Ens | A6: Pure Orth | A7: Full CREDO | NB $p$ (REG vs MI / UnmCC) |"
             ),
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for c in cohorts:
@@ -1504,34 +1634,32 @@ def _write_latex_and_markdown_tables(
         md_lines.append(
             f"| **{c['cohort_name']}** | "
             + " | ".join(cells)
-            + f" | {c['holm_bonferroni_fwer_p']:.4f} |"
+            + f" | {c['nb_reg_vs_mi_p']:.3f} / {c['nb_reg_vs_unmatched_p']:.3f} |"
         )
 
     md_lines.extend(
         [
             "",
-            "## Table 3: Certified Neyman-Pearson Sensitivity, $\\kappa_0$ Routing & Savings",
+            "## Table 3: Theorem 3 — CREDO Deficit Foveation vs. Classical Mid-Band Conformal",
             "",
             (
-                "| Cohort | Base NP TPR | Monolithic MI NP TPR | Pure Orth NP TPR | "
-                "Full CREDO NP TPR | Mean $\\kappa_0$ | Learned Orth Weight $w_{\\text{orth}}$ | "
-                "Pilot Rows Measured | Stage-2 Sensor Saved |"
+                "| Cohort | Pilot Rows Measured | Stage-2 Saved | Stage-1 Only AUPRC | "
+                "Classical Mid-Band Conformal `{0,1}` | CREDO Deficit Foveation `in_1 & D_q>0` | "
+                "100% Stage-2 AUPRC | Foveation vs Mid-Band Holm $p_{\\text{FWER}}$ |"
             ),
-            "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+            "|---|---:|---:|---:|---:|---:|---:|---:|",
         ]
     )
     for c in cohorts:
-        ab = c["ablation_ladder"]
         md_lines.append(
             f"| **{c['cohort_name']}** | "
-            f"${ab['calibrated_gbdt']['np_tpr']['mean']:.3f}$ | "
-            f"${ab['monolithic_global_mi']['np_tpr']['mean']:.3f}$ | "
-            f"${ab['pure_orthogonal_lattice']['np_tpr']['mean']:.3f}$ | "
-            f"**${ab['full_credo_lattice']['np_tpr']['mean']:.3f}$** | "
-            f"${c['mean_kappa0']['mean']:.2f}$ | "
-            f"${c['orthogonal_lattice_weight']['mean']:.2f}$ | "
             f"{100.0 * c['pilot_fraction_measured']['mean']:.1f}% | "
-            f"{100.0 * c['stage2_sensor_savings']['mean']:.1f}% |"
+            f"{100.0 * c['stage2_sensor_savings']['mean']:.1f}% | "
+            f"${c['stage1_only_auprc']['mean']:.4f}$ | "
+            f"${c['classical_midband_conformal_auprc']['mean']:.4f}$ | "
+            f"**${c['credo_deficit_foveated_auprc']['mean']:.4f}$** | "
+            f"${c['full_stage2_auprc']['mean']:.4f}$ | "
+            f"{c['holm_foveation_vs_midband_fwer_p']:.5f} |"
         )
 
     (out_dir / "PAPER_CAMPAIGN_REPORT.md").write_text("\n".join(md_lines) + "\n")

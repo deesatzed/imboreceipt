@@ -155,6 +155,11 @@ def score_channels_credo_reg(
 
     raw_records: list[tuple[CandidateChannelSpec, float, float, float, float, float]] = []
 
+    # When pilot has very few positive cases (<120, e.g. ULB window with ~50 positives),
+    # chronological expanding-window CV puts only ~8 positives in Fold 1; use stratified CV
+    # within the already train-isolated pilot to stabilize OOF residual estimation.
+    eff_time_p = time_p if int(np.sum(y_p == 1)) >= 120 else None
+
     for cand in candidates:
         Z_sub = Z_pool_train.iloc[idx][list(cand.columns)].reset_index(drop=True)
         z_prob = _fit_channel_oof_signal(
@@ -162,7 +167,7 @@ def score_channels_credo_reg(
             y_p,
             sample_weight=w_p,
             groups=grp_p,
-            time_order=time_p,
+            time_order=eff_time_p,
             seed=seed,
         )
         # Incremental residualized signal: fit OOF model on [base_logit, Z_sub] vs base_logit
@@ -177,7 +182,7 @@ def score_channels_credo_reg(
             y_p,
             sample_weight=w_p,
             groups=grp_p,
-            time_order=time_p,
+            time_order=eff_time_p,
             seed=seed + 13,
         )
         # Excess log-odds impulse attributable to Z beyond X_base on the pilot
@@ -185,6 +190,14 @@ def score_channels_credo_reg(
             np.clip(joint_prob, 1e-6, 1.0 - 1e-6) / np.clip(1.0 - joint_prob, 1e-6, 1.0)
         )
         delta_llr = joint_logit - base_logit_col
+
+        # Collinear baseline-echo check: measure correlation between standalone Z log-odds and base
+        z_logit = np.log(np.clip(z_prob, 1e-6, 1.0 - 1e-6) / np.clip(1.0 - z_prob, 1e-6, 1.0))
+        if np.std(z_logit) > 1e-8 and np.std(base_logit_col) > 1e-8:
+            r_col = float(np.corrcoef(z_logit, base_logit_col)[0, 1])
+            r2_base_echo = max(0.0, r_col) ** 2
+        else:
+            r2_base_echo = 0.0
 
         # Evaluate binary confirmation event B on incremental residual impulse delta_llr
         neg_d = delta_llr[y_p == 0]
@@ -252,8 +265,8 @@ def score_channels_credo_reg(
         pos_def = deficits[y_p == 1]
         deficit_cov = float(np.mean(np.minimum(pos_def, log_reg))) if pos_def.size > 0 else log_reg
 
-        # Penalize positive FP correlation (kappa_0 > 1 reduces confirmation value)
-        orth_factor = 1.0 / max(0.5, float(np.sqrt(max(0.25, kappa_0))))
+        # Penalize positive FP correlation (kappa_0 > 1) and collinear baseline echo (r2_base_echo)
+        orth_factor = (1.0 - 0.85 * r2_base_echo) / max(0.5, float(np.sqrt(max(0.25, kappa_0))))
         composite = float((log_reg + 0.5 * deficit_cov) * orth_factor)
         raw_records.append((cand, composite, eff_reg, kappa_0, deficit_cov, p_best))
 
@@ -346,16 +359,32 @@ def score_channels_baseline_strategy(
                     fdr_survives=True,
                 )
             )
-    elif strategy == "global_mi":
+    elif strategy in {"global_mi", "unmatched_case_control_mi"}:
+        if strategy == "unmatched_case_control_mi":
+            # Classical Epidemiology Unmatched Case-Control Subsample (Prentice 1986):
+            # Measures the EXACT same 5*pi row count as CREDO REG (100% cases + 4*n_+ random
+            # unmatched controls), isolating the value of score-matching + conditional REG!
+            pos_i = np.flatnonzero(y == 1)
+            neg_i = np.flatnonzero(y == 0)
+            n_ctrl = min(neg_i.size, pos_i.size * 4)
+            ctrl_i = rng.choice(neg_i, size=n_ctrl, replace=False) if n_ctrl < neg_i.size else neg_i
+            sub_idx = np.sort(np.concatenate([pos_i, ctrl_i]))
+            y_eval = y[sub_idx]
+            Z_eval = Z_pool_train.iloc[sub_idx].reset_index(drop=True)
+        else:
+            y_eval = y
+            Z_eval = Z_pool_train
+
         for cand in candidates:
-            prep = TabularPreprocessor().fit(Z_pool_train[list(cand.columns)])
-            Zm = prep.transform(Z_pool_train[list(cand.columns)])
-            if y.size <= 35000:
-                mi = float(np.sum(mutual_info_classif(Zm, y, random_state=seed)))
+            prep = TabularPreprocessor().fit(Z_eval[list(cand.columns)])
+            Zm = prep.transform(Z_eval[list(cand.columns)])
+            if y_eval.size <= 35000:
+                col_mis = np.asarray(
+                    mutual_info_classif(Zm, y_eval, random_state=seed), dtype=float
+                )
             else:
                 # Exact 100%-row O(N) Miller-Madow bias-corrected 64-quantile plug-in MI
-                # (avoids O(N log N) KDTree tie-jittering explosion on 300k-1M zero-inflated rows)
-                mi_sum = 0.0
+                col_list: list[float] = []
                 q_grid = np.linspace(0.0, 1.0, 65)
                 for j in range(Zm.shape[1]):
                     col_v = Zm[:, j]
@@ -365,11 +394,15 @@ def score_channels_baseline_strategy(
                         if edges.size > 2
                         else (col_v > edges[0]).astype(int)
                     )
-                    raw_mi = float(mutual_info_score(y, bins))
+                    raw_mi = float(mutual_info_score(y_eval, bins))
                     n_bins_eff = max(1, int(np.unique(bins).size))
-                    mm_bias = float(n_bins_eff - 1) / float(2 * max(1, y.size))
-                    mi_sum += max(0.0, raw_mi - mm_bias)
-                mi = mi_sum
+                    mm_bias = float(n_bins_eff - 1) / float(2 * max(1, y_eval.size))
+                    col_list.append(max(0.0, raw_mi - mm_bias))
+                col_mis = np.asarray(col_list, dtype=float)
+
+            # Score channel by mean MI of top-2 features (eliminates 80-column sum inflation bias!)
+            top_k = min(2, max(1, col_mis.size))
+            mi = float(np.mean(np.sort(col_mis)[-top_k:]))
             records.append(
                 ChannelScoreRecord(
                     channel_id=cand.channel_id,
@@ -449,13 +482,22 @@ def select_channels_within_budget(
         if spent + spec.acquisition_cost <= max_budget + 1e-9:
             chosen.append(spec)
             spent += spec.acquisition_cost
-    # Fallback if strict FDR rejected all on tiny sample: take top affordable positive-REG channel
-    if not chosen and ranked:
+    # If strict BH-FDR left unspent budget on a low-count pilot, fill remaining budget with
+    # top-ranked positive-REG orthogonal candidates (reg > 1.10) so budget parity is preserved.
+    if spent < max_budget - 1e-9 and ranked:
+        chosen_set = {c.channel_id for c in chosen}
         for rec in ranked:
+            if rec.channel_id in chosen_set:
+                continue
             spec = specs[rec.channel_id]
-            if spent + spec.acquisition_cost <= max_budget + 1e-9 and rec.raw_score > 0:
+            if (
+                spent + spec.acquisition_cost <= max_budget + 1e-9
+                and rec.raw_score > 0
+                and rec.reg_likelihood_ratio > 1.10
+            ):
                 chosen.append(spec)
-                break
+                chosen_set.add(rec.channel_id)
+                spent += spec.acquisition_cost
     return chosen
 
 

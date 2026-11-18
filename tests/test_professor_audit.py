@@ -124,10 +124,66 @@ def test_credo_reg_rejects_redundant_baseline_echo_unlike_global_mi() -> None:
     pilot = sample_case_cohort_pilot(y, strata.oof_consensus_prob, controls_per_positive=4, seed=29)
 
     gmi = score_channels_baseline_strategy("global_mi", X_base, Z_pool, y, cands, strata, seed=29)
+    ucc = score_channels_baseline_strategy(
+        "unmatched_case_control_mi", X_base, Z_pool, y, cands, strata, seed=29
+    )
     reg = score_channels_credo_reg(X_base, Z_pool, y, cands, strata, pilot, contract, seed=29)
 
     assert gmi[0].channel_id == "ch_redundant_clone"
+    assert ucc[0].channel_id == "ch_redundant_clone"
     assert reg[0].channel_id == "ch_true_orthogonal"
+
+
+def test_receipt_repairer_never_poisons_future_positives_without_trap_flags() -> None:
+    """ReceiptRepairer must not flip >30d negatives to y=1 when traps_train is None."""
+    from imboreceipt.receipt.repair import ReceiptRepairer
+
+    X = pd.DataFrame({"x": np.linspace(0, 1, 100)})
+    y = np.zeros(100, dtype=int)
+    y[:10] = 1
+    censor = np.zeros(100, dtype=bool)
+    censor[10:15] = True
+    future_pos = np.zeros(100, dtype=bool)
+    future_pos[15:40] = True
+
+    rep = ReceiptRepairer()
+    repaired = rep.fit_transform_train(
+        X, y, competing_censor_mask=censor, future_positive_mask=future_pos
+    )
+    # 5 censored rows removed -> 95 rows remaining; zero pseudo-positives added!
+    assert len(repaired.X_expanded) == 95
+    assert int(np.sum(repaired.y_expanded == 1)) == 10
+
+
+def test_theorem3_rare_event_conformal_singleton_paradox_foveation() -> None:
+    """Verify CREDO Evidence-Deficit Upper-Tail Foveation beats classical mid-band {0,1}."""
+    from imboreceipt.contract.decision import DecisionContract
+    from imboreceipt.lattice.foveation import BinaryConformalFoveator
+
+    rng = np.random.default_rng(101)
+    n_cal, n_test = 2000, 3000
+    y_cal = (rng.uniform(0, 1, n_cal) < 0.02).astype(int)
+    y_test = (rng.uniform(0, 1, n_test) < 0.02).astype(int)
+
+    # Stage 1 has moderate precision in the upper tail (~35% precision among top alerts)
+    p1_cal = np.where(y_cal == 1, rng.uniform(0.15, 0.55, n_cal), rng.uniform(0.0, 0.05, n_cal))
+    p1_test = np.where(y_test == 1, rng.uniform(0.15, 0.55, n_test), rng.uniform(0.0, 0.05, n_test))
+    # Add top-tail Stage-1 false positives (which land in conformal singleton {1}!)
+    fp_idx = rng.choice(np.flatnonzero(y_test == 0), size=75, replace=False)
+    p1_test[fp_idx] = rng.uniform(0.25, 0.58, size=75)
+
+    # Stage 2 cleanly separates true positives from Stage-1 false positives
+    p2_test = np.where(y_test == 1, rng.uniform(0.70, 0.98, n_test), rng.uniform(0.0, 0.04, n_test))
+
+    fov = BinaryConformalFoveator(alpha_pos=0.08, alpha_neg=0.05).fit(p1_cal, y_cal)
+    contract = DecisionContract(task_name="thm3_test", target_precision=0.80, max_fpr_budget=0.02)
+    rep = fov.evaluate_foveation(y_test, p1_test, p2_test, contract)
+
+    assert rep.credo_deficit_foveated_auprc > rep.classical_midband_conformal_auprc + 0.10
+    assert (
+        rep.net_utility_foveated_net_of_query_cost_per_1k
+        >= rep.net_utility_classical_midband_per_1k
+    )
 
 
 def test_taiwan_non_circular_and_ulb_disjoint_test_windows() -> None:

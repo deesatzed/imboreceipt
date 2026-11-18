@@ -51,20 +51,76 @@ class MultiChannelCohort:
         train_idx: np.ndarray,
         *other_idxs: np.ndarray,
     ) -> list[pd.DataFrame]:
-        """Fit stateful compilers strictly on ``train_idx`` and return materialized Z splits."""
+        """Fit stateful compilers & baseline-aggregator vendor echoes strictly on ``train_idx``."""
         all_idxs = (train_idx, *other_idxs)
         base_parts = [self.Z_pool.iloc[idx].reset_index(drop=True) for idx in all_idxs]
-        if self.raw_aux_df is None or not self.compiler_factories:
-            return base_parts
+        if self.raw_aux_df is not None and self.compiler_factories:
+            aux_tr = self.raw_aux_df.iloc[train_idx].reset_index(drop=True)
+            fitted_compilers = [fac().fit(aux_tr) for fac in self.compiler_factories]
+            out: list[pd.DataFrame] = []
+            for base_df, idx in zip(base_parts, all_idxs, strict=True):
+                aux_sub = self.raw_aux_df.iloc[idx].reset_index(drop=True)
+                comp_dfs = [comp.transform(aux_sub) for comp in fitted_compilers]
+                out.append(pd.concat([base_df, *comp_dfs], axis=1))
+            base_parts = out
 
-        aux_tr = self.raw_aux_df.iloc[train_idx].reset_index(drop=True)
-        fitted_compilers = [fac().fit(aux_tr) for fac in self.compiler_factories]
-        out: list[pd.DataFrame] = []
-        for base_df, idx in zip(base_parts, all_idxs, strict=True):
-            aux_sub = self.raw_aux_df.iloc[idx].reset_index(drop=True)
-            comp_dfs = [comp.transform(aux_sub) for comp in fitted_compilers]
-            out.append(pd.concat([base_df, *comp_dfs], axis=1))
-        return out
+        # For any candidate channel tagged as a redundant vendor proxy ("redundant_proxy" or
+        # "redundant"), materialize a train-fitted proprietary X_base aggregator score
+        # Z_vendor = g_train(X_base) + noise so marginal MI / unmatched case-control MI are
+        # genuinely tested against a baseline-repackaging vendor feed (zero test leakage!).
+        red_cands = [
+            c for c in self.candidates if c.mechanism_tag in {"redundant_proxy", "redundant"}
+        ]
+        if red_cands:
+            from scipy.special import logit
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.model_selection import StratifiedKFold
+            from sklearn.preprocessing import StandardScaler
+
+            from imboreceipt.frontier.baselines import TabularPreprocessor
+
+            Xb_tr = self.X_base.iloc[train_idx].reset_index(drop=True)
+            y_tr = np.asarray(self.y_tilde[train_idx], dtype=int).ravel()
+            prep = TabularPreprocessor(semantic_types=self.base_semantic_types).fit(Xb_tr)
+            scaler = StandardScaler()
+            X_tr_m = np.nan_to_num(scaler.fit_transform(prep.transform(Xb_tr)), nan=0.0)
+
+            # Out-of-fold linear risk index on train_idx + full train model for other_idxs
+            # (Models a third-party bureau/vendor linear score of X_base: high marginal MI per
+            # column, but zero new information beyond X_base and zero 2-layer GBDT stacking!)
+            oof_p = np.full(y_tr.size, float(np.clip(y_tr.mean(), 1e-4, 0.99)), dtype=float)
+            n_pos = int(y_tr.sum())
+            if n_pos >= 6 and (y_tr.size - n_pos) >= 6:
+                skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+                for t_k, v_k in skf.split(np.zeros(y_tr.size), y_tr):
+                    lr_k = LogisticRegression(C=0.5, max_iter=400, random_state=42)
+                    lr_k.fit(X_tr_m[t_k], y_tr[t_k])
+                    oof_p[v_k] = lr_k.predict_proba(X_tr_m[v_k])[:, 1]
+
+            lr_full = LogisticRegression(C=0.5, max_iter=400, random_state=42)
+            lr_full.fit(X_tr_m, y_tr)
+
+            for s_i, (df_part, idx) in enumerate(zip(base_parts, all_idxs, strict=True)):
+                rng_v = np.random.default_rng(1042 + s_i)
+                if s_i == 0:
+                    p_b = oof_p
+                else:
+                    X_sub_m = np.nan_to_num(
+                        scaler.transform(
+                            prep.transform(self.X_base.iloc[idx].reset_index(drop=True))
+                        ),
+                        nan=0.0,
+                    )
+                    p_b = lr_full.predict_proba(X_sub_m)[:, 1]
+                l_b = logit(np.clip(p_b, 1e-6, 1.0 - 1e-6))
+                for rc in red_cands:
+                    for col_i, col_name in enumerate(rc.columns):
+                        noise_sd = 0.18 + 0.06 * col_i
+                        df_part[col_name] = (
+                            l_b + rng_v.normal(0.0, noise_sd, size=len(df_part))
+                        ).astype(np.float32)
+
+        return base_parts
 
 
 def generate_gate05_cohort(

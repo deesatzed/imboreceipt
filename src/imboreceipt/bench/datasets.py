@@ -657,6 +657,7 @@ def load_tier2_diabetes130(
             "ch_discharge_routing",
             "ch_diagnosis_burden",
             "ch_medication_intensification",
+            "ch_glycemic_biomarkers",
         },
         y_true=y_tilde,
         y_tilde=y_tilde,

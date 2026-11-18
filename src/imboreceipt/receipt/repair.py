@@ -170,9 +170,7 @@ class ReceiptRepairer:
         pos_mask = y_clean == 1
         neg_mask = ~pos_mask
 
-        if "multi_trap_occupancy" in mode_parts or (
-            fut_clean is not None and np.any(fut_clean & neg_mask)
-        ):
+        if "multi_trap_occupancy" in mode_parts:
             # Fit preliminary observed model s(x) = P(Y_tilde=1 | X=x) to localize hidden positives
             base_pipe = Pipeline(
                 [
@@ -193,7 +191,7 @@ class ReceiptRepairer:
                 0.90,
             )
 
-            # Future positives (>30d horizon-censored cases) carry direct hazard signal
+            # In multi-trap selective ascertainment, delayed positives missed by traps carry hazard
             if fut_clean is not None:
                 fut_neg = fut_clean & neg_mask
                 r_unlabeled[fut_neg] = np.maximum(
@@ -201,9 +199,7 @@ class ReceiptRepairer:
                 )
                 mode_parts.append("horizon_hazard_bridged")
 
-            # Construct pseudo-weighted dataset:
-            # - Observed positives: y=1, weight=1.0
-            # - Unlabeled rows with r(x) > 0.01 split into (y=1, w=r(x)) and (y=0, w=1-r(x))
+            # Construct pseudo-weighted dataset for multi-trap selective under-ascertainment:
             unlab_idx = np.flatnonzero(neg_mask)
             split_unlab = unlab_idx[r_unlabeled[unlab_idx] > 0.01]
 
@@ -227,9 +223,15 @@ class ReceiptRepairer:
                 c_exp = c_hat
                 src_idx = keep_idx
         else:
+            # Without multi-trap under-ascertainment, NEVER flip >30d negatives into <30d positives!
+            # Only filter impossible competing-risk events (deaths/hospice) and mildly downweight
+            # borderline >30d censored negatives so they do not dominate <30d split boundaries.
             X_exp = X_clean
             y_exp = y_clean
             w_exp = np.ones(y_clean.size, dtype=float)
+            if fut_clean is not None and np.any(fut_clean & neg_mask):
+                w_exp[fut_clean & neg_mask] = 0.85
+                mode_parts.append("horizon_boundary_downweighted")
             c_exp = c_hat
             src_idx = keep_idx
             if not mode_parts:

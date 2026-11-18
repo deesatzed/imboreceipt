@@ -19,6 +19,7 @@ from imboreceipt.frontier.baselines import (
     FittedDecoderArm,
     PlattLogitCalibrator,
     TabularPreprocessor,
+    fit_equal_capacity_monolithic_ensemble,
     fit_single_calibrated_gbdt,
 )
 from imboreceipt.frontier.ceilings import select_neyman_pearson_threshold
@@ -158,7 +159,9 @@ class ConfirmRescueLattice:
             seed=self.seed,
         )
 
-        # Upweight Scout false negatives on training fold for Rescue learners
+        # Upweight Scout false negatives on training fold for Rescue learners when Scout has strong
+        # primary signal; avoid distorting class prior when X_base alone is weak.
+        scout_tr_ap = float(average_precision_score(y_tr, scout_tr_p)) if np.any(y_tr == 1) else 0.0
         pos_med = float(np.median(scout_tr_p[y_tr == 1])) if np.any(y_tr == 1) else 0.2
         fn_miss_tr = (y_tr == 1) & (scout_tr_p <= pos_med)
         rescue_weights = (
@@ -166,7 +169,8 @@ class ConfirmRescueLattice:
             if sample_weight_train is not None
             else np.ones(y_tr.size, dtype=float)
         )
-        rescue_weights[fn_miss_tr] *= 2.5
+        if scout_tr_ap >= 0.25:
+            rescue_weights[fn_miss_tr] *= 2.0
 
         self.branches_ = []
         n_ch = max(1, len(Z_channels_train))
@@ -181,17 +185,17 @@ class ConfirmRescueLattice:
             Zb_tr = prep_b.transform(Z_tr)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                if Zb_tr.shape[1] <= 3:
+                if Zb_tr.shape[1] <= 2:
                     clf_b: object = LogisticRegression(
                         C=1.0, max_iter=600, random_state=self.seed + idx
                     )
                     clf_b.fit(Zb_tr, y_tr, sample_weight=sample_weight_train)  # type: ignore[attr-defined]
                 else:
                     clf_b = LGBMClassifier(
-                        n_estimators=120,
+                        n_estimators=100,
                         learning_rate=0.05,
-                        num_leaves=23,
-                        min_child_samples=15,
+                        num_leaves=15 if Zb_tr.shape[1] <= 3 else 23,
+                        min_child_samples=20,
                         max_delta_step=1.0,
                         random_state=self.seed + idx,
                         n_jobs=4,
@@ -291,7 +295,7 @@ class ConfirmRescueLattice:
             all_tr = self._concat_all(X_base_train, Z_channels_train)
             all_cal = self._concat_all(X_base_cal, Z_channels_cal)
 
-            self.coupled_arm_ = fit_single_calibrated_gbdt(
+            self.coupled_arm_ = fit_equal_capacity_monolithic_ensemble(
                 all_tr,
                 y_tr,
                 all_cal,
@@ -338,14 +342,12 @@ class ConfirmRescueLattice:
             if int(y_c.sum()) >= 6 and int((1 - y_c).sum()) >= 20:
                 # Empirical-Bayes shrinkage scales inversely with calibration positives n_+^cal
                 # preventing meta-selection overfitting on small calibration folds!
-                shrink_strength = max(0.03, 3.0 / max(6.0, float(y_c.sum())))
+                shrink_strength = min(0.15, 0.8 / max(6.0, float(y_c.sum())))
                 for cand_w in (0.0, 0.20, 0.40, 0.60, 0.80, 1.0):
                     blend_p = expit(cand_w * llr_orth_c + (1.0 - cand_w) * llr_coup_c)
                     ap = float(average_precision_score(y_c, blend_p))
-                    tau_np = select_neyman_pearson_threshold(y_c, blend_p, self.max_fpr_budget)
-                    np_tpr = float(np.mean(blend_p[y_c == 1] >= tau_np))
                     prior_pen = shrink_strength * ((cand_w - prior_w_orth) ** 2)
-                    obj = 0.55 * ap + 0.45 * np_tpr - prior_pen
+                    obj = ap - prior_pen
                     if obj > best_obj:
                         best_obj = obj
                         best_w = cand_w
@@ -371,19 +373,20 @@ class ConfirmRescueLattice:
         confirm_sum = np.zeros(ps.size, dtype=float)
         rescue_max = np.full(ps.size, -30.0, dtype=float)
         and_synergy = np.zeros(ps.size, dtype=float)
+        branch_cols: list[np.ndarray] = []
 
         for br, pb_raw, pc_raw in zip(self.branches_, b_prob_list, c_prob_list, strict=True):
             pb = np.clip(pb_raw, _LOGIT_EPS, 1.0 - _LOGIT_EPS)
             llr_b = logit(pb) - pi_logit
             confirm_sum += br.orthogonality_weight * llr_b
-            and_synergy += (
-                br.orthogonality_weight * np.maximum(0.0, llr_scout) * np.maximum(0.0, llr_b)
-            )
+            syn_m = br.orthogonality_weight * np.maximum(0.0, llr_scout) * np.maximum(0.0, llr_b)
+            and_synergy += syn_m
             pc = np.clip(pc_raw, _LOGIT_EPS, 1.0 - _LOGIT_EPS)
             llr_c = logit(pc) - pi_logit
             rescue_max = np.maximum(rescue_max, llr_c)
+            branch_cols.extend([llr_b, llr_c])
 
-        return np.column_stack([llr_scout, confirm_sum, and_synergy, rescue_max])
+        return np.column_stack([llr_scout, confirm_sum, and_synergy, rescue_max, *branch_cols])
 
     def _predict_orth_proba(
         self,

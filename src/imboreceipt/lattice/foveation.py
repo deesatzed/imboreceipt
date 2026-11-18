@@ -6,12 +6,13 @@ import math
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict
+from sklearn.metrics import average_precision_score
 
 from imboreceipt.contract.decision import DecisionContract, expected_net_utility_per_1k
 
 
 class ConformalFoveationReport(BaseModel):
-    """Comparison of 1-stage passive conformal abstention vs. 2-stage CREDO Conformal Foveation."""
+    """Comparison of 1-stage, Classical Mid-Band Conformal {0,1}, and CREDO Deficit Foveation."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -27,7 +28,13 @@ class ConformalFoveationReport(BaseModel):
     foveated_precision: float
     foveated_recall: float
     foveated_fpr: float
+    stage1_only_auprc: float = 0.0
+    classical_midband_conformal_auprc: float = 0.0
+    random_routing_auprc: float = 0.0
+    credo_deficit_foveated_auprc: float = 0.0
+    full_stage2_auprc: float = 0.0
     net_utility_stage1_only_per_1k: float
+    net_utility_classical_midband_per_1k: float = 0.0
     net_utility_foveated_net_of_query_cost_per_1k: float
     net_utility_full_stage2_everywhere_per_1k: float
 
@@ -142,10 +149,47 @@ class BinaryConformalFoveator:
         s1_graded = ((s1_hard == 0) & (p1 >= p_graded)).astype(int)
         util_s1 = expected_net_utility_per_1k(yt, s1_hard, contract, s1_graded)
 
-        # Arm B: Two-Stage Conformal Foveation (queries Stage 2 STRICTLY on |C_1(x)| != 1!)
-        query_mask = ambiguous
+        # Theorem 3 (Rare-Event Conformal Singleton Paradox & Evidence-Deficit Foveation):
+        # Under rare events (pi << q), Stage-1 singleton {1} (only_1) STILL has positive
+        # Base-Rate Evidence Deficit D_q(x) > 0 (p1(x) < max(q_target, 0.85)) and high FP rate!
+        # - CREDO Evidence-Deficit Upper-Tail Foveation uses ~in_1 strictly to prune certified
+        #   negatives (guaranteeing <= alpha_pos missed positives) and queries Stage 2 on ALL
+        #   candidates in in_1 (or top ambiguous band) with D_q(x) > 0:
+        deficit_positive = p1 < max(contract.target_precision, 0.85)
+        query_mask = (in_1 | ambiguous) & deficit_positive
+        if not np.any(query_mask):
+            query_mask = in_1 | ambiguous
         query_rate = float(np.mean(query_mask))
         savings_frac = 1.0 - query_rate
+        k_queries = int(np.sum(query_mask))
+
+        # Classical Symmetric Mid-Band Conformal Baseline at EQUAL Stage-2 query budget k_queries:
+        # Classical conformal abstention skips singleton {1} (leaving top-scoring Stage-1 FPs
+        # unverified!) and queries only the middle ambiguous {0, 1} band below {1}:
+        order_desc = np.argsort(-p1, kind="mergesort")
+        n_singleton_1 = int(np.sum(only_1))
+        skip_top = min(
+            max(0, yt.size - k_queries),
+            max(n_singleton_1, int(round(0.30 * k_queries))),
+        )
+        midband_mask = np.zeros(yt.size, dtype=bool)
+        if k_queries > 0:
+            midband_mask[order_desc[skip_top : skip_top + k_queries]] = True
+        midband_probs = np.where(midband_mask, p2, p1)
+        mid_hard = (midband_probs >= tau_2_hard).astype(int)
+        mid_graded = ((mid_hard == 0) & (midband_probs >= p_graded)).astype(int)
+        query_cost_per_1k = 1000.0 * query_rate * self.stage2_query_cost_per_case
+        util_midband = float(
+            expected_net_utility_per_1k(yt, mid_hard, contract, mid_graded) - query_cost_per_1k
+        )
+
+        # Equal-budget Random Stage-2 Routing baseline
+        rng_r = np.random.default_rng(42)
+        rand_mask = np.zeros(yt.size, dtype=bool)
+        if k_queries > 0:
+            rand_idx = rng_r.choice(yt.size, size=min(yt.size, k_queries), replace=False)
+            rand_mask[rand_idx] = True
+        rand_probs = np.where(rand_mask, p2, p1)
 
         fov_probs = np.where(query_mask, p2, p1)
         fov_hard = np.zeros(yt.size, dtype=int)
@@ -161,7 +205,6 @@ class BinaryConformalFoveator:
         )
 
         raw_util_fov = expected_net_utility_per_1k(yt, fov_hard, contract, fov_graded)
-        query_cost_per_1k = 1000.0 * query_rate * self.stage2_query_cost_per_case
         net_util_fov = float(raw_util_fov - query_cost_per_1k)
 
         # Arm C: Measure Stage-2 on 100% of population (incurs 100% Stage-2 acquisition cost!)
@@ -177,6 +220,13 @@ class BinaryConformalFoveator:
         pos_tot = max(1, int(np.sum(yt == 1)))
         neg_tot = max(1, int(np.sum(yt == 0)))
 
+        has_pos = int(np.sum(yt == 1)) > 0
+        ap_s1 = float(average_precision_score(yt, p1)) if has_pos else 0.0
+        ap_mid = float(average_precision_score(yt, midband_probs)) if has_pos else 0.0
+        ap_rnd = float(average_precision_score(yt, rand_probs)) if has_pos else 0.0
+        ap_fov = float(average_precision_score(yt, fov_probs)) if has_pos else 0.0
+        ap_s2 = float(average_precision_score(yt, p2)) if has_pos else 0.0
+
         return ConformalFoveationReport(
             alpha_neg=self.alpha_neg,
             alpha_pos=self.alpha_pos,
@@ -190,7 +240,13 @@ class BinaryConformalFoveator:
             foveated_precision=float(tp / max(1, tp + fp)),
             foveated_recall=float(tp / pos_tot),
             foveated_fpr=float(fp / neg_tot),
+            stage1_only_auprc=ap_s1,
+            classical_midband_conformal_auprc=ap_mid,
+            random_routing_auprc=ap_rnd,
+            credo_deficit_foveated_auprc=ap_fov,
+            full_stage2_auprc=ap_s2,
             net_utility_stage1_only_per_1k=util_s1,
+            net_utility_classical_midband_per_1k=util_midband,
             net_utility_foveated_net_of_query_cost_per_1k=net_util_fov,
             net_utility_full_stage2_everywhere_per_1k=util_full_s2,
         )
