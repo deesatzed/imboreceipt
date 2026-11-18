@@ -1,0 +1,23 @@
+{
+  "auditor": "preprint-blind-auditor",
+  "target_server": "arxiv",
+  "verdict": "PASS",
+  "summary": "Read-only blind preprint screening audit of main.tex and references.bib for arXiv completed with zero blockers. Sole human authorship, explicit AI workflow disclosure in Methods, Google Antigravity for Science acknowledgment, retrospective computational claim grounding, Ethics/Data & Code Availability statements, TeX path portability, and BibTeX citation completeness all pass verification.",
+  "blockers": [],
+  "warnings": [
+    {
+      "id": "W1",
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L39,L244,L273",
+      "detail": "Abstract L39 and text L273 cite runtime Stage-2 lookup savings of 41%--79% (the range across the 6 low-prevalence cohorts), whereas Table 3 caption L244 reports the full 9-cohort range of 26.0% to 79.0% (which includes moderate-prevalence UCI Diabetes at 26.0% and UCI Taiwan Credit at 34.6%)."
+    }
+  ],
+  "checked_files": [
+    "main.tex",
+    "references.bib"
+  ],
+  "manuscript_file": null,
+  "manuscript_sha256": "3ea116358ff68cb59abf0a66972a37d4781b5b01afe523de6439c621888c4ccf",
+  "file_count": 8,
+  "recorded_at": "2026-11-18T01:51:53.358915+00:00"
+}

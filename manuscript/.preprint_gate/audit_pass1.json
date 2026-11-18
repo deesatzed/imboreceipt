@@ -1,0 +1,78 @@
+{
+  "overall_passed": true,
+  "sealed_for_submission": false,
+  "mode": "audit",
+  "target_server": "arxiv",
+  "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
+  "manuscript_file": null,
+  "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
+  "manuscript_sha256": "3ea116358ff68cb59abf0a66972a37d4781b5b01afe523de6439c621888c4ccf",
+  "file_count": 8,
+  "tracked_files": {
+    "fig1_tier1_saturation.pdf": "1eaaef2fd1e5873ed9e7302d0c2fb4d968f0cdf386814e60adaa5de02c255ae5",
+    "fig1_tier1_saturation.png": "0723923718991da7a6b325b89f60ab7682dcb6002d67f70ea42212b7cddc584e",
+    "fig2_ablation_ladder.pdf": "b40768a67563f67656ec51222b6c9bffa0150e7620f31de5c5a165ef96545a28",
+    "fig2_ablation_ladder.png": "bbf0a488ade31ac81ab3ac529fb1fb58b5061207f5e32c36c95370beefe60dcb",
+    "fig3_kappa0_and_foveation.pdf": "70ce02bfcbc6195a9af2ca9d63c0e81598e36d51a7de1de5eaa0294e2aa2e291",
+    "fig3_kappa0_and_foveation.png": "43ccc147c4b13f404b947f0c7a8ab56a1bc734edd2c08e3a5a71f1eaaefda494",
+    "main.tex": "236be9784acad799cf467d87448fe0ecd5e39f69f02c8462d81abc20e2b7530c",
+    "references.bib": "6564abafc1fb81579066868a3b0e5ed32876c9939b3b2ccd43682c76a12555b9"
+  },
+  "evaluated_at": "2026-11-18T01:35:03.944269+00:00",
+  "gates": {
+    "G1_AI_ATTRIBUTION": {
+      "gate": "G1_AI_ATTRIBUTION",
+      "passed": true,
+      "failures": [],
+      "warnings": []
+    },
+    "G2_SKILL_LICENSES": {
+      "gate": "G2_SKILL_LICENSES",
+      "passed": true,
+      "detected_resources": [],
+      "failures": [],
+      "warnings": []
+    },
+    "G3_CITATIONS": {
+      "gate": "G3_CITATIONS",
+      "passed": true,
+      "citation_summary": {
+        "mode": "online",
+        "bib_entry_count": 20,
+        "cited_key_count": 19,
+        "verified_count": 20
+      },
+      "failures": [],
+      "warnings": []
+    },
+    "G4_SERVER_SCREENING": {
+      "gate": "G4_SERVER_SCREENING",
+      "server": "arxiv",
+      "passed": true,
+      "failures": [],
+      "warnings": []
+    },
+    "G5_CLAIM_GROUNDING": {
+      "gate": "G5_CLAIM_GROUNDING",
+      "purely_computational": false,
+      "passed": true,
+      "failures": [],
+      "warnings": []
+    },
+    "G6_REVERIFICATION_SEAL": {
+      "gate": "G6_REVERIFICATION_SEAL",
+      "mode": "audit",
+      "passed": true,
+      "sealed": false,
+      "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
+      "status": "PASS1_CLEAN_AWAITING_BLIND_REVIEW_AND_REVERIFY",
+      "failures": [],
+      "warnings": [
+        {
+          "code": "NOT_YET_SEALED",
+          "detail": "Pass-1 audit does NOT seal the manuscript. Invoke 'preprint-blind-auditor', record its SHA-256 attestation via record_blind_review.py, then run gate_runner.py --mode reverify."
+        }
+      ]
+    }
+  }
+}
