@@ -1,5 +1,6 @@
-# Legacy read-only reference repository (never track or modify)
+# Legacy read-only reference repository & local clinical notes (never track or modify)
 /imbora/
+ESI-3*
 
 # Python & virtual environments
 .venv/

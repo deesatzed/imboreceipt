@@ -6,7 +6,7 @@
   "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
   "manuscript_file": null,
   "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
-  "manuscript_sha256": "40be8ba0f8529756ddfb8e3115faaf74b9c89b2784ba20f12cd1ce083434aa52",
+  "manuscript_sha256": "f003f4b3d5c64e19700245c4d9603504bad5d00d976831f77f7bb3b4d463d2fc",
   "file_count": 10,
   "tracked_files": {
     "fig1_tier1_saturation.pdf": "1eaaef2fd1e5873ed9e7302d0c2fb4d968f0cdf386814e60adaa5de02c255ae5",
@@ -16,11 +16,11 @@
     "fig3_kappa0_and_foveation.pdf": "92a1d84c4327315ea33b3baec6486584cd08854274d39595e0413e02804b854e",
     "fig3_kappa0_and_foveation.png": "02315f78827ff31bf022ae2fdf57a8f80783908460780a3648879c683322778b",
     "main.bbl": "9ef87d9591471196c890af63006146f65e380398d7c8183e36eb9af4f7d24173",
-    "main.pdf": "2d51f93d120be25fd96a584e5faebd73982acedea6784bcb0eee36e8f9f043d5",
-    "main.tex": "5eff0b65c89ab42e1733f124ce201b44d1fe1679f9a9b526f89ea85f52426a55",
+    "main.pdf": "40a395c78ff1649fbe1f06a1223dbc500c32952356b3241953f3884156d2fa82",
+    "main.tex": "85711ef1622eeb76d04d70d8457dc8026c3838488a983821ef2b5e3a0262326a",
     "references.bib": "834ee62fa31302c38b9b97acbbf8f4bb1b91f3ba5e93c84e7c6b35a8223c9d9b"
   },
-  "evaluated_at": "2026-11-18T16:09:57.644913+00:00",
+  "evaluated_at": "2026-11-18T16:37:08.498746+00:00",
   "gates": {
     "G1_AI_ATTRIBUTION": {
       "gate": "G1_AI_ATTRIBUTION",
@@ -67,7 +67,7 @@
       "passed": true,
       "sealed": true,
       "status": "SEALED_FOR_SUBMISSION",
-      "seal_id": "8a984fe944fcfd809f8b86a3",
+      "seal_id": "0efada9729da78e6d65fc268",
       "seal_path": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate/release_seal.json",
       "failures": [],
       "warnings": []

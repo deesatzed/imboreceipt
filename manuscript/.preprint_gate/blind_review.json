@@ -2,7 +2,7 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent blind screening audit of the polished main.tex and references.bib for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. All typography, figure/table captions, BibTeX acronym bracing, AI/program attribution, ethics exemption, data/code availability, citation integrity, and numerical consistency checks across all 10 fixed-table benchmarks and 9 multi-channel cohorts are verified and compliant.",
+  "summary": "Independent blind screening audit of main.tex and references.bib for arXiv (stat.ME / stat.AP / cs.LG) passed with zero blockers and zero warnings. Data and Code Availability provides both the accompanying open-source reproducibility archive (credo_reproducibility_code.zip) and GitHub repository URL alongside live public dataset links for UCI, OpenML, and the NeurIPS Bank Account Fraud DOI archive, and all 5 screening criteria are fully satisfied.",
   "blockers": [],
   "warnings": [],
   "checked_files": [
@@ -10,7 +10,7 @@
     "references.bib"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "40be8ba0f8529756ddfb8e3115faaf74b9c89b2784ba20f12cd1ce083434aa52",
+  "manuscript_sha256": "f003f4b3d5c64e19700245c4d9603504bad5d00d976831f77f7bb3b4d463d2fc",
   "file_count": 10,
-  "recorded_at": "2026-11-18T16:09:06.741542+00:00"
+  "recorded_at": "2026-11-18T16:35:09.089617+00:00"
 }
