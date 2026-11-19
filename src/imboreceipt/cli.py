@@ -12,6 +12,7 @@ from imboreceipt.bench.datasets import DEFAULT_CACHE_DIR
 from imboreceipt.bench.runner import (
     run_gate05_suite,
     run_multiseed_paper_campaign,
+    run_reconstructed_paper_campaign,
     run_tier1_saturation_suite,
     run_tier2_credo_bench,
     run_wave2_paper_campaign,
@@ -182,6 +183,47 @@ def cmd_bench_wave2(out: Path, cache_dir: Path, n_seeds: int, uncapped: bool) ->
         )
     console.print(tbl)
     console.print(f"[green]Saved unified 9-cohort Wave-2 campaign artifacts to {out}[/green]")
+
+
+@main.command("bench-reconstructed")
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("results/reconstructed"),
+)
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR)
+@click.option("--n-seeds", type=int, default=5)
+@click.option("--uncapped/--capped", default=True)
+def cmd_bench_reconstructed(out: Path, cache_dir: Path, n_seeds: int, uncapped: bool) -> None:
+    """Run reconstructed single-factor CREDO evaluation (Native + Proxy Stress + 7 Sims)."""
+    seeds = tuple(42 + i for i in range(n_seeds))
+    summary = run_reconstructed_paper_campaign(
+        out_dir=out, cache_dir=cache_dir, seeds=seeds, uncapped=uncapped
+    )
+    tbl = Table(
+        title=f"Reconstructed Native-Channel CREDO Summary ({n_seeds}x, uncapped={uncapped})"
+    )
+    tbl.add_column("Cohort", style="cyan")
+    tbl.add_column("Base A0", justify="right")
+    tbl.add_column("GlobMI A4", justify="right")
+    tbl.add_column("UnmCMI A4u", justify="right")
+    tbl.add_column("StratCMI A5", justify="right", style="bold green")
+    tbl.add_column("AllNative Ref", justify="right")
+    tbl.add_column("Holm p(A5>A0)", justify="right")
+
+    for c in summary["native_channel_summary"]:
+        ab = c["ablation_ladder"]
+        tbl.add_row(
+            c["cohort_name"],
+            f"{ab['calibrated_gbdt']['auprc']['mean']:.4f}",
+            f"{ab['monolithic_global_mi']['auprc']['mean']:.4f}",
+            f"{ab['monolithic_unmatched_pilot_cmi']['auprc']['mean']:.4f}",
+            f"{ab['monolithic_matched_pilot_cmi']['auprc']['mean']:.4f}",
+            f"{ab['unrestricted_all_native_gbdt']['auprc']['mean']:.4f}",
+            f"{c['holm_prim_vs_base_auprc_p']:.5f}",
+        )
+    console.print(tbl)
+    console.print(f"[green]Saved reconstructed campaign receipts & manifests to {out}[/green]")
 
 
 if __name__ == "__main__":

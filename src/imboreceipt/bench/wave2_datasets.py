@@ -51,10 +51,14 @@ def _disjoint_chrono_slice(
 def load_wave2_scania_aps(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
     """Load Scania APS Failure at Heavy Trucks (76,000 trucks, 1.81% failure, 170 sensors).
 
-    Official Scania Decision Contract: $10 workshop check (FP) vs. $500 roadside breakdown (FN).
+    NOTE on feature semantics: Scania histogram groups (ag, ay, az, ba, cn, cs, ee) represent
+    operating-range histogram bins rather than chronological time steps; summary dispersion and
+    adjacent-bin gradient features capture histogram shape rather than temporal slowing down,
+    and remaining anonymized counters carry no undocumented subsystem labels.
     """
     csv_path = cache_dir / "tier2_scania_aps.csv"
     if not csv_path.exists():
@@ -88,30 +92,60 @@ def load_wave2_scania_aps(
     used_set = set(base_cols) | set(all_hist_cols)
     rem_counters = [c for c in num_df.columns if c not in used_set]
     mid_c = len(rem_counters) // 2
-    pneu_cols = rem_counters[:mid_c]
-    valve_cols = rem_counters[mid_c:]
+    cnt_a_cols = rem_counters[:mid_c]
+    cnt_b_cols = rem_counters[mid_c:]
 
     raw_aux = num_df[all_hist_cols].copy().reset_index(drop=True)
     compiler_factories: list[Callable[[], Any]] = [
         lambda: CriticalSlowingDownCompiler(hist_a_groups),
         lambda: CriticalSlowingDownCompiler(hist_b_groups),
     ]
-    csd_a_cols = tuple(
+    shape_a_cols = tuple(
         f"csd__{g}__{suf}"
         for g in hist_a_groups
         for suf in ("diff_base", "log_var_inflation", "ac1", "slope")
     )
-    csd_b_cols = tuple(
+    shape_b_cols = tuple(
         f"csd__{g}__{suf}"
         for g in hist_b_groups
         for suf in ("diff_base", "log_var_inflation", "ac1", "slope")
     )
 
-    rng = np.random.default_rng(seed)
-    aa_clean = np.nan_to_num(X_base["aa_000"].to_numpy(dtype=float), nan=0.0)
-    Z_pool = pd.concat(
-        [
-            num_df[all_hist_cols + pneu_cols + valve_cols].reset_index(drop=True),
+    z_parts = [num_df[all_hist_cols + cnt_a_cols + cnt_b_cols].reset_index(drop=True)]
+    hist_a_raw = tuple(c for cols in hist_a_groups.values() for c in cols)
+    hist_b_raw = tuple(c for cols in hist_b_groups.values() for c in cols)
+
+    candidates = [
+        CandidateChannelSpec(
+            "ch_hist_bins_A",
+            hist_a_raw + shape_a_cols,
+            acquisition_cost=1.0,
+            mechanism_tag="histogram_bin_shape_A",
+        ),
+        CandidateChannelSpec(
+            "ch_hist_bins_B",
+            hist_b_raw + shape_b_cols,
+            acquisition_cost=1.0,
+            mechanism_tag="histogram_bin_shape_B",
+        ),
+        CandidateChannelSpec(
+            "ch_anon_counters_A",
+            tuple(cnt_a_cols),
+            acquisition_cost=1.0,
+            mechanism_tag="anonymized_counters_A",
+        ),
+        CandidateChannelSpec(
+            "ch_anon_counters_B",
+            tuple(cnt_b_cols),
+            acquisition_cost=1.0,
+            mechanism_tag="anonymized_counters_B",
+        ),
+    ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        aa_clean = np.nan_to_num(X_base["aa_000"].to_numpy(dtype=float), nan=0.0)
+        z_parts.append(
             pd.DataFrame(
                 {
                     "redundant_odometer_echo": (
@@ -123,52 +157,26 @@ def load_wave2_scania_aps(
                     "decoy_ambient_temp": rng.normal(12.0, 6.0, len(df)).astype(np.float32),
                     "decoy_depot_code": rng.integers(1, 12, len(df)).astype(str),
                 }
-            ),
-        ],
-        axis=1,
-    )
+            )
+        )
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_odometer_proxy",
+                    ("redundant_odometer_echo", "redundant_log_load_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_ambient_fleet",
+                    ("decoy_ambient_temp", "decoy_depot_code"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
 
-    hist_a_raw = tuple(c for cols in hist_a_groups.values() for c in cols)
-    hist_b_raw = tuple(c for cols in hist_b_groups.values() for c in cols)
-
-    candidates = [
-        CandidateChannelSpec(
-            "ch_hist_spectra_A",
-            hist_a_raw + csd_a_cols,
-            acquisition_cost=1.0,
-            mechanism_tag="histogram_degradation_A",
-        ),
-        CandidateChannelSpec(
-            "ch_hist_spectra_B",
-            hist_b_raw + csd_b_cols,
-            acquisition_cost=1.0,
-            mechanism_tag="histogram_degradation_B",
-        ),
-        CandidateChannelSpec(
-            "ch_pneumatic_counters_A",
-            tuple(pneu_cols),
-            acquisition_cost=1.0,
-            mechanism_tag="pneumatic_counters",
-        ),
-        CandidateChannelSpec(
-            "ch_valve_counters_B",
-            tuple(valve_cols),
-            acquisition_cost=1.0,
-            mechanism_tag="valve_thermal_counters",
-        ),
-        CandidateChannelSpec(
-            "ch_redundant_odometer_proxy",
-            ("redundant_odometer_echo", "redundant_log_load_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_ambient_fleet",
-            ("decoy_ambient_temp", "decoy_depot_code"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
-    ]
+    Z_pool = pd.concat(z_parts, axis=1)
 
     return MultiChannelCohort(
         name="Scania_APS_76k_Fleet",
@@ -176,10 +184,10 @@ def load_wave2_scania_aps(
         Z_pool=Z_pool,
         candidates=candidates,
         ground_truth_relevant_channels={
-            "ch_hist_spectra_A",
-            "ch_hist_spectra_B",
-            "ch_pneumatic_counters_A",
-            "ch_valve_counters_B",
+            "ch_hist_bins_A",
+            "ch_hist_bins_B",
+            "ch_anon_counters_A",
+            "ch_anon_counters_B",
         },
         y_true=y_true,
         y_tilde=y_true.copy(),
@@ -191,7 +199,7 @@ def load_wave2_scania_aps(
             cost_fn=50.0,
             graded_action_cost_fp=0.15,
         ),
-        acquisition_budget=3.0,
+        acquisition_budget=2.0,
         base_semantic_types={
             **{c: SemanticType.CONTINUOUS for c in base_cols},
             "telemetry_missing_count": SemanticType.RECEIPT_FLAG,
@@ -199,6 +207,8 @@ def load_wave2_scania_aps(
         receipt_cols=["telemetry_missing_count"],
         raw_aux_df=raw_aux,
         compiler_factories=compiler_factories,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
     )
 
 
@@ -208,14 +218,14 @@ def load_wave2_neurips_baf(
     n_windows: int = 5,
     max_rows: int | None = None,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
-    """Load NeurIPS 2022 Bank Account Fraud Base Suite (1,000,000 rows, 8 months, 1.10% fraud)."""
+    """Load NeurIPS 2022 Bank Account Fraud Base Suite (1M rows, privacy-preserving synthetic)."""
     csv_path = cache_dir / "kaggle" / "BAF" / "Base.csv"
     if not csv_path.exists():
         raise FileNotFoundError(f"{csv_path} not found. Run scripts/stage_wave2_datasets.py.")
 
     df = pd.read_csv(csv_path, low_memory=False)
-    # Preserve exact chronological arrival order across months 0..7
     df["__seq_order__"] = df["month"].to_numpy(dtype=np.float64) * 1e7 + np.arange(
         len(df), dtype=np.float64
     )
@@ -230,7 +240,6 @@ def load_wave2_neurips_baf(
     time_arr = df.pop("__seq_order__").to_numpy(dtype=np.float64)
     df.pop("month")
 
-    # Replace BAF sentinel -1 missing codes on count/month/session columns with NaN cleanly
     for neg_miss_col in (
         "prev_address_months_count",
         "current_address_months_count",
@@ -283,28 +292,13 @@ def load_wave2_neurips_baf(
         "device_distinct_emails_8w",
     )
 
-    rng = np.random.default_rng(seed)
-    age_v = np.nan_to_num(X_base["customer_age"].to_numpy(dtype=float), nan=35.0)
-    inc_v = np.nan_to_num(X_base["income"].to_numpy(dtype=float), nan=0.5)
-    lim_v = np.nan_to_num(X_base["proposed_credit_limit"].to_numpy(dtype=float), nan=500.0)
-
-    Z_pool = pd.DataFrame(
-        {
-            **{
-                c: pd.to_numeric(df[c], errors="coerce").astype(np.float32)
-                for c in bureau_cols + velocity_cols + device_num_cols
-            },
-            "device_os": df["device_os"].astype(str),
-            "redundant_age_income_score": (
-                0.04 * age_v + 1.8 * inc_v + rng.normal(0.0, 0.12, len(df))
-            ).astype(np.float32),
-            "redundant_limit_echo": (
-                np.log1p(np.maximum(0.0, lim_v)) + rng.normal(0.0, 0.20, len(df))
-            ).astype(np.float32),
-            "decoy_cdn_rtt_ms": rng.exponential(18.0, len(df)).astype(np.float32),
-            "decoy_tls_bucket": rng.integers(0, 8, len(df)).astype(np.float32),
-        }
-    )
+    z_dict: dict[str, Any] = {
+        **{
+            c: pd.to_numeric(df[c], errors="coerce").astype(np.float32)
+            for c in bureau_cols + velocity_cols + device_num_cols
+        },
+        "device_os": df["device_os"].astype(str),
+    }
 
     candidates = [
         CandidateChannelSpec(
@@ -325,19 +319,39 @@ def load_wave2_neurips_baf(
             acquisition_cost=1.0,
             mechanism_tag="device_fingerprint",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_affordability_proxy",
-            ("redundant_age_income_score", "redundant_limit_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_gateway_noise",
-            ("decoy_cdn_rtt_ms", "decoy_tls_bucket"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        age_v = np.nan_to_num(X_base["customer_age"].to_numpy(dtype=float), nan=35.0)
+        inc_v = np.nan_to_num(X_base["income"].to_numpy(dtype=float), nan=0.5)
+        lim_v = np.nan_to_num(X_base["proposed_credit_limit"].to_numpy(dtype=float), nan=500.0)
+        z_dict["redundant_age_income_score"] = (
+            0.04 * age_v + 1.8 * inc_v + rng.normal(0.0, 0.12, len(df))
+        ).astype(np.float32)
+        z_dict["redundant_limit_echo"] = (
+            np.log1p(np.maximum(0.0, lim_v)) + rng.normal(0.0, 0.20, len(df))
+        ).astype(np.float32)
+        z_dict["decoy_cdn_rtt_ms"] = rng.exponential(18.0, len(df)).astype(np.float32)
+        z_dict["decoy_tls_bucket"] = rng.integers(0, 8, len(df)).astype(np.float32)
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_affordability_proxy",
+                    ("redundant_age_income_score", "redundant_limit_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_gateway_noise",
+                    ("decoy_cdn_rtt_ms", "decoy_tls_bucket"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_dict)
 
     return MultiChannelCohort(
         name="NeurIPS_BAF_1M_Chronological",
@@ -374,6 +388,8 @@ def load_wave2_neurips_baf(
         },
         time_order=time_arr,
         disjoint_test_blocks=is_disjoint,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="privacy_synthetic_from_real",
     )
 
 
@@ -462,6 +478,7 @@ def load_wave2_ieee_cis_fraud(
     n_windows: int = 5,
     max_rows: int | None = None,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
     """Load IEEE-CIS Fraud Detection (590,540 txns + selective identity table, 3.50% fraud)."""
     pkl_path = _prepare_ieee_cis_cache(cache_dir)
@@ -501,26 +518,12 @@ def load_wave2_ieee_cis_fraud(
     d_cols = ("dist2",) + tuple(f"D{i}" for i in range(1, 16))
     v_cols = tuple(c for c in df.columns if c.startswith("V"))
 
-    rng = np.random.default_rng(seed)
-    amt_v = np.nan_to_num(X_base["TransactionAmt"].to_numpy(dtype=float), nan=50.0)
-    c1_v = np.nan_to_num(X_base["card1"].to_numpy(dtype=float), nan=5000.0)
-    rcpt_v = X_base["has_identity_receipt"].to_numpy(dtype=float)
-
     z_dict: dict[str, Any] = {}
     for c in id_cols + cm_cols + d_cols + v_cols:
         if str(df[c].dtype) == "category" or df[c].dtype == object:
             z_dict[c] = df[c].astype(str)
         else:
             z_dict[c] = df[c].astype(np.float32)
-
-    z_dict["redundant_amt_log_echo"] = (
-        np.log1p(np.maximum(0.0, amt_v)) + 0.8 * rcpt_v + rng.normal(0.0, 0.18, len(df))
-    ).astype(np.float32)
-    z_dict["redundant_card_bin_echo"] = (c1_v + rng.normal(0.0, 150.0, len(df))).astype(np.float32)
-    z_dict["decoy_switch_jitter"] = rng.normal(0.0, 1.0, len(df)).astype(np.float32)
-    z_dict["decoy_iso_route"] = rng.integers(1, 10, len(df)).astype(np.float32)
-
-    Z_pool = pd.DataFrame(z_dict)
 
     candidates = [
         CandidateChannelSpec(
@@ -547,19 +550,39 @@ def load_wave2_ieee_cis_fraud(
             acquisition_cost=1.0,
             mechanism_tag="vesta_velocity_blocks",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_switch_echo",
-            ("redundant_amt_log_echo", "redundant_card_bin_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_switch_latency",
-            ("decoy_switch_jitter", "decoy_iso_route"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        amt_v = np.nan_to_num(X_base["TransactionAmt"].to_numpy(dtype=float), nan=50.0)
+        c1_v = np.nan_to_num(X_base["card1"].to_numpy(dtype=float), nan=5000.0)
+        rcpt_v = X_base["has_identity_receipt"].to_numpy(dtype=float)
+        z_dict["redundant_amt_log_echo"] = (
+            np.log1p(np.maximum(0.0, amt_v)) + 0.8 * rcpt_v + rng.normal(0.0, 0.18, len(df))
+        ).astype(np.float32)
+        z_dict["redundant_card_bin_echo"] = (c1_v + rng.normal(0.0, 150.0, len(df))).astype(
+            np.float32
+        )
+        z_dict["decoy_switch_jitter"] = rng.normal(0.0, 1.0, len(df)).astype(np.float32)
+        z_dict["decoy_iso_route"] = rng.integers(1, 10, len(df)).astype(np.float32)
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_switch_echo",
+                    ("redundant_amt_log_echo", "redundant_card_bin_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_switch_latency",
+                    ("decoy_switch_jitter", "decoy_iso_route"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_dict)
 
     return MultiChannelCohort(
         name="IEEE_CIS_590k_MultiTable",
@@ -582,7 +605,7 @@ def load_wave2_ieee_cis_fraud(
             cost_fn=35.0,
             graded_action_cost_fp=0.15,
         ),
-        acquisition_budget=3.0,
+        acquisition_budget=2.0,
         base_semantic_types={
             "TransactionAmt": SemanticType.CONTINUOUS,
             "ProductCD": SemanticType.NOMINAL,
@@ -602,6 +625,8 @@ def load_wave2_ieee_cis_fraud(
         receipt_cols=["has_identity_receipt"],
         time_order=time_arr,
         disjoint_test_blocks=is_disjoint,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
     )
 
 
@@ -784,6 +809,7 @@ def load_wave2_home_credit_relational(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     max_rows: int | None = None,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
     """Load Home Credit Default Risk (307,511 borrowers across 7 tables, 8.07% default)."""
     pkl_path = _prepare_home_credit_7table_cache(cache_dir)
@@ -930,30 +956,10 @@ def load_wave2_home_credit_relational(
         "prev_days_decision_max",
     )
 
-    rng = np.random.default_rng(seed)
-    cred_v = np.nan_to_num(X_base["AMT_CREDIT"].to_numpy(dtype=float), nan=5e5)
-    ann_v = np.nan_to_num(X_base["AMT_ANNUITY"].to_numpy(dtype=float), nan=2.5e4)
-    inc_v = np.nan_to_num(X_base["AMT_INCOME_TOTAL"].to_numpy(dtype=float), nan=1.5e5)
-    birth_v = np.nan_to_num(X_base["DAYS_BIRTH"].to_numpy(dtype=float), nan=-15000.0)
-
-    Z_pool = pd.DataFrame(
-        {
-            **{
-                c: pd.to_numeric(df[c], errors="coerce").astype(np.float32)
-                for c in ext_cols + bur_cols + inst_stat_cols + rev_stat_cols + prev_cols
-            },
-            "redundant_dti_echo": (
-                (ann_v / np.maximum(1000.0, inc_v)) + rng.normal(0.0, 0.03, len(df))
-            ).astype(np.float32),
-            "redundant_lti_age_echo": (
-                (cred_v / np.maximum(1000.0, inc_v))
-                - 0.0002 * birth_v
-                + rng.normal(0.0, 0.35, len(df))
-            ).astype(np.float32),
-            "decoy_ad_campaign": rng.normal(0.0, 1.0, len(df)).astype(np.float32),
-            "decoy_kiosk_id": rng.integers(1, 20, len(df)).astype(np.float32),
-        }
-    )
+    z_dict: dict[str, Any] = {
+        c: pd.to_numeric(df[c], errors="coerce").astype(np.float32)
+        for c in ext_cols + bur_cols + inst_stat_cols + rev_stat_cols + prev_cols
+    }
 
     candidates = [
         CandidateChannelSpec(
@@ -986,19 +992,40 @@ def load_wave2_home_credit_relational(
             acquisition_cost=1.0,
             mechanism_tag="underwriting_refusal_receipts",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_intake_affordability",
-            ("redundant_dti_echo", "redundant_lti_age_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_marketing_channel",
-            ("decoy_ad_campaign", "decoy_kiosk_id"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        cred_v = np.nan_to_num(X_base["AMT_CREDIT"].to_numpy(dtype=float), nan=5e5)
+        ann_v = np.nan_to_num(X_base["AMT_ANNUITY"].to_numpy(dtype=float), nan=2.5e4)
+        inc_v = np.nan_to_num(X_base["AMT_INCOME_TOTAL"].to_numpy(dtype=float), nan=1.5e5)
+        birth_v = np.nan_to_num(X_base["DAYS_BIRTH"].to_numpy(dtype=float), nan=-15000.0)
+        z_dict["redundant_dti_echo"] = (
+            (ann_v / np.maximum(1000.0, inc_v)) + rng.normal(0.0, 0.03, len(df))
+        ).astype(np.float32)
+        z_dict["redundant_lti_age_echo"] = (
+            (cred_v / np.maximum(1000.0, inc_v)) - 0.0002 * birth_v + rng.normal(0.0, 0.35, len(df))
+        ).astype(np.float32)
+        z_dict["decoy_ad_campaign"] = rng.normal(0.0, 1.0, len(df)).astype(np.float32)
+        z_dict["decoy_kiosk_id"] = rng.integers(1, 20, len(df)).astype(np.float32)
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_intake_affordability",
+                    ("redundant_dti_echo", "redundant_lti_age_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_marketing_channel",
+                    ("decoy_ad_campaign", "decoy_kiosk_id"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_dict)
 
     return MultiChannelCohort(
         name="Home_Credit_307k_7Table_Relational",
@@ -1031,4 +1058,6 @@ def load_wave2_home_credit_relational(
         receipt_cols=["bureau_inquiry_receipt_total"],
         raw_aux_df=raw_aux,
         compiler_factories=compiler_factories,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
     )

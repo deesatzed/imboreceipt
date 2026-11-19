@@ -201,14 +201,65 @@ def freeze_split(
     rng = np.random.default_rng(seed)
 
     if time_col is not None and group_col is None:
-        order = np.argsort(np.asarray(df[time_col]), kind="mergesort")
+        t_arr = np.asarray(df[time_col], dtype=float)
+        order = np.argsort(t_arr, kind="mergesort")
         c1 = int(round(n * train_frac))
         c2 = c1 + int(round(n * cal_frac))
         c3 = c2 + int(round(n * val_frac))
+
+        # Advance cut indices past tied timestamps where possible so max(prev_t) < min(next_t)
+        def _advance_past_ties(cut: int, limit_hi: int) -> int:
+            if cut <= 0 or cut >= limit_hi:
+                return cut
+            t_boundary = t_arr[order[cut - 1]]
+            cand = cut
+            while cand < limit_hi - 4 and t_arr[order[cand]] <= t_boundary:
+                cand += 1
+            return cand if cand < limit_hi - 4 else cut
+
+        c1 = _advance_past_ties(c1, c2)
+        c2 = _advance_past_ties(c2, c3)
+        c3 = _advance_past_ties(c3, n)
+
         train_idx = np.sort(order[:c1])
         cal_idx = np.sort(order[c1:c2])
         val_idx = np.sort(order[c2:c3])
         test_idx = np.sort(order[c3:])
+    elif time_col is not None and group_col is not None:
+        # Enforce BOTH forward chronological order AND zero entity overlap via forward purge
+        t_arr = np.asarray(df[time_col], dtype=float)
+        g_arr = df[group_col].to_numpy()
+        order = np.argsort(t_arr, kind="mergesort")
+        c1 = int(round(n * train_frac))
+        c2 = c1 + int(round(n * cal_frac))
+        c3 = c2 + int(round(n * val_frac))
+
+        raw_tr = order[:c1]
+        seen_tr = set(g_arr[raw_tr].tolist())
+
+        raw_cal = order[c1:c2]
+        keep_cal = np.array([g not in seen_tr for g in g_arr[raw_cal]], dtype=bool)
+        cal_clean = raw_cal[keep_cal]
+        seen_tr_cal = seen_tr | set(g_arr[cal_clean].tolist())
+
+        raw_val = order[c2:c3]
+        keep_val = np.array([g not in seen_tr_cal for g in g_arr[raw_val]], dtype=bool)
+        val_clean = raw_val[keep_val]
+        seen_all_dev = seen_tr_cal | set(g_arr[val_clean].tolist())
+
+        raw_tst = order[c3:]
+        keep_tst = np.array([g not in seen_all_dev for g in g_arr[raw_tst]], dtype=bool)
+        tst_clean = raw_tst[keep_tst]
+
+        if min(raw_tr.size, cal_clean.size, val_clean.size, tst_clean.size) == 0:
+            raise ValueError(
+                "Joint chronological + grouped split purged an entire partition; "
+                "insufficient new groups in later eras."
+            )
+        train_idx = np.sort(raw_tr)
+        cal_idx = np.sort(cal_clean)
+        val_idx = np.sort(val_clean)
+        test_idx = np.sort(tst_clean)
     elif group_col is not None:
         groups = df[group_col].to_numpy()
         # Group-level aggregation for stratified group allocation

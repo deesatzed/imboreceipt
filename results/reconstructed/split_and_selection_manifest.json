@@ -1,0 +1,1850 @@
+{
+  "Gate05_Synthetic_MultiMechanism": [
+    {
+      "seed": 42,
+      "split_hash": "d3dbc3199aa71ba6223b91f7eb095b1e0b841f8ff4bbc8dbbf957db45c902df5",
+      "split_protocol": {
+        "split_hash": "d3dbc3199aa71ba6223b91f7eb095b1e0b841f8ff4bbc8dbbf957db45c902df5",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 6600,
+      "n_cal": 1734,
+      "n_val": 1735,
+      "n_test": 1736,
+      "n_pos_test": 88,
+      "selected_channels_matched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_global_mi": [
+        "ch_redundant_global",
+        "ch_orth_biomarker",
+        "ch_confounded_fp_trap"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 7,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 9590,
+        "discovery_full_table_channel_accesses": 46200,
+        "discovery_access_savings_fraction": 0.7924242424242425,
+        "downstream_train_cal_val_selected_channel_accesses": 30207,
+        "downstream_unrestricted_all_channel_accesses": 40276,
+        "deployment_selective_channel_accesses_per_1k": 1047.2350230414747,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "8d5876223121855e4d0617465b4ce3e6e389c2fcbefb6988bdc7f297681ead23",
+      "split_protocol": {
+        "split_hash": "8d5876223121855e4d0617465b4ce3e6e389c2fcbefb6988bdc7f297681ead23",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 6600,
+      "n_cal": 1729,
+      "n_val": 1720,
+      "n_test": 1728,
+      "n_pos_test": 95,
+      "selected_channels_matched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_global_mi": [
+        "ch_redundant_global",
+        "ch_conservation_silence",
+        "ch_orth_biomarker"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 7,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 9660,
+        "discovery_full_table_channel_accesses": 46200,
+        "discovery_access_savings_fraction": 0.7909090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 30147,
+        "downstream_unrestricted_all_channel_accesses": 40196,
+        "deployment_selective_channel_accesses_per_1k": 1276.0416666666667,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "50c06345bdf432bfa5274e66adfce00b3f492b15d6eb069e6f16fb7955cd418b",
+      "split_protocol": {
+        "split_hash": "50c06345bdf432bfa5274e66adfce00b3f492b15d6eb069e6f16fb7955cd418b",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 6600,
+      "n_cal": 1752,
+      "n_val": 1735,
+      "n_test": 1724,
+      "n_pos_test": 98,
+      "selected_channels_matched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_global_mi": [
+        "ch_orth_biomarker",
+        "ch_redundant_global",
+        "ch_conservation_silence"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 7,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 9450,
+        "discovery_full_table_channel_accesses": 46200,
+        "discovery_access_savings_fraction": 0.7954545454545454,
+        "downstream_train_cal_val_selected_channel_accesses": 30261,
+        "downstream_unrestricted_all_channel_accesses": 40348,
+        "deployment_selective_channel_accesses_per_1k": 995.3596287703015,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "7a12944129860c2ee57c2bef7cc25b0f4cad16b380e289494c6c0e12f52caad1",
+      "split_protocol": {
+        "split_hash": "7a12944129860c2ee57c2bef7cc25b0f4cad16b380e289494c6c0e12f52caad1",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 6600,
+      "n_cal": 1732,
+      "n_val": 1738,
+      "n_test": 1736,
+      "n_pos_test": 89,
+      "selected_channels_matched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_global_mi": [
+        "ch_redundant_global",
+        "ch_orth_biomarker",
+        "ch_confounded_fp_trap"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 7,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 9205,
+        "discovery_full_table_channel_accesses": 46200,
+        "discovery_access_savings_fraction": 0.8007575757575758,
+        "downstream_train_cal_val_selected_channel_accesses": 30210,
+        "downstream_unrestricted_all_channel_accesses": 40280,
+        "deployment_selective_channel_accesses_per_1k": 1118.0875576036867,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "6caea0dc860e6504d462ad45de8ec94dd8867c7725ce564e45dfeff58053074f",
+      "split_protocol": {
+        "split_hash": "6caea0dc860e6504d462ad45de8ec94dd8867c7725ce564e45dfeff58053074f",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 6600,
+      "n_cal": 1726,
+      "n_val": 1731,
+      "n_test": 1741,
+      "n_pos_test": 94,
+      "selected_channels_matched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_orth_biomarker",
+        "ch_conservation_silence",
+        "ch_csd_dynamics"
+      ],
+      "selected_channels_global_mi": [
+        "ch_redundant_global",
+        "ch_orth_biomarker",
+        "ch_confounded_fp_trap"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 7,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 9485,
+        "discovery_full_table_channel_accesses": 46200,
+        "discovery_access_savings_fraction": 0.7946969696969697,
+        "downstream_train_cal_val_selected_channel_accesses": 30171,
+        "downstream_unrestricted_all_channel_accesses": 40228,
+        "deployment_selective_channel_accesses_per_1k": 1132.107983917289,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    }
+  ],
+  "UCI_AI4I_2020_Maintenance": [
+    {
+      "seed": 42,
+      "split_hash": "e1be6cf096b102b4fea2774f6ac85913468dcf6b0a3ac8fa44f3463f48749b2c",
+      "split_protocol": {
+        "split_hash": "e1be6cf096b102b4fea2774f6ac85913468dcf6b0a3ac8fa44f3463f48749b2c",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 5500,
+      "n_cal": 1500,
+      "n_val": 1500,
+      "n_test": 1500,
+      "n_pos_test": 51,
+      "selected_channels_matched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_power_conservation",
+        "ch_wear_overstrain"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2790,
+        "discovery_full_table_channel_accesses": 16500,
+        "discovery_access_savings_fraction": 0.8309090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 17000,
+        "downstream_unrestricted_all_channel_accesses": 25500,
+        "deployment_selective_channel_accesses_per_1k": 420.0,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "5e658988e997d93da3d3b3010ca94737087df06577fab6d3324c5f33121a6862",
+      "split_protocol": {
+        "split_hash": "5e658988e997d93da3d3b3010ca94737087df06577fab6d3324c5f33121a6862",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 5500,
+      "n_cal": 1500,
+      "n_val": 1500,
+      "n_test": 1500,
+      "n_pos_test": 51,
+      "selected_channels_matched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_wear_overstrain",
+        "ch_thermal_dissipation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_power_conservation",
+        "ch_wear_overstrain"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2790,
+        "discovery_full_table_channel_accesses": 16500,
+        "discovery_access_savings_fraction": 0.8309090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 17000,
+        "downstream_unrestricted_all_channel_accesses": 25500,
+        "deployment_selective_channel_accesses_per_1k": 478.6666666666667,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "6ffc2ab3c02177f2950449bc3b24815bf4ac3787503e47eef2b1933c17d90bf8",
+      "split_protocol": {
+        "split_hash": "6ffc2ab3c02177f2950449bc3b24815bf4ac3787503e47eef2b1933c17d90bf8",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 5500,
+      "n_cal": 1500,
+      "n_val": 1500,
+      "n_test": 1500,
+      "n_pos_test": 51,
+      "selected_channels_matched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_wear_overstrain",
+        "ch_thermal_dissipation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_power_conservation",
+        "ch_wear_overstrain"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2790,
+        "discovery_full_table_channel_accesses": 16500,
+        "discovery_access_savings_fraction": 0.8309090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 17000,
+        "downstream_unrestricted_all_channel_accesses": 25500,
+        "deployment_selective_channel_accesses_per_1k": 454.6666666666667,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "5e90f5c47e4c78e4653120c8419819b6e96a7c2191896ab491ac75ac211b953f",
+      "split_protocol": {
+        "split_hash": "5e90f5c47e4c78e4653120c8419819b6e96a7c2191896ab491ac75ac211b953f",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 5500,
+      "n_cal": 1500,
+      "n_val": 1500,
+      "n_test": 1500,
+      "n_pos_test": 51,
+      "selected_channels_matched_cmi": [
+        "ch_wear_overstrain",
+        "ch_thermal_dissipation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_wear_overstrain",
+        "ch_thermal_dissipation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_power_conservation",
+        "ch_wear_overstrain"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2790,
+        "discovery_full_table_channel_accesses": 16500,
+        "discovery_access_savings_fraction": 0.8309090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 17000,
+        "downstream_unrestricted_all_channel_accesses": 25500,
+        "deployment_selective_channel_accesses_per_1k": 456.0,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "0aa76d55ae38ec638bd77307efb9b7af20cf7d165f2acea76ebe43e19a794f83",
+      "split_protocol": {
+        "split_hash": "0aa76d55ae38ec638bd77307efb9b7af20cf7d165f2acea76ebe43e19a794f83",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 5500,
+      "n_cal": 1500,
+      "n_val": 1500,
+      "n_test": 1500,
+      "n_pos_test": 51,
+      "selected_channels_matched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_wear_overstrain",
+        "ch_power_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_power_conservation",
+        "ch_wear_overstrain"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2790,
+        "discovery_full_table_channel_accesses": 16500,
+        "discovery_access_savings_fraction": 0.8309090909090909,
+        "downstream_train_cal_val_selected_channel_accesses": 17000,
+        "downstream_unrestricted_all_channel_accesses": 25500,
+        "deployment_selective_channel_accesses_per_1k": 480.0,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    }
+  ],
+  "UCI_Taiwan_Credit_6m_Panel": [
+    {
+      "seed": 42,
+      "split_hash": "38be5aceabd7025a3fdaf01b19d48bcad6051fc5a3208e7cae3b133db510fdb4",
+      "split_protocol": {
+        "split_hash": "38be5aceabd7025a3fdaf01b19d48bcad6051fc5a3208e7cae3b133db510fdb4",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 14807,
+      "n_cal": 4038,
+      "n_val": 4038,
+      "n_test": 4038,
+      "n_pos_test": 754,
+      "selected_channels_matched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 24876,
+        "discovery_full_table_channel_accesses": 44421,
+        "discovery_access_savings_fraction": 0.43999459714999667,
+        "downstream_train_cal_val_selected_channel_accesses": 45766,
+        "downstream_unrestricted_all_channel_accesses": 68649,
+        "deployment_selective_channel_accesses_per_1k": 1295.195641406637,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "9ad0681ba9f96ade15f9a127dc75b50c7112b25bb04ae021bb0b71d448309fa6",
+      "split_protocol": {
+        "split_hash": "9ad0681ba9f96ade15f9a127dc75b50c7112b25bb04ae021bb0b71d448309fa6",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 14807,
+      "n_cal": 4038,
+      "n_val": 4038,
+      "n_test": 4038,
+      "n_pos_test": 754,
+      "selected_channels_matched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 24876,
+        "discovery_full_table_channel_accesses": 44421,
+        "discovery_access_savings_fraction": 0.43999459714999667,
+        "downstream_train_cal_val_selected_channel_accesses": 45766,
+        "downstream_unrestricted_all_channel_accesses": 68649,
+        "deployment_selective_channel_accesses_per_1k": 1296.1862308073305,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "1295e44197e2dba62ccd335eee69b773cd66c4da891a62e79d63150c7d0bc53e",
+      "split_protocol": {
+        "split_hash": "1295e44197e2dba62ccd335eee69b773cd66c4da891a62e79d63150c7d0bc53e",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 14807,
+      "n_cal": 4038,
+      "n_val": 4038,
+      "n_test": 4038,
+      "n_pos_test": 754,
+      "selected_channels_matched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 24876,
+        "discovery_full_table_channel_accesses": 44421,
+        "discovery_access_savings_fraction": 0.43999459714999667,
+        "downstream_train_cal_val_selected_channel_accesses": 45766,
+        "downstream_unrestricted_all_channel_accesses": 68649,
+        "deployment_selective_channel_accesses_per_1k": 1337.7909856364536,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "fb28fb82017251945f9a42528d132f793b6e15d36abbde4cdedcf055724a3ff9",
+      "split_protocol": {
+        "split_hash": "fb28fb82017251945f9a42528d132f793b6e15d36abbde4cdedcf055724a3ff9",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 14807,
+      "n_cal": 4038,
+      "n_val": 4038,
+      "n_test": 4038,
+      "n_pos_test": 754,
+      "selected_channels_matched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 24876,
+        "discovery_full_table_channel_accesses": 44421,
+        "discovery_access_savings_fraction": 0.43999459714999667,
+        "downstream_train_cal_val_selected_channel_accesses": 45766,
+        "downstream_unrestricted_all_channel_accesses": 68649,
+        "deployment_selective_channel_accesses_per_1k": 1267.9544328875681,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "f56f8d6108c2acbbc68e829a8c595115aa71001dd0c9fece3b47ca5a52c5d018",
+      "split_protocol": {
+        "split_hash": "f56f8d6108c2acbbc68e829a8c595115aa71001dd0c9fece3b47ca5a52c5d018",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 14807,
+      "n_cal": 4038,
+      "n_val": 4038,
+      "n_test": 4038,
+      "n_pos_test": 754,
+      "selected_channels_matched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "selected_channels_global_mi": [
+        "ch_recent_repayment_status",
+        "ch_payment_silence_conservation"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 24876,
+        "discovery_full_table_channel_accesses": 44421,
+        "discovery_access_savings_fraction": 0.43999459714999667,
+        "downstream_train_cal_val_selected_channel_accesses": 45766,
+        "downstream_unrestricted_all_channel_accesses": 68649,
+        "deployment_selective_channel_accesses_per_1k": 1344.7251114413077,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    }
+  ],
+  "UCI_Diabetes_130US_Hospitals": [
+    {
+      "seed": 42,
+      "split_hash": "df5f27057818b4d85b18336a2f135be57785dd3a937a1f21230ed7134f08f0e6",
+      "split_protocol": {
+        "split_hash": "df5f27057818b4d85b18336a2f135be57785dd3a937a1f21230ed7134f08f0e6",
+        "grouped_by": "__grp__",
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 54737,
+      "n_cal": 14850,
+      "n_val": 14943,
+      "n_test": 14813,
+      "n_pos_test": 1682,
+      "selected_channels_matched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_global_mi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 6,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 112644,
+        "discovery_full_table_channel_accesses": 328422,
+        "discovery_access_savings_fraction": 0.6570144509198531,
+        "downstream_train_cal_val_selected_channel_accesses": 169060,
+        "downstream_unrestricted_all_channel_accesses": 507180,
+        "deployment_selective_channel_accesses_per_1k": 1448.7274691149664,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "79d047a8f84d97895801486a497c53468f0fc0c9593f2f5a9181d277f6fdb634",
+      "split_protocol": {
+        "split_hash": "79d047a8f84d97895801486a497c53468f0fc0c9593f2f5a9181d277f6fdb634",
+        "grouped_by": "__grp__",
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 54753,
+      "n_cal": 15041,
+      "n_val": 14713,
+      "n_test": 14836,
+      "n_pos_test": 1734,
+      "selected_channels_matched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_global_mi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 6,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 111978,
+        "discovery_full_table_channel_accesses": 328518,
+        "discovery_access_savings_fraction": 0.6591419648238452,
+        "downstream_train_cal_val_selected_channel_accesses": 169014,
+        "downstream_unrestricted_all_channel_accesses": 507042,
+        "deployment_selective_channel_accesses_per_1k": 1538.2852520895121,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "12084787c4dcdd908f6362cb764daf968d4762fac3c624ca6eaf9027262bbfe2",
+      "split_protocol": {
+        "split_hash": "12084787c4dcdd908f6362cb764daf968d4762fac3c624ca6eaf9027262bbfe2",
+        "grouped_by": "__grp__",
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 54626,
+      "n_cal": 15073,
+      "n_val": 14850,
+      "n_test": 14794,
+      "n_pos_test": 1626,
+      "selected_channels_matched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_global_mi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 6,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 111906,
+        "discovery_full_table_channel_accesses": 327756,
+        "discovery_access_savings_fraction": 0.6585691795115879,
+        "downstream_train_cal_val_selected_channel_accesses": 169098,
+        "downstream_unrestricted_all_channel_accesses": 507294,
+        "deployment_selective_channel_accesses_per_1k": 1532.783560903069,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "0854268d79d47b936b10ee8fc34552b2fbff68924f3a8d458a6900ad1956889f",
+      "split_protocol": {
+        "split_hash": "0854268d79d47b936b10ee8fc34552b2fbff68924f3a8d458a6900ad1956889f",
+        "grouped_by": "__grp__",
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 54565,
+      "n_cal": 14881,
+      "n_val": 14915,
+      "n_test": 14982,
+      "n_pos_test": 1705,
+      "selected_channels_matched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_global_mi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 6,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 112266,
+        "discovery_full_table_channel_accesses": 327390,
+        "discovery_access_savings_fraction": 0.6570878768441308,
+        "downstream_train_cal_val_selected_channel_accesses": 168722,
+        "downstream_unrestricted_all_channel_accesses": 506166,
+        "deployment_selective_channel_accesses_per_1k": 1525.0300360432518,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "52845cc5c0314b73ef819f9429a3a5683863b5fc3a2d122c07e2738135e3f546",
+      "split_protocol": {
+        "split_hash": "52845cc5c0314b73ef819f9429a3a5683863b5fc3a2d122c07e2738135e3f546",
+        "grouped_by": "__grp__",
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 54714,
+      "n_cal": 14933,
+      "n_val": 14799,
+      "n_test": 14897,
+      "n_pos_test": 1703,
+      "selected_channels_matched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "selected_channels_global_mi": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 6,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 111924,
+        "discovery_full_table_channel_accesses": 328284,
+        "discovery_access_savings_fraction": 0.6590634938041452,
+        "downstream_train_cal_val_selected_channel_accesses": 168892,
+        "downstream_unrestricted_all_channel_accesses": 506676,
+        "deployment_selective_channel_accesses_per_1k": 1525.1392897898907,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+      }
+    }
+  ],
+  "ULB_CreditCard_Fraud_Chronological": [
+    {
+      "seed": 42,
+      "split_hash": "d65f1adf632cee71cccd1fab5afc16d47defd9a11b6faaa030cd88b4737b2b83",
+      "split_protocol": {
+        "split_hash": "d65f1adf632cee71cccd1fab5afc16d47defd9a11b6faaa030cd88b4737b2b83",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.166668712786201,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 81455,
+      "n_cal": 22215,
+      "n_val": 22215,
+      "n_test": 22215,
+      "n_pos_test": 25,
+      "selected_channels_matched_cmi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "selected_channels_global_mi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 3834,
+        "discovery_full_table_channel_accesses": 244365,
+        "discovery_access_savings_fraction": 0.9843103554109631,
+        "downstream_train_cal_val_selected_channel_accesses": 251770,
+        "downstream_unrestricted_all_channel_accesses": 377655,
+        "deployment_selective_channel_accesses_per_1k": 416.74544226873735,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "d96e8c4dda964dcec770a34b67db49541c383a91ad1c0d06b8d6f00c39f7ead3",
+      "split_protocol": {
+        "split_hash": "d96e8c4dda964dcec770a34b67db49541c383a91ad1c0d06b8d6f00c39f7ead3",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667075895597516,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 81454,
+      "n_cal": 22215,
+      "n_val": 22215,
+      "n_test": 22215,
+      "n_pos_test": 9,
+      "selected_channels_matched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_C"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_B"
+      ],
+      "selected_channels_global_mi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2592,
+        "discovery_full_table_channel_accesses": 244362,
+        "discovery_access_savings_fraction": 0.989392786112407,
+        "downstream_train_cal_val_selected_channel_accesses": 251768,
+        "downstream_unrestricted_all_channel_accesses": 377652,
+        "deployment_selective_channel_accesses_per_1k": 462.66036461850103,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "3c88687d7caf2c7e67e5779cd72e1ccc5a327d7cd88222f5ff7b7561808c5f60",
+      "split_protocol": {
+        "split_hash": "3c88687d7caf2c7e67e5779cd72e1ccc5a327d7cd88222f5ff7b7561808c5f60",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667075895597516,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 81454,
+      "n_cal": 22215,
+      "n_val": 22215,
+      "n_test": 22215,
+      "n_pos_test": 22,
+      "selected_channels_matched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_B"
+      ],
+      "selected_channels_global_mi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2484,
+        "discovery_full_table_channel_accesses": 244362,
+        "discovery_access_savings_fraction": 0.9898347533577234,
+        "downstream_train_cal_val_selected_channel_accesses": 251768,
+        "downstream_unrestricted_all_channel_accesses": 377652,
+        "deployment_selective_channel_accesses_per_1k": 466.351564258384,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "69a9ca87a3a8f6c6d131e342f7d4c54944a568efebd8091163652f2e3350e620",
+      "split_protocol": {
+        "split_hash": "69a9ca87a3a8f6c6d131e342f7d4c54944a568efebd8091163652f2e3350e620",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667075895597516,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 81454,
+      "n_cal": 22215,
+      "n_val": 22215,
+      "n_test": 22215,
+      "n_pos_test": 41,
+      "selected_channels_matched_cmi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_B"
+      ],
+      "selected_channels_global_mi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 3375,
+        "discovery_full_table_channel_accesses": 244362,
+        "discovery_access_savings_fraction": 0.9861885235838633,
+        "downstream_train_cal_val_selected_channel_accesses": 251768,
+        "downstream_unrestricted_all_channel_accesses": 377652,
+        "deployment_selective_channel_accesses_per_1k": 369.9302273238803,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "e6711d5ef90fe6a071909b4e02c9d447db8ec824e4e5b9078bc65737c9eb04d2",
+      "split_protocol": {
+        "split_hash": "e6711d5ef90fe6a071909b4e02c9d447db8ec824e4e5b9078bc65737c9eb04d2",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.166668712786201,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 81455,
+      "n_cal": 22215,
+      "n_val": 22215,
+      "n_test": 22215,
+      "n_pos_test": 17,
+      "selected_channels_matched_cmi": [
+        "ch_pca_block_A",
+        "ch_pca_block_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "selected_channels_global_mi": [
+        "ch_pca_block_B",
+        "ch_pca_block_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 2970,
+        "discovery_full_table_channel_accesses": 244365,
+        "discovery_access_savings_fraction": 0.987846049966239,
+        "downstream_train_cal_val_selected_channel_accesses": 251770,
+        "downstream_unrestricted_all_channel_accesses": 377655,
+        "deployment_selective_channel_accesses_per_1k": 381.00382624352915,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    }
+  ],
+  "Scania_APS_76k_Fleet": [
+    {
+      "seed": 42,
+      "split_hash": "e92b004bfe987ce0ee2d679f7ea7a3f06b8db2e96b0efce4eabac3b175e603ed",
+      "split_protocol": {
+        "split_hash": "e92b004bfe987ce0ee2d679f7ea7a3f06b8db2e96b0efce4eabac3b175e603ed",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 41800,
+      "n_cal": 11401,
+      "n_val": 11399,
+      "n_test": 11400,
+      "n_pos_test": 206,
+      "selected_channels_matched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_hist_bins_B",
+        "ch_anon_counters_B"
+      ],
+      "selected_channels_global_mi": [
+        "ch_anon_counters_B",
+        "ch_anon_counters_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 15120,
+        "discovery_full_table_channel_accesses": 167200,
+        "discovery_access_savings_fraction": 0.9095693779904306,
+        "downstream_train_cal_val_selected_channel_accesses": 129200,
+        "downstream_unrestricted_all_channel_accesses": 258400,
+        "deployment_selective_channel_accesses_per_1k": 414.7368421052632,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "8126f219563b9712706ef1d65210acdff8afc3f46fa3027a1d64c15868939188",
+      "split_protocol": {
+        "split_hash": "8126f219563b9712706ef1d65210acdff8afc3f46fa3027a1d64c15868939188",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 41800,
+      "n_cal": 11401,
+      "n_val": 11399,
+      "n_test": 11400,
+      "n_pos_test": 206,
+      "selected_channels_matched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_hist_bins_B",
+        "ch_hist_bins_A"
+      ],
+      "selected_channels_global_mi": [
+        "ch_anon_counters_B",
+        "ch_anon_counters_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 15120,
+        "discovery_full_table_channel_accesses": 167200,
+        "discovery_access_savings_fraction": 0.9095693779904306,
+        "downstream_train_cal_val_selected_channel_accesses": 129200,
+        "downstream_unrestricted_all_channel_accesses": 258400,
+        "deployment_selective_channel_accesses_per_1k": 435.7894736842105,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "adb127c3743c5c99116db303ad311008029b467ae5d4ea6c890ce43244d60259",
+      "split_protocol": {
+        "split_hash": "adb127c3743c5c99116db303ad311008029b467ae5d4ea6c890ce43244d60259",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 41800,
+      "n_cal": 11401,
+      "n_val": 11399,
+      "n_test": 11400,
+      "n_pos_test": 206,
+      "selected_channels_matched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_global_mi": [
+        "ch_anon_counters_B",
+        "ch_anon_counters_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 15120,
+        "discovery_full_table_channel_accesses": 167200,
+        "discovery_access_savings_fraction": 0.9095693779904306,
+        "downstream_train_cal_val_selected_channel_accesses": 129200,
+        "downstream_unrestricted_all_channel_accesses": 258400,
+        "deployment_selective_channel_accesses_per_1k": 436.66666666666663,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "5f820b86822a98e1fa8c542730ab1c11b7bf489d9414f99762e1505589fceb34",
+      "split_protocol": {
+        "split_hash": "5f820b86822a98e1fa8c542730ab1c11b7bf489d9414f99762e1505589fceb34",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 41800,
+      "n_cal": 11401,
+      "n_val": 11399,
+      "n_test": 11400,
+      "n_pos_test": 206,
+      "selected_channels_matched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_hist_bins_B",
+        "ch_anon_counters_A"
+      ],
+      "selected_channels_global_mi": [
+        "ch_anon_counters_B",
+        "ch_anon_counters_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 15120,
+        "discovery_full_table_channel_accesses": 167200,
+        "discovery_access_savings_fraction": 0.9095693779904306,
+        "downstream_train_cal_val_selected_channel_accesses": 129200,
+        "downstream_unrestricted_all_channel_accesses": 258400,
+        "deployment_selective_channel_accesses_per_1k": 427.5438596491228,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "afda16e53fcc527a60dbe27a8b46228c1d9c8798e562536d46970a0ac33e49d1",
+      "split_protocol": {
+        "split_hash": "afda16e53fcc527a60dbe27a8b46228c1d9c8798e562536d46970a0ac33e49d1",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 41800,
+      "n_cal": 11401,
+      "n_val": 11399,
+      "n_test": 11400,
+      "n_pos_test": 206,
+      "selected_channels_matched_cmi": [
+        "ch_hist_bins_A",
+        "ch_hist_bins_B"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_hist_bins_B",
+        "ch_hist_bins_A"
+      ],
+      "selected_channels_global_mi": [
+        "ch_anon_counters_B",
+        "ch_anon_counters_A"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 15120,
+        "discovery_full_table_channel_accesses": 167200,
+        "discovery_access_savings_fraction": 0.9095693779904306,
+        "downstream_train_cal_val_selected_channel_accesses": 129200,
+        "downstream_unrestricted_all_channel_accesses": 258400,
+        "deployment_selective_channel_accesses_per_1k": 424.03508771929825,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    }
+  ],
+  "Home_Credit_307k_7Table_Relational": [
+    {
+      "seed": 42,
+      "split_hash": "ed5292decbee16eae2183b8d6dd7a054b71ef90b9b8cbb893147ae1bd3a4dbbd",
+      "split_protocol": {
+        "split_hash": "ed5292decbee16eae2183b8d6dd7a054b71ef90b9b8cbb893147ae1bd3a4dbbd",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 169131,
+      "n_cal": 46127,
+      "n_val": 46126,
+      "n_test": 46127,
+      "n_pos_test": 3724,
+      "selected_channels_matched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_global_mi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_prior_applications_receipt_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 5,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 341350,
+        "discovery_full_table_channel_accesses": 845655,
+        "discovery_access_savings_fraction": 0.59634839266604,
+        "downstream_train_cal_val_selected_channel_accesses": 784152,
+        "downstream_unrestricted_all_channel_accesses": 1306920,
+        "deployment_selective_channel_accesses_per_1k": 1721.421293385653,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 5000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "9494cc456e30dab18cffdb5988d1d8b2b94a5c77d522ebe99729e7b638c572bc",
+      "split_protocol": {
+        "split_hash": "9494cc456e30dab18cffdb5988d1d8b2b94a5c77d522ebe99729e7b638c572bc",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 169131,
+      "n_cal": 46127,
+      "n_val": 46126,
+      "n_test": 46127,
+      "n_pos_test": 3724,
+      "selected_channels_matched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_global_mi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_prior_applications_receipt_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 5,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 341350,
+        "discovery_full_table_channel_accesses": 845655,
+        "discovery_access_savings_fraction": 0.59634839266604,
+        "downstream_train_cal_val_selected_channel_accesses": 784152,
+        "downstream_unrestricted_all_channel_accesses": 1306920,
+        "deployment_selective_channel_accesses_per_1k": 1783.3373078674094,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 5000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "aeff3c6889ecb75b89f9e797e9634be65914d26a86ae956bbb1716e23a029c25",
+      "split_protocol": {
+        "split_hash": "aeff3c6889ecb75b89f9e797e9634be65914d26a86ae956bbb1716e23a029c25",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 169131,
+      "n_cal": 46127,
+      "n_val": 46126,
+      "n_test": 46127,
+      "n_pos_test": 3724,
+      "selected_channels_matched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_global_mi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_prior_applications_receipt_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 5,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 341350,
+        "discovery_full_table_channel_accesses": 845655,
+        "discovery_access_savings_fraction": 0.59634839266604,
+        "downstream_train_cal_val_selected_channel_accesses": 784152,
+        "downstream_unrestricted_all_channel_accesses": 1306920,
+        "deployment_selective_channel_accesses_per_1k": 1757.3872135625556,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 5000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "7382ac0ac20b89aadac53f210702786f3536d5103869158ad6d8643efdc4f78d",
+      "split_protocol": {
+        "split_hash": "7382ac0ac20b89aadac53f210702786f3536d5103869158ad6d8643efdc4f78d",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 169131,
+      "n_cal": 46127,
+      "n_val": 46126,
+      "n_test": 46127,
+      "n_pos_test": 3724,
+      "selected_channels_matched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_global_mi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_prior_applications_receipt_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 5,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 341350,
+        "discovery_full_table_channel_accesses": 845655,
+        "discovery_access_savings_fraction": 0.59634839266604,
+        "downstream_train_cal_val_selected_channel_accesses": 784152,
+        "downstream_unrestricted_all_channel_accesses": 1306920,
+        "deployment_selective_channel_accesses_per_1k": 1736.900297006092,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 5000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "47a828a388c52ef7d3c5d3f66ea50dcef626d833b15add35c786f8d5f0dc0ecf",
+      "split_protocol": {
+        "split_hash": "47a828a388c52ef7d3c5d3f66ea50dcef626d833b15add35c786f8d5f0dc0ecf",
+        "grouped_by": null,
+        "ordered_by": null,
+        "temporal_burnin_fraction": 0.0,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 169131,
+      "n_cal": 46127,
+      "n_val": 46126,
+      "n_test": 46127,
+      "n_pos_test": 3724,
+      "selected_channels_matched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_revolving_pos_card_table"
+      ],
+      "selected_channels_global_mi": [
+        "ch_external_bureau_scores",
+        "ch_bureau_tradelines_table",
+        "ch_prior_applications_receipt_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 5,
+        "n_selected_channels": 3,
+        "discovery_pilot_channel_accesses": 341350,
+        "discovery_full_table_channel_accesses": 845655,
+        "discovery_access_savings_fraction": 0.59634839266604,
+        "downstream_train_cal_val_selected_channel_accesses": 784152,
+        "downstream_unrestricted_all_channel_accesses": 1306920,
+        "deployment_selective_channel_accesses_per_1k": 1783.9226483404514,
+        "deployment_all_selected_channel_accesses_per_1k": 3000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 5000.0
+      }
+    }
+  ],
+  "IEEE_CIS_590k_MultiTable": [
+    {
+      "seed": 42,
+      "split_hash": "47aaae623c369e1d66f300502059d95d9309d40fe6cce48ffa3bcaed8507a575",
+      "split_protocol": {
+        "split_hash": "47aaae623c369e1d66f300502059d95d9309d40fe6cce48ffa3bcaed8507a575",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667160069865894,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 168895,
+      "n_cal": 46062,
+      "n_val": 46063,
+      "n_test": 46061,
+      "n_pos_test": 1798,
+      "selected_channels_matched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_global_mi": [
+        "ch_entity_counting_graph_CM",
+        "ch_identity_device_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 77820,
+        "discovery_full_table_channel_accesses": 675580,
+        "discovery_access_savings_fraction": 0.8848100891086178,
+        "downstream_train_cal_val_selected_channel_accesses": 522040,
+        "downstream_unrestricted_all_channel_accesses": 1044080,
+        "deployment_selective_channel_accesses_per_1k": 817.2640628731465,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "9f1633f957662fd60b835420d82f9c5c194c5057b253c42db9ee171bbf68f4e6",
+      "split_protocol": {
+        "split_hash": "9f1633f957662fd60b835420d82f9c5c194c5057b253c42db9ee171bbf68f4e6",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667752153704962,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 168895,
+      "n_cal": 46062,
+      "n_val": 46062,
+      "n_test": 46062,
+      "n_pos_test": 1683,
+      "selected_channels_matched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_global_mi": [
+        "ch_entity_counting_graph_CM",
+        "ch_timedelta_dormancy_D"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 104400,
+        "discovery_full_table_channel_accesses": 675580,
+        "discovery_access_savings_fraction": 0.8454661180023091,
+        "downstream_train_cal_val_selected_channel_accesses": 522038,
+        "downstream_unrestricted_all_channel_accesses": 1044076,
+        "deployment_selective_channel_accesses_per_1k": 692.5882506187313,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "ad126f17ed1126ed5e3d7ff54fc3588b2ad3f75b76ce82fe5ab19c212f37b04a",
+      "split_protocol": {
+        "split_hash": "ad126f17ed1126ed5e3d7ff54fc3588b2ad3f75b76ce82fe5ab19c212f37b04a",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16666666666666663,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 168894,
+      "n_cal": 46062,
+      "n_val": 46062,
+      "n_test": 46062,
+      "n_pos_test": 1676,
+      "selected_channels_matched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_global_mi": [
+        "ch_entity_counting_graph_CM",
+        "ch_identity_device_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 115400,
+        "discovery_full_table_channel_accesses": 675576,
+        "discovery_access_savings_fraction": 0.8291828010468104,
+        "downstream_train_cal_val_selected_channel_accesses": 522036,
+        "downstream_unrestricted_all_channel_accesses": 1044072,
+        "deployment_selective_channel_accesses_per_1k": 915.6788676132169,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "7be0f09d98339a82f7a516c38826f877928f86f297073adcbe8cac2a86d66903",
+      "split_protocol": {
+        "split_hash": "7be0f09d98339a82f7a516c38826f877928f86f297073adcbe8cac2a86d66903",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16668344237544042,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 168895,
+      "n_cal": 46062,
+      "n_val": 46062,
+      "n_test": 46062,
+      "n_pos_test": 1443,
+      "selected_channels_matched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_global_mi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 104660,
+        "discovery_full_table_channel_accesses": 675580,
+        "discovery_access_savings_fraction": 0.8450812635069126,
+        "downstream_train_cal_val_selected_channel_accesses": 522038,
+        "downstream_unrestricted_all_channel_accesses": 1044076,
+        "deployment_selective_channel_accesses_per_1k": 617.4286830793278,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "1fc9bca94c16336c07096007d211b7fcaba3d972ace17ad7ba26252ea1467534",
+      "split_protocol": {
+        "split_hash": "1fc9bca94c16336c07096007d211b7fcaba3d972ace17ad7ba26252ea1467534",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.16667160069865894,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 168895,
+      "n_cal": 46062,
+      "n_val": 46062,
+      "n_test": 46062,
+      "n_pos_test": 1781,
+      "selected_channels_matched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_entity_counting_graph_CM",
+        "ch_vesta_card_velocity_V"
+      ],
+      "selected_channels_global_mi": [
+        "ch_entity_counting_graph_CM",
+        "ch_identity_device_table"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 4,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 107760,
+        "discovery_full_table_channel_accesses": 675580,
+        "discovery_access_savings_fraction": 0.8404926137541076,
+        "downstream_train_cal_val_selected_channel_accesses": 522038,
+        "downstream_unrestricted_all_channel_accesses": 1044076,
+        "deployment_selective_channel_accesses_per_1k": 759.9756849463765,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 4000.0
+      }
+    }
+  ],
+  "NeurIPS_BAF_1M_Chronological": [
+    {
+      "seed": 42,
+      "split_hash": "2bc24f5ec0b7009c67af96f66a750728c11a87c2992ba238dab05da49ec1294f",
+      "split_protocol": {
+        "split_hash": "2bc24f5ec0b7009c67af96f66a750728c11a87c2992ba238dab05da49ec1294f",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.1666678321678322,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 286000,
+      "n_cal": 78000,
+      "n_val": 78000,
+      "n_test": 78000,
+      "n_pos_test": 661,
+      "selected_channels_matched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_global_mi": [
+        "ch_credit_bureau_api",
+        "ch_device_session_telemetry"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 35655,
+        "discovery_full_table_channel_accesses": 858000,
+        "discovery_access_savings_fraction": 0.9584440559440559,
+        "downstream_train_cal_val_selected_channel_accesses": 884000,
+        "downstream_unrestricted_all_channel_accesses": 1326000,
+        "deployment_selective_channel_accesses_per_1k": 1028.2307692307693,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 43,
+      "split_hash": "e4399d8e4eb2a1a51cf73190828904ab7d2a3954830e1aade32914ad396ba523",
+      "split_protocol": {
+        "split_hash": "e4399d8e4eb2a1a51cf73190828904ab7d2a3954830e1aade32914ad396ba523",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.1666678321678322,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 286000,
+      "n_cal": 78000,
+      "n_val": 78000,
+      "n_test": 78000,
+      "n_pos_test": 891,
+      "selected_channels_matched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_global_mi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 32835,
+        "discovery_full_table_channel_accesses": 858000,
+        "discovery_access_savings_fraction": 0.9617307692307693,
+        "downstream_train_cal_val_selected_channel_accesses": 884000,
+        "downstream_unrestricted_all_channel_accesses": 1326000,
+        "deployment_selective_channel_accesses_per_1k": 719.6153846153846,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 44,
+      "split_hash": "f3814281700fdd6e5fa57c5150ea6c346c8fe211e0f1773997e55d1b4ebd3519",
+      "split_protocol": {
+        "split_hash": "f3814281700fdd6e5fa57c5150ea6c346c8fe211e0f1773997e55d1b4ebd3519",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.1666678321678322,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 286000,
+      "n_cal": 78000,
+      "n_val": 78000,
+      "n_test": 78000,
+      "n_pos_test": 915,
+      "selected_channels_matched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_global_mi": [
+        "ch_credit_bureau_api",
+        "ch_device_session_telemetry"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 31815,
+        "discovery_full_table_channel_accesses": 858000,
+        "discovery_access_savings_fraction": 0.9629195804195804,
+        "downstream_train_cal_val_selected_channel_accesses": 884000,
+        "downstream_unrestricted_all_channel_accesses": 1326000,
+        "deployment_selective_channel_accesses_per_1k": 551.7948717948717,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 45,
+      "split_hash": "881caf51c9b3e7f66f55906789ff83fa4972a09af54b62b50545c629512f43ae",
+      "split_protocol": {
+        "split_hash": "881caf51c9b3e7f66f55906789ff83fa4972a09af54b62b50545c629512f43ae",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.1666678321678322,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 286000,
+      "n_cal": 78000,
+      "n_val": 78000,
+      "n_test": 78000,
+      "n_pos_test": 1023,
+      "selected_channels_matched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_global_mi": [
+        "ch_credit_bureau_api",
+        "ch_device_session_telemetry"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 35835,
+        "discovery_full_table_channel_accesses": 858000,
+        "discovery_access_savings_fraction": 0.9582342657342657,
+        "downstream_train_cal_val_selected_channel_accesses": 884000,
+        "downstream_unrestricted_all_channel_accesses": 1326000,
+        "deployment_selective_channel_accesses_per_1k": 707.6410256410256,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    },
+    {
+      "seed": 46,
+      "split_hash": "3e3255e5af698122331618fdc4dc49f6c00d419aeab7df43367a3a9f3011e983",
+      "split_protocol": {
+        "split_hash": "3e3255e5af698122331618fdc4dc49f6c00d419aeab7df43367a3a9f3011e983",
+        "grouped_by": null,
+        "ordered_by": "__time__",
+        "temporal_burnin_fraction": 0.1666678321678322,
+        "temporal_cv_feasible": true
+      },
+      "n_train": 286000,
+      "n_cal": 78000,
+      "n_val": 78000,
+      "n_test": 78000,
+      "n_pos_test": 1135,
+      "selected_channels_matched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_unmatched_cmi": [
+        "ch_device_session_telemetry",
+        "ch_credit_bureau_api"
+      ],
+      "selected_channels_global_mi": [
+        "ch_credit_bureau_api",
+        "ch_device_session_telemetry"
+      ],
+      "cost_accounting": {
+        "n_candidate_channels": 3,
+        "n_selected_channels": 2,
+        "discovery_pilot_channel_accesses": 41310,
+        "discovery_full_table_channel_accesses": 858000,
+        "discovery_access_savings_fraction": 0.9518531468531468,
+        "downstream_train_cal_val_selected_channel_accesses": 884000,
+        "downstream_unrestricted_all_channel_accesses": 1326000,
+        "deployment_selective_channel_accesses_per_1k": 804.025641025641,
+        "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+        "deployment_unrestricted_all_native_accesses_per_1k": 3000.0
+      }
+    }
+  ]
+}

@@ -45,6 +45,12 @@ class MultiChannelCohort:
     raw_aux_df: pd.DataFrame | None = None
     compiler_factories: list[Callable[[], Any]] | None = None
     disjoint_test_blocks: bool = False
+    include_synthetic_proxies: bool = False
+    dataset_provenance: str = "real_observational"
+    n_raw_rows_before_eligibility: int | None = None
+    n_excluded_ineligible: int = 0
+    n_excluded_ineligible_positives: int = 0
+    eligibility_note: str = ""
 
     def materialize_z_splits(
         self,
@@ -64,35 +70,33 @@ class MultiChannelCohort:
                 out.append(pd.concat([base_df, *comp_dfs], axis=1))
             base_parts = out
 
-        # For any candidate channel tagged as a redundant vendor proxy ("redundant_proxy" or
-        # "redundant"), materialize a train-fitted proprietary X_base aggregator score
-        # Z_vendor = g_train(X_base) + noise so marginal MI / unmatched case-control MI are
-        # genuinely tested against a baseline-repackaging vendor feed (zero test leakage!).
         red_cands = [
             c for c in self.candidates if c.mechanism_tag in {"redundant_proxy", "redundant"}
         ]
         if red_cands:
             from scipy.special import logit
             from sklearn.linear_model import LogisticRegression
-            from sklearn.model_selection import StratifiedKFold
             from sklearn.preprocessing import StandardScaler
 
+            from imboreceipt.discover.strata import make_leak_free_cv_splits
             from imboreceipt.frontier.baselines import TabularPreprocessor
 
             Xb_tr = self.X_base.iloc[train_idx].reset_index(drop=True)
             y_tr = np.asarray(self.y_tilde[train_idx], dtype=int).ravel()
+            grp_tr = self.group_ids[train_idx] if self.group_ids is not None else None
+            time_tr = self.time_order[train_idx] if self.time_order is not None else None
+
             prep = TabularPreprocessor(semantic_types=self.base_semantic_types).fit(Xb_tr)
             scaler = StandardScaler()
             X_tr_m = np.nan_to_num(scaler.fit_transform(prep.transform(Xb_tr)), nan=0.0)
 
-            # Out-of-fold linear risk index on train_idx + full train model for other_idxs
-            # (Models a third-party bureau/vendor linear score of X_base: high marginal MI per
-            # column, but zero new information beyond X_base and zero 2-layer GBDT stacking!)
             oof_p = np.full(y_tr.size, float(np.clip(y_tr.mean(), 1e-4, 0.99)), dtype=float)
             n_pos = int(y_tr.sum())
             if n_pos >= 6 and (y_tr.size - n_pos) >= 6:
-                skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-                for t_k, v_k in skf.split(np.zeros(y_tr.size), y_tr):
+                splits = make_leak_free_cv_splits(
+                    y_tr, n_folds=3, groups=grp_tr, time_order=time_tr, seed=42
+                )
+                for t_k, v_k in splits:
                     lr_k = LogisticRegression(C=0.5, max_iter=400, random_state=42)
                     lr_k.fit(X_tr_m[t_k], y_tr[t_k])
                     oof_p[v_k] = lr_k.predict_proba(X_tr_m[v_k])[:, 1]
@@ -372,4 +376,6 @@ def generate_gate05_cohort(
         mechanism_subtype=subtype,
         raw_aux_df=raw_aux,
         compiler_factories=compiler_factories,
+        include_synthetic_proxies=True,
+        dataset_provenance="synthetic_simulator",
     )

@@ -146,18 +146,20 @@ def _fetch_openml_cached(data_id: int, cache_name: str, cache_dir: Path) -> pd.D
 def load_tier2_ai4i_maintenance(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
-    """Load UCI AI4I 2020 Predictive Maintenance (OpenML 42890) with ground-truth subtypes!
+    """Load UCI AI4I 2020 Predictive Maintenance (OpenML 42890, synthetic physics benchmark).
 
-    Contains 10,000 industrial milling runs, 339 rare failures (~3.39%), and explicit ground-truth
+    Contains 10,000 simulated industrial milling runs, 339 failures (~3.39%), and physics-defined
     mechanism columns: TWF (Tool Wear), HDF (Heat Dissipation), PWF (Power), OSF (Overstrain),
-    and RNF (Random Shock Failure - genuinely memoryless!).
+    and RNF (Random Shock Failure). When ``include_synthetic_proxies=False`` (default), includes
+    only the three native physical sensor channels; when ``True``, appends baseline-echo and
+    noise decoy channels for proxy stress testing.
     """
     df = _fetch_openml_cached(42890, "tier2_ai4i_2020", cache_dir)
     col_map = {c: c.strip() for c in df.columns}
     df = df.rename(columns=col_map)
 
-    # Locate columns flexibly across OpenML naming variants
     def _find(substr: str) -> str:
         for c in df.columns:
             if substr.lower() in c.lower():
@@ -174,7 +176,6 @@ def load_tier2_ai4i_maintenance(
 
     y_true = pd.to_numeric(df[c_fail], errors="coerce").fillna(0).to_numpy(dtype=int)
 
-    # Extract ground-truth failure subtype labels
     subtype = np.full(len(df), "none", dtype=object)
     for tag in ("RNF", "TWF", "HDF", "PWF", "OSF"):
         matches = [c for c in df.columns if c.upper() == tag]
@@ -195,30 +196,18 @@ def load_tier2_ai4i_maintenance(
     wear = pd.to_numeric(df[c_wear], errors="coerce")
     rpm_rad = X_base["rotational_rpm"] * (2.0 * np.pi / 60.0)
 
-    # Physical conservation & mechanism features (no target leakage!)
     mech_power_w = torque * rpm_rad
     temp_delta = proc_temp - X_base["air_temp_k"]
     overstrain_nm_min = wear * torque
 
-    rng = np.random.default_rng(seed)
-    rpm_arr = X_base["rotational_rpm"].to_numpy(dtype=float)
-    air_arr = X_base["air_temp_k"].to_numpy(dtype=float)
-    Z_pool = pd.DataFrame(
-        {
-            "process_temp_k": proc_temp,
-            "thermal_delta_k": temp_delta,
-            "torque_nm": torque,
-            "mechanical_power_w": mech_power_w,
-            "tool_wear_min": wear,
-            "overstrain_product": overstrain_nm_min,
-            # Realistic collinear baseline-echo decoy (secondary tachometer + ambient thermistor):
-            # exhibits genuine marginal MI with failure via RPM/air_temp, yet ZERO residual gain!
-            "redundant_tach_rpm_echo": rpm_arr + rng.normal(0.0, 18.0, size=len(df)),
-            "redundant_air_therm_echo": air_arr + rng.normal(0.0, 0.25, size=len(df)),
-            "decoy_vibration_1": rng.normal(0.0, 1.0, size=len(df)),
-            "decoy_ambient_humidity": rng.normal(50.0, 10.0, size=len(df)),
-        }
-    )
+    z_cols_dict: dict[str, Any] = {
+        "process_temp_k": proc_temp,
+        "thermal_delta_k": temp_delta,
+        "torque_nm": torque,
+        "mechanical_power_w": mech_power_w,
+        "tool_wear_min": wear,
+        "overstrain_product": overstrain_nm_min,
+    }
 
     candidates = [
         CandidateChannelSpec(
@@ -239,25 +228,40 @@ def load_tier2_ai4i_maintenance(
             acquisition_cost=1.0,
             mechanism_tag="TWF_OSF_wear",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_tach_proxy",
-            ("redundant_tach_rpm_echo", "redundant_air_therm_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_vibration",
-            ("decoy_vibration_1",),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_humidity",
-            ("decoy_ambient_humidity",),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        rpm_arr = X_base["rotational_rpm"].to_numpy(dtype=float)
+        air_arr = X_base["air_temp_k"].to_numpy(dtype=float)
+        z_cols_dict["redundant_tach_rpm_echo"] = rpm_arr + rng.normal(0.0, 18.0, size=len(df))
+        z_cols_dict["redundant_air_therm_echo"] = air_arr + rng.normal(0.0, 0.25, size=len(df))
+        z_cols_dict["decoy_vibration_1"] = rng.normal(0.0, 1.0, size=len(df))
+        z_cols_dict["decoy_ambient_humidity"] = rng.normal(50.0, 10.0, size=len(df))
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_tach_proxy",
+                    ("redundant_tach_rpm_echo", "redundant_air_therm_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_vibration",
+                    ("decoy_vibration_1",),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_humidity",
+                    ("decoy_ambient_humidity",),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_cols_dict)
 
     return MultiChannelCohort(
         name="UCI_AI4I_2020_Maintenance",
@@ -286,21 +290,23 @@ def load_tier2_ai4i_maintenance(
             "rotational_rpm": SemanticType.CONTINUOUS,
         },
         mechanism_subtype=subtype,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="synthetic_physics",
     )
 
 
 def load_tier2_taiwan_credit_panel(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
-    """Load UCI Taiwan Credit Default 6-month panel (OpenML 42477, N=30,000).
+    """Load UCI Taiwan Credit Default 6-month panel (OpenML 42477, N=30,000 raw).
 
-    Target: Severe rare default (default payment next month on accounts without prior chronic
-    3+ month delinquency, or severe high-balance default tail ~3.8% prevalence), allowing clean
-    testing of Critical Slowing Down, Missing-Line Payment Silence, and Flow Conservation!
+    Eligibility defined strictly on baseline month-6 standing (``PAY_6 <= 0``, observed in
+    ``X_base``), predicting unmodified next-month default.
     """
     df = _fetch_openml_cached(42477, "tier2_taiwan_credit", cache_dir)
-    # Standardize column names to uppercase and map OpenML X1..X23 schema if present
+    n_raw = len(df)
     df.columns = [c.strip().upper() for c in df.columns]
     if "X1" in df.columns and "LIMIT_BAL" not in df.columns:
         df = df.rename(
@@ -331,7 +337,6 @@ def load_tier2_taiwan_credit_panel(
             }
         )
 
-    # Rename PAY_0 -> PAY_1 if needed; ordered oldest (t6) to newest (t1)
     if "PAY_0" in df.columns and "PAY_1" not in df.columns:
         df = df.rename(columns={"PAY_0": "PAY_1"})
 
@@ -339,7 +344,6 @@ def load_tier2_taiwan_credit_panel(
     t_col = target_candidates[-1] if target_candidates else df.columns[-1]
     raw_default = pd.to_numeric(df[t_col], errors="coerce").fillna(0).to_numpy(dtype=int)
 
-    limit_bal = pd.to_numeric(df["LIMIT_BAL"], errors="coerce").fillna(1.0)
     bill_cols = ["BILL_AMT6", "BILL_AMT5", "BILL_AMT4", "BILL_AMT3", "BILL_AMT2", "BILL_AMT1"]
     pay_amt_cols = ["PAY_AMT6", "PAY_AMT5", "PAY_AMT4", "PAY_AMT3", "PAY_AMT2", "PAY_AMT1"]
     pay_stat_cols = ["PAY_6", "PAY_5", "PAY_4", "PAY_3", "PAY_2", "PAY_1"]
@@ -347,10 +351,9 @@ def load_tier2_taiwan_credit_panel(
     for c in bill_cols + pay_amt_cols + pay_stat_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
 
-    # Zero target circularity: restrict cohort STRICTLY on baseline month-6 standing (PAY_6 <= 0,
-    # i.e., accounts current 6 months prior, observed inside X_base!) and predict the 100%
-    # unmodified UCI ground-truth next-month default label!
     baseline_current = df["PAY_6"].to_numpy(dtype=float) <= 0.0
+    n_excl = int((~baseline_current).sum())
+    n_excl_pos = int((raw_default[~baseline_current] == 1).sum())
     df = df.loc[baseline_current].reset_index(drop=True)
     y_true = raw_default[baseline_current].astype(int)
     limit_bal = pd.to_numeric(df["LIMIT_BAL"], errors="coerce").fillna(1.0)
@@ -367,7 +370,6 @@ def load_tier2_taiwan_credit_panel(
         }
     )
 
-    # Stateful trajectory/invariant compilers MUST be fit strictly on train_idx after freeze_split!
     raw_aux = df[bill_cols + pay_amt_cols].copy().reset_index(drop=True)
     compiler_factories: list[Callable[[], Any]] = [
         lambda: CriticalSlowingDownCompiler({"bill": bill_cols}),
@@ -396,33 +398,17 @@ def load_tier2_taiwan_credit_panel(
         "inv__net_debt_surge__violation_abs",
     )
 
-    rng = np.random.default_rng(seed)
-    Z_pool = pd.concat(
-        [
-            df[["PAY_3", "PAY_2", "PAY_1", "BILL_AMT1", "PAY_AMT1"]].rename(
-                columns={
-                    "PAY_3": "precursor_pay_m3",
-                    "PAY_2": "precursor_pay_m2",
-                    "PAY_1": "precursor_pay_m1",
-                    "BILL_AMT1": "latest_bill_m1",
-                    "PAY_AMT1": "latest_pay_m1",
-                }
-            ),
-            pd.DataFrame(
-                {
-                    # Redundant baseline bureau clone: nonlinear echo of X_base
-                    "redundant_bureau_limit_echo": np.log1p(np.maximum(0.0, limit_bal))
-                    + 0.35 * df["PAY_6"].to_numpy(dtype=float)
-                    + rng.normal(0, 0.20, len(df)),
-                    "redundant_m6_bill_echo": df["BILL_AMT6"].to_numpy(dtype=float)
-                    + rng.normal(0, 1200.0, len(df)),
-                    "decoy_macro_idx": rng.normal(0, 1, len(df)),
-                    "decoy_branch_noise": rng.normal(0, 1, len(df)),
-                }
-            ),
-        ],
-        axis=1,
-    )
+    z_parts = [
+        df[["PAY_3", "PAY_2", "PAY_1", "BILL_AMT1", "PAY_AMT1"]].rename(
+            columns={
+                "PAY_3": "precursor_pay_m3",
+                "PAY_2": "precursor_pay_m2",
+                "PAY_1": "precursor_pay_m1",
+                "BILL_AMT1": "latest_bill_m1",
+                "PAY_AMT1": "latest_pay_m1",
+            }
+        )
+    ]
 
     candidates = [
         CandidateChannelSpec(
@@ -435,33 +421,55 @@ def load_tier2_taiwan_credit_panel(
             "ch_bill_csd_trajectory",
             csd_cols + ("latest_bill_m1",),
             acquisition_cost=1.0,
-            mechanism_tag="critical_slowing_down",
+            mechanism_tag="bill_trajectory",
         ),
         CandidateChannelSpec(
             "ch_payment_silence_conservation",
             eesh_inv_cols + ("latest_pay_m1",),
             acquisition_cost=1.0,
-            mechanism_tag="missing_line_conservation",
-        ),
-        CandidateChannelSpec(
-            "ch_redundant_bureau_clone",
-            ("redundant_bureau_limit_echo", "redundant_m6_bill_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_macro",
-            ("decoy_macro_idx",),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_branch",
-            ("decoy_branch_noise",),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
+            mechanism_tag="payment_cadence_flow",
         ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        z_parts.append(
+            pd.DataFrame(
+                {
+                    "redundant_bureau_limit_echo": np.log1p(np.maximum(0.0, limit_bal))
+                    + 0.35 * df["PAY_6"].to_numpy(dtype=float)
+                    + rng.normal(0, 0.20, len(df)),
+                    "redundant_m6_bill_echo": df["BILL_AMT6"].to_numpy(dtype=float)
+                    + rng.normal(0, 1200.0, len(df)),
+                    "decoy_macro_idx": rng.normal(0, 1, len(df)),
+                    "decoy_branch_noise": rng.normal(0, 1, len(df)),
+                }
+            )
+        )
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_bureau_clone",
+                    ("redundant_bureau_limit_echo", "redundant_m6_bill_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_macro",
+                    ("decoy_macro_idx",),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_branch",
+                    ("decoy_branch_noise",),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.concat(z_parts, axis=1)
 
     return MultiChannelCohort(
         name="UCI_Taiwan_Credit_6m_Panel",
@@ -495,6 +503,12 @@ def load_tier2_taiwan_credit_panel(
         },
         raw_aux_df=raw_aux,
         compiler_factories=compiler_factories,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
+        n_raw_rows_before_eligibility=n_raw,
+        n_excluded_ineligible=n_excl,
+        n_excluded_ineligible_positives=n_excl_pos,
+        eligibility_note="Accounts current at baseline month 6 (PAY_6 <= 0)",
     )
 
 
@@ -502,14 +516,22 @@ def load_tier2_diabetes130(
     cache_dir: Path = DEFAULT_CACHE_DIR,
     max_patients: int | None = 25000,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
-    """Load UCI Diabetes 130-US Hospitals (OpenML 4541) with patient groups & receipt censoring.
+    """Load UCI Diabetes 130-US Hospitals (OpenML 4541) for Admission-Time Screening.
 
-    Explicitly models:
-    - ``competing_censor_mask``: expired/hospice discharges (disposition IDs 11, 13, 14, 19, 20, 21)
-      that cannot be readmitted within 30 days.
-    - ``future_positive_mask``: ``>30`` day readmissions censored by the 30-day binary cutoff.
-    - ``group_ids``: ``patient_nbr`` (zero patient leakage across splits).
+    Implements strict clinical landmark and eligibility hygiene:
+    1. Upfront Outcome-Independent Eligibility Restriction: Inpatient deaths and hospice
+       discharges (``discharge_disposition_id in {11, 13, 14, 19, 20, 21}``; 2,423 raw encounters
+       including 43 with recorded ``<30``) are excluded BEFORE splitting, completely independent
+       of ``readmitted``.
+    2. True Admission-Time Baseline ``X_base``: Contains ONLY the 7 intake fields available at
+       hospital admission (``race``, ``gender``, ``age_bucket``, ``admission_type_id``,
+       ``admission_source_id``, ``payer_code``, ``weight_flag``). Encounter-wide length of stay
+       (``time_in_hospital``), ``num_lab_procedures``, and ``num_procedures`` are placed in the
+       Stage-2 hospital-workup candidate channel ``ch_inpatient_workup``.
+    3. Target Endpoint: Recorded 30-day inpatient readmission (``readmitted == '<30'``) in the
+       source database among discharged-alive non-hospice encounters, grouped by ``patient_nbr``.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
     csv_path = cache_dir / "tier2_diabetes130.csv"
@@ -537,8 +559,20 @@ def load_tier2_diabetes130(
 
     df = pd.read_csv(csv_path, low_memory=False).replace("?", np.nan)
     df.columns = [c.strip() for c in df.columns]
+    n_raw_all = len(df)
 
-    # Deterministic patient-grouped subsample if requested for fast reproducible benchmark execution
+    # 1. Upfront outcome-independent eligibility restriction: discharged-alive, non-hospice
+    disp_all = pd.to_numeric(df["discharge_disposition_id"], errors="coerce").fillna(-1).astype(int)
+    inelig_mask = disp_all.isin({11, 13, 14, 19, 20, 21}).to_numpy(dtype=bool)
+    raw_lt30_all = (df["readmitted"].astype(str).str.strip().str.upper() == "<30").to_numpy(
+        dtype=bool
+    )
+    n_excl = int(inelig_mask.sum())
+    n_excl_pos = int((inelig_mask & raw_lt30_all).sum())
+
+    df = df.loc[~inelig_mask].reset_index(drop=True)
+
+    # Deterministic patient-grouped subsample if requested
     if max_patients is not None and "patient_nbr" in df.columns:
         uniq_p = df["patient_nbr"].unique()
         if len(uniq_p) > max_patients:
@@ -550,59 +584,51 @@ def load_tier2_diabetes130(
     y_tilde = (raw_readm == "<30").to_numpy(dtype=int)
     future_pos = (raw_readm == ">30").to_numpy(dtype=bool)
 
-    disp_num = pd.to_numeric(df["discharge_disposition_id"], errors="coerce").fillna(-1).astype(int)
-    competing_censor = disp_num.isin({11, 13, 14, 19, 20, 21}).to_numpy(dtype=bool)
-
     groups = (
         df["patient_nbr"].to_numpy()
         if "patient_nbr" in df.columns
         else np.arange(len(df), dtype=int)
     )
 
+    # 2. True Admission-Time Baseline X_base (7 fields available at admission intake)
     X_base = pd.DataFrame(
         {
-            "race": df["race"].astype(str),
-            "gender": df["gender"].astype(str),
-            "age_bucket": df["age"].astype(str),
+            "race": df["race"].fillna("__MISSING__").astype(str),
+            "gender": df["gender"].fillna("__MISSING__").astype(str),
+            "age_bucket": df["age"].fillna("__MISSING__").astype(str),
             "admission_type_id": df["admission_type_id"].astype(str),
             "admission_source_id": df["admission_source_id"].astype(str),
-            "time_in_hospital": pd.to_numeric(df["time_in_hospital"], errors="coerce"),
-            "num_lab_procedures": pd.to_numeric(df["num_lab_procedures"], errors="coerce"),
+            "payer_code": df["payer_code"].fillna("__MISSING__").astype(str),
+            "weight_flag": df["weight"].fillna("__MISSING__").astype(str),
         }
     )
 
-    rng = np.random.default_rng(seed)
-    # Sanitize discharge_disposition_id so competing-censor codes {11,13,14,19,20,21}
-    # are masked to a neutral category and never create code-level circularity with censoring!
-    sanitized_disp = np.where(
-        competing_censor, "other_or_censored", df["discharge_disposition_id"].astype(str)
-    )
-    t_hosp = X_base["time_in_hospital"].fillna(3.0).to_numpy(dtype=float)
-    n_labs = X_base["num_lab_procedures"].fillna(40.0).to_numpy(dtype=float)
-
-    Z_pool = pd.DataFrame(
-        {
-            "number_inpatient": pd.to_numeric(df["number_inpatient"], errors="coerce"),
-            "number_emergency": pd.to_numeric(df["number_emergency"], errors="coerce"),
-            "number_outpatient": pd.to_numeric(df["number_outpatient"], errors="coerce"),
-            "discharge_disposition_clean": sanitized_disp,
-            "medical_specialty": df["medical_specialty"].astype(str),
-            "number_diagnoses": pd.to_numeric(df["number_diagnoses"], errors="coerce"),
-            "diag_1_chapter": df["diag_1"].astype(str).str.slice(0, 3),
-            "num_medications": pd.to_numeric(df["num_medications"], errors="coerce"),
-            "insulin": df["insulin"].astype(str),
-            "change": df["change"].astype(str),
-            "diabetesMed": df["diabetesMed"].astype(str),
-            "A1Cresult": df["A1Cresult"].astype(str),
-            "max_glu_serum": df["max_glu_serum"].astype(str),
-            "redundant_intake_los_echo": t_hosp + rng.normal(0, 0.5, size=len(df)),
-            "redundant_lab_intensity_echo": n_labs + rng.normal(0, 3.0, size=len(df)),
-            "decoy_ward_code": rng.integers(1, 15, size=len(df)).astype(str),
-            "decoy_chart_noise": rng.normal(0, 1, size=len(df)),
-        }
-    )
+    z_dict: dict[str, Any] = {
+        "time_in_hospital": pd.to_numeric(df["time_in_hospital"], errors="coerce"),
+        "num_lab_procedures": pd.to_numeric(df["num_lab_procedures"], errors="coerce"),
+        "num_procedures": pd.to_numeric(df["num_procedures"], errors="coerce"),
+        "number_inpatient": pd.to_numeric(df["number_inpatient"], errors="coerce"),
+        "number_emergency": pd.to_numeric(df["number_emergency"], errors="coerce"),
+        "number_outpatient": pd.to_numeric(df["number_outpatient"], errors="coerce"),
+        "discharge_disposition_clean": df["discharge_disposition_id"].astype(str),
+        "medical_specialty": df["medical_specialty"].fillna("__MISSING__").astype(str),
+        "number_diagnoses": pd.to_numeric(df["number_diagnoses"], errors="coerce"),
+        "diag_1_chapter": df["diag_1"].fillna("__MISSING__").astype(str).str.slice(0, 3),
+        "num_medications": pd.to_numeric(df["num_medications"], errors="coerce"),
+        "insulin": df["insulin"].fillna("__MISSING__").astype(str),
+        "change": df["change"].fillna("__MISSING__").astype(str),
+        "diabetesMed": df["diabetesMed"].fillna("__MISSING__").astype(str),
+        "A1Cresult": df["A1Cresult"].fillna("None").astype(str),
+        "max_glu_serum": df["max_glu_serum"].fillna("None").astype(str),
+    }
 
     candidates = [
+        CandidateChannelSpec(
+            "ch_inpatient_workup",
+            ("time_in_hospital", "num_lab_procedures", "num_procedures"),
+            acquisition_cost=1.0,
+            mechanism_tag="inpatient_workup",
+        ),
         CandidateChannelSpec(
             "ch_prior_utilization",
             ("number_inpatient", "number_emergency", "number_outpatient"),
@@ -633,19 +659,39 @@ def load_tier2_diabetes130(
             acquisition_cost=1.0,
             mechanism_tag="glycemic_panel",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_intake_proxy",
-            ("redundant_intake_los_echo", "redundant_lab_intensity_echo"),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_ward",
-            ("decoy_ward_code", "decoy_chart_noise"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed)
+        # Synthesize proxy strictly from admission-time X_base fields (never post-admission workup!)
+        age_codes = X_base["age_bucket"].astype("category").cat.codes.to_numpy(dtype=float)
+        adm_codes = (
+            pd.to_numeric(X_base["admission_type_id"], errors="coerce")
+            .fillna(1.0)
+            .to_numpy(dtype=float)
+        )
+        z_dict["redundant_intake_age_echo"] = age_codes + rng.normal(0.0, 0.35, size=len(df))
+        z_dict["redundant_intake_adm_echo"] = adm_codes + rng.normal(0.0, 0.35, size=len(df))
+        z_dict["decoy_ward_code"] = rng.integers(1, 15, size=len(df)).astype(str)
+        z_dict["decoy_chart_noise"] = rng.normal(0.0, 1.0, size=len(df))
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_intake_proxy",
+                    ("redundant_intake_age_echo", "redundant_intake_adm_echo"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_ward",
+                    ("decoy_ward_code", "decoy_chart_noise"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_dict)
 
     return MultiChannelCohort(
         name="UCI_Diabetes_130US_Hospitals",
@@ -653,6 +699,7 @@ def load_tier2_diabetes130(
         Z_pool=Z_pool,
         candidates=candidates,
         ground_truth_relevant_channels={
+            "ch_inpatient_workup",
             "ch_prior_utilization",
             "ch_discharge_routing",
             "ch_diagnosis_burden",
@@ -660,9 +707,9 @@ def load_tier2_diabetes130(
             "ch_glycemic_biomarkers",
         },
         y_true=y_tilde,
-        y_tilde=y_tilde,
+        y_tilde=y_tilde.copy(),
         contract=DecisionContract(
-            task_name="Diabetes130_Readmission_30d",
+            task_name="Diabetes130_Recorded_Readmission_30d",
             target_precision=0.28,
             max_fpr_budget=0.05,
             cost_fp=1.0,
@@ -676,13 +723,22 @@ def load_tier2_diabetes130(
             "age_bucket": SemanticType.ORDINAL,
             "admission_type_id": SemanticType.NOMINAL,
             "admission_source_id": SemanticType.NOMINAL,
-            "time_in_hospital": SemanticType.COUNT,
-            "num_lab_procedures": SemanticType.RECEIPT_FLAG,
+            "payer_code": SemanticType.NOMINAL,
+            "weight_flag": SemanticType.ORDINAL,
         },
         group_ids=groups,
         future_positive_mask=future_pos,
-        competing_censor_mask=competing_censor,
-        receipt_cols=["num_lab_procedures"],
+        competing_censor_mask=None,
+        receipt_cols=["payer_code", "weight_flag"],
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
+        n_raw_rows_before_eligibility=n_raw_all,
+        n_excluded_ineligible=n_excl,
+        n_excluded_ineligible_positives=n_excl_pos,
+        eligibility_note=(
+            "Discharged-alive non-hospice encounters (excluding disposition IDs "
+            "{11,13,14,19,20,21} upfront independent of readmission status)"
+        ),
     )
 
 
@@ -692,14 +748,9 @@ def load_tier2_credit_card_fraud(
     window_idx: int | None = None,
     n_windows: int = 5,
     seed: int = 42,
+    include_synthetic_proxies: bool = False,
 ) -> MultiChannelCohort:
-    """Load ULB Credit Card Fraud (OpenML 1597) with strict chronological ordering on Time!
-
-    - When ``max_negatives`` is None and ``window_idx`` is provided (0..n_windows-1),
-      slices a contiguous 76% chronological horizon window across the full 284,807-row
-      transaction stream so multi-window replication evaluates genuinely distinct
-      out-of-time regimes without negative subsampling!
-    """
+    """Load ULB Credit Card Fraud (OpenML 1597) with strict chronological ordering on Time."""
     df = _fetch_openml_cached(1597, "tier2_ulb_creditcard", cache_dir)
     df.columns = [c.strip() for c in df.columns]
     df["__seq_order__"] = (
@@ -715,9 +766,6 @@ def load_tier2_credit_card_fraud(
 
     is_disjoint_windows = False
     if window_idx is not None and n_windows > 1:
-        # Strictly disjoint out-of-time test blocks across n_windows!
-        # With freeze_split assigning the final 15% to test, span_frac <= 0.52
-        # guarantees step_frac > 0.15 * span_frac so test intervals NEVER overlap!
         span_frac = min(0.52, 1.0 / (1.0 + 0.23 * float(n_windows - 1)))
         step_frac = (1.0 - span_frac) / float(n_windows - 1)
         start_f = step_frac * float(window_idx)
@@ -745,54 +793,56 @@ def load_tier2_credit_card_fraud(
         }
     )
 
-    rng = np.random.default_rng(seed + 7)
-    # Redundant gateway echo of X_base (V1..V4 carry strong marginal fraud MI, testing whether
-    # Global MI wastes acquisition budget re-buying baseline PCA components!)
-    Z_pool = pd.DataFrame(
-        {
-            **{f"V{i}": pd.to_numeric(df[f"V{i}"], errors="coerce") for i in range(6, 29)},
-            **{
-                f"redundant_v{i}_echo": X_base[f"V{i}"].to_numpy(dtype=float)
-                + rng.normal(0.0, 0.25, len(df))
-                for i in range(1, 5)
-            },
-            "decoy_merchant_hash": rng.normal(0, 1, len(df)),
-            "decoy_latency_ms": rng.exponential(20.0, len(df)),
-        }
-    )
-
+    z_dict: dict[str, Any] = {
+        f"V{i}": pd.to_numeric(df[f"V{i}"], errors="coerce") for i in range(6, 29)
+    }
     candidates = [
         CandidateChannelSpec(
-            "ch_behavior_block_A",
+            "ch_pca_block_A",
             tuple(f"V{i}" for i in range(6, 13)),
             acquisition_cost=1.0,
             mechanism_tag="pca_block_A",
         ),
         CandidateChannelSpec(
-            "ch_device_block_B",
+            "ch_pca_block_B",
             tuple(f"V{i}" for i in range(13, 20)),
             acquisition_cost=1.0,
             mechanism_tag="pca_block_B",
         ),
         CandidateChannelSpec(
-            "ch_velocity_block_C",
+            "ch_pca_block_C",
             tuple(f"V{i}" for i in range(20, 29)),
             acquisition_cost=1.0,
             mechanism_tag="pca_block_C",
         ),
-        CandidateChannelSpec(
-            "ch_redundant_gateway_echo",
-            tuple(f"redundant_v{i}_echo" for i in range(1, 5)),
-            acquisition_cost=1.0,
-            mechanism_tag="redundant_proxy",
-        ),
-        CandidateChannelSpec(
-            "ch_decoy_gateway",
-            ("decoy_merchant_hash", "decoy_latency_ms"),
-            acquisition_cost=1.0,
-            mechanism_tag="decoy",
-        ),
     ]
+
+    if include_synthetic_proxies:
+        rng = np.random.default_rng(seed + 7)
+        for i in range(1, 5):
+            z_dict[f"redundant_v{i}_echo"] = X_base[f"V{i}"].to_numpy(dtype=float) + rng.normal(
+                0.0, 0.25, len(df)
+            )
+        z_dict["decoy_merchant_hash"] = rng.normal(0, 1, len(df))
+        z_dict["decoy_latency_ms"] = rng.exponential(20.0, len(df))
+        candidates.extend(
+            [
+                CandidateChannelSpec(
+                    "ch_redundant_gateway_echo",
+                    tuple(f"redundant_v{i}_echo" for i in range(1, 5)),
+                    acquisition_cost=1.0,
+                    mechanism_tag="redundant_proxy",
+                ),
+                CandidateChannelSpec(
+                    "ch_decoy_gateway",
+                    ("decoy_merchant_hash", "decoy_latency_ms"),
+                    acquisition_cost=1.0,
+                    mechanism_tag="decoy",
+                ),
+            ]
+        )
+
+    Z_pool = pd.DataFrame(z_dict)
 
     return MultiChannelCohort(
         name="ULB_CreditCard_Fraud_Chronological",
@@ -800,9 +850,9 @@ def load_tier2_credit_card_fraud(
         Z_pool=Z_pool,
         candidates=candidates,
         ground_truth_relevant_channels={
-            "ch_behavior_block_A",
-            "ch_device_block_B",
-            "ch_velocity_block_C",
+            "ch_pca_block_A",
+            "ch_pca_block_B",
+            "ch_pca_block_C",
         },
         y_true=y_true,
         y_tilde=y_true.copy(),
@@ -817,4 +867,6 @@ def load_tier2_credit_card_fraud(
         acquisition_budget=2.0,
         time_order=time_arr,
         disjoint_test_blocks=is_disjoint_windows,
+        include_synthetic_proxies=include_synthetic_proxies,
+        dataset_provenance="real_observational",
     )

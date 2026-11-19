@@ -353,9 +353,13 @@ class ConfirmRescueLattice:
                         best_w = cand_w
 
             self.orthogonal_lattice_weight_ = best_w
-            # Do NOT refit a 3rd post-selection Platt calibrator on the same y_c fold:
-            # convex log-odds blend of two calibrated models stays calibrated!
-            self._hybrid_calibrator = None
+            # Calibrate final blended posterior on cross-fitted OOF blended predictions
+            # because a convex combination of calibrated log-odds is not automatically calibrated!
+            if 0.001 < best_w < 0.999 and int(y_c.sum()) >= 6 and int((1 - y_c).sum()) >= 20:
+                blend_cal_oof = expit(best_w * llr_orth_c + (1.0 - best_w) * llr_coup_c)
+                self._hybrid_calibrator = PlattLogitCalibrator().fit(blend_cal_oof, y_c)
+            else:
+                self._hybrid_calibrator = None
 
         self._fitted = True
         return self
@@ -456,7 +460,7 @@ class ConfirmRescueLattice:
             for scout_mult in (2.5, 4.0, 7.0, 12.0):
                 alpha_scout = min(0.35, max(self.max_fpr_budget, confirm_budget * scout_mult))
                 tau_a = select_neyman_pearson_threshold(y_val, scout_p, alpha_scout)
-                a_hit = scout_p >= tau_a
+                a_hit = scout_p > tau_a
 
                 tau_bs: list[float] = []
                 confirm_or = np.zeros(y_val.size, dtype=bool)
@@ -475,7 +479,7 @@ class ConfirmRescueLattice:
                         else:
                             tb = select_neyman_pearson_threshold(y_val, bp, confirm_budget / m_br)
                     tau_bs.append(tb)
-                    confirm_or |= a_hit & (bp >= tb)
+                    confirm_or |= a_hit & (bp > tb)
 
                 tau_cs: list[float] = []
                 rescue_or = np.zeros(y_val.size, dtype=bool)
@@ -485,7 +489,7 @@ class ConfirmRescueLattice:
                     else:
                         tc = select_neyman_pearson_threshold(y_val, cp, rescue_budget_each)
                     tau_cs.append(tc)
-                    rescue_or |= cp >= tc
+                    rescue_or |= cp > tc
 
                 final_alert = confirm_or | rescue_or
                 realized_fpr = float(np.sum(final_alert & neg_mask) / n_neg)
@@ -521,8 +525,8 @@ class ConfirmRescueLattice:
             bp = br.confirm_arm.predict_proba(Zc)
             XZ = pd.concat([X_base.reset_index(drop=True), Zc.reset_index(drop=True)], axis=1)
             cp = br.rescue_arm.predict_proba(XZ)
-            confirm_hit = (scout_p >= br.tau_scout) & (bp >= br.tau_confirm)
-            rescue_hit = cp >= br.tau_rescue
+            confirm_hit = (scout_p > br.tau_scout) & (bp > br.tau_confirm)
+            rescue_hit = cp > br.tau_rescue
             alert |= confirm_hit | rescue_hit
         return alert.astype(int)
 

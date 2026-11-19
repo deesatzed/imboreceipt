@@ -5,10 +5,10 @@ build-backend = "hatchling.build"
 [project]
 name = "imboreceipt"
 version = "0.1.0"
-description = "CREDO & CREDO-Bench: Receipt repair, evidence-deficit channel discovery, and orthogonal confirmation lattices for rare-event prediction"
+description = "CREDO & CREDO-Bench: Budgeted channel discovery and selective feature acquisition for imbalanced prediction"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 dependencies = [
     "numpy>=1.26.0",
     "scipy>=1.13.0",

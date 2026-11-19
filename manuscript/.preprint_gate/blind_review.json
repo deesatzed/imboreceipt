@@ -2,15 +2,34 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent blind screening audit of main.tex and references.bib for arXiv (stat.ME / stat.AP / cs.LG) and Preprints.org passed with zero blockers and zero warnings. The pdflatex compatibility preamble (iftex/inputenc/fontenc), complete back-matter sections (Author Contributions, Funding, Institutional Review Board and Informed Consent Statement, Data and Code Availability at https://github.com/deesatzed/imboreceipt and credo_reproducibility_code.zip, Acknowledgments, and Conflicts of Interest), AI workflow disclosure, citation integrity, and numerical consistency across all 19 datasets are fully verified.",
+  "summary": "Independent cold screening of main.tex and references.bib for arXiv found zero blockers across AI authorship, Google Antigravity for Science workflow and acknowledgment disclosures, retrospective claim grounding, ethics/code/data availability statements, and citation integrity. All 31 bibliography entries and 3 embedded figure PDFs align with manuscript tables and claims, and clinical/financial experiments are consistently framed as retrospective masked-column simulations on public de-identified datasets.",
   "blockers": [],
-  "warnings": [],
+  "warnings": [
+    {
+      "id": "W1",
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L46,L284",
+      "detail": "Abstract states 'Holm p <= 0.018 for AUPRC and (alpha,delta)-certified Neyman-Pearson sensitivity' (three-decimal rounding), whereas Section 3.2 (L284) reports the exact NP sensitivity ceiling as 0.01807 (strictly <= 0.0181)."
+    },
+    {
+      "id": "W2",
+      "category": "DATABASE_TOOL_ATTRIBUTION",
+      "location": "main.tex:L97,L113,L407",
+      "detail": "LightGBM, imbalanced-learn, and OpenML are properly cited; consider optionally adding a scikit-learn citation (Pedregosa et al., 2011) for Platt logistic calibration/k-NN diagnostics and listing the UCI Scania APS ID (421) plus the remaining 7 OpenML dataset IDs in Data and Code Availability."
+    },
+    {
+      "id": "W3",
+      "category": "SERVER_SCREENING",
+      "location": "main.tex:L183-185,L401-403",
+      "detail": "Minor duplication between Section 2.6 (Ethics Statement) and the unnumbered Institutional Review Board and Informed Consent Statement section, both stating the 45 CFR 46.104(d)(4) exemption."
+    }
+  ],
   "checked_files": [
     "main.tex",
     "references.bib"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "d9a38176163bb83559f0f9a87eecce5a381b3ca91bd885983e4c8dec5039c00f",
+  "manuscript_sha256": "104fba2ddbb62a0147791a836c1c08be8e187b0965dbb989e976faba0de34cf7",
   "file_count": 10,
-  "recorded_at": "2026-11-18T17:07:32.991871+00:00"
+  "recorded_at": "2026-11-19T00:38:14.997354+00:00"
 }

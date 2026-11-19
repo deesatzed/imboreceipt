@@ -66,13 +66,10 @@ def test_group_and_time_cv_splits_prevent_entity_and_future_leakage() -> None:
 
     times = np.arange(300, dtype=float)
     t_splits = make_leak_free_cv_splits(y, n_folds=5, time_order=times, seed=11)
-    # For all 4 non-burn-in blocks (va start >= 60), training indices must strictly precede va!
-    later_blocks_checked = 0
+    assert len(t_splits) >= 4
+    # EVERY returned chronological fold must satisfy max(train_time) < min(val_time)
     for tr, va in t_splits:
-        if np.min(times[va]) >= 60:
-            assert np.max(times[tr]) < np.min(times[va]), "Future-to-past temporal CV leakage!"
-            later_blocks_checked += 1
-    assert later_blocks_checked == 4
+        assert np.max(times[tr]) < np.min(times[va]), "Future-to-past temporal CV leakage!"
 
 
 def test_platt_calibrator_preserves_extreme_tail_auprc_without_tie_clipping() -> None:

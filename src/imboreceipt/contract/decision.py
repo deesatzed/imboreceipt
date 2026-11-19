@@ -103,12 +103,41 @@ def instance_evidence_deficit(
     return np.maximum(0.0, req_log_lr - log_lr)
 
 
+def wilson_interval(
+    successes: int,
+    total: int,
+    alpha: float = 0.05,
+) -> tuple[float, float]:
+    """Compute exact Wilson (1927) score confidence interval ``(low, high)`` for a binomial rate."""
+    if total <= 0:
+        return (0.0, 1.0)
+    k = int(np.clip(successes, 0, total))
+    n = float(total)
+    p_hat = float(k) / n
+    z = float(norm.ppf(1.0 - alpha / 2.0))
+    z2 = z * z
+    denom = 1.0 + z2 / n
+    center = (p_hat + z2 / (2.0 * n)) / denom
+    half = (z * math.sqrt((p_hat * (1.0 - p_hat) / n) + (z2 / (4.0 * n * n)))) / denom
+    return (float(max(0.0, center - half)), float(min(1.0, center + half)))
+
+
+def wilson_halfwidth(
+    successes: int,
+    total: int,
+    alpha: float = 0.05,
+) -> float:
+    """Return half-width ``(high - low) / 2`` of the Wilson score interval at observed ``k / n``."""
+    lo, hi = wilson_interval(successes, total, alpha=alpha)
+    return float(0.5 * (hi - lo))
+
+
 def minimum_detectable_recall_halfwidth(
     n_pos_test: int,
     reference_recall: float = 0.80,
     alpha: float = 0.05,
 ) -> float:
-    """Compute 95% confidence interval half-width for recall on ``n_pos_test`` positives."""
+    """Illustrative normal-approximation planning half-width at assumed ``reference_recall``."""
     if n_pos_test <= 0:
         return 1.0
     z = float(norm.ppf(1.0 - alpha / 2.0))

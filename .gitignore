@@ -1,6 +1,16 @@
 # Legacy read-only reference repository & local clinical notes (never track or modify)
 /imbora/
 ESI-3*
+Breakthrough App Deliverable.txt
+
+# LaTeX intermediate build files
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.blg
 
 # Python & virtual environments
 .venv/

@@ -14,6 +14,8 @@
 \setlength{\parskip}{0.8pt}
 \setlist[itemize]{leftmargin=1.1em,itemsep=0pt,topsep=0pt,parsep=0pt}
 
+\emergencystretch=3em
+\hbadness=2000
 \begin{document}
 \small
 \setlength{\abovedisplayskip}{1.8pt}
@@ -21,60 +23,55 @@
 \setlength{\abovedisplayshortskip}{1pt}
 \setlength{\belowdisplayshortskip}{1pt}
 
-{\large\textbf{1-Page Executive Walkthrough: How \texttt{CREDO} Works (A Step-by-Step Thought Experiment)}}\\[2pt]
-{\scriptsize \textbf{Author:} Wayne A. Satz, MD (Temple Emergency Medicine) \hfill \textbf{Cohort:} UCI 30-Day Hospital Readmission ($101,766$ stays, $11.2\%$ readmitted)}
+{\large\textbf{1-Page Executive Walkthrough: Budgeted Channel Discovery \& Selective Acquisition (\texttt{CREDO})}}\\[2pt]
+{\scriptsize \textbf{Author:} Wayne A. Satz, MD (Temple Emergency Medicine) \hfill \textbf{Clinical Case:} UCI Admission-Time Readmission ($99,343$ eligible stays, $11.39\%$ $<30\text{d}$)}
 \vspace{-3pt}
 \noindent\rule{\textwidth}{0.6pt}
 
-\textbf{The Three Predicates of Our Thought Experiment:}
-Instead of treating rare-event prediction as an \textbf{algorithmic} problem (\texttt{SMOTE}, reweighting), we frame it around three information predicates: \textbf{(1) Define the Latent-Space Information Gap} between the current feature space and the target decision threshold; \textbf{(2) Exploit ``High-Signal False Positives''}---recognizing that aside from the rare True Positives themselves, the richest information about what the current model is missing lives in the High-Signal False Positives (look-alike false alarms that max out the baseline score); and \textbf{(3) Use a Two-Stage Process to Rescue Signal ``Lost in True-Negative Abundance''}---sweeping away the overwhelming sea of easy True Negatives ($89\%\text{--}99\%$ of rows) at Stage 1, then focusing Stage-2 features specifically on the upper-tail screening set where True Positives and High-Signal False Positives collide.
+\textbf{Core Question:}
+When an inexpensive arrival intake table $X_{\text{base}}$ leaves severe conditional risk overlap under class imbalance, can a small score-stratified case-cohort pilot identify genuinely informative Stage-2 channels without measuring $100\%$ of training charts or buying baseline echoes---and when does selective Stage-2 routing help at deployment?
 
-\textbf{The Setup: Why Isn't Everything in the Stage-1 Intake Screen from Day 1?}
+\textbf{Why Admission-Time Screening Needs Two Stages (After Upfront Eligibility Filtering):}
 \begin{itemize}
-  \item \textbf{What if you DO put 100\% of columns into Stage 1?} We tested that first across \textbf{10 full-feature benchmarks (50 splits)}: even with $100\%$ of columns included upfront, once a table's information is exhausted, \texttt{SMOTE}, \texttt{ADASYN}, \texttt{EasyEnsemble}, and \texttt{RUSBoost} achieve \textbf{0 out of 10 statistically significant AUPRC wins} over calibrated \texttt{LightGBM}.
-  \item \textbf{Why Stage 1 vs.\ Stage 2 exists in real life:} In hospitals, banks, and fleets, \textbf{Stage 1} is what is free and instant at arrival (7 basic registration fields, a 1-page loan form, or a card-swipe header), whereas \textbf{Stage-2 channels} live in separate EHR modules, lab orders, or paid external Credit/Identity APIs (\texttt{Home Credit}'s 7 tables; \texttt{IEEE-CIS}'s identity table). Using only the \textbf{7 free Stage-1 registration fields} on UCI Readmission (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type/Source}, \texttt{Length of Stay}, \texttt{Lab Count}), calibrated \texttt{LightGBM} gets just \textbf{\texttt{0.1305} AUPRC} (barely above random \texttt{0.112}) because thousands of patients look \textbf{identical} on those 7 numbers.
+  \item \textbf{Fixed-Table Resampling Check (10 Benchmarks, 50 Splits):} Once gradient-boosted trees bound small-Hessian steps (\texttt{max\_delta\_step}$=1.0$) and Platt-calibrate on natural prevalence, \texttt{SMOTE}, \texttt{ADASYN}, copulas, \texttt{EasyEnsemble}, and \texttt{RUSBoost} yield \textbf{0 out of 10 detectable AUPRC gains} ($p_{\text{NB}} \ge 0.068$), consistent with population prior-shift ranking invariance (\textbf{Lemma 1}), while small minority sets ($n_+ \le 12$) carry wide Wilson $95\%$ intervals ($\pm 0.18\text{--}0.22$).
+  \item \textbf{True Admission-Time Intake} ($X_{\text{base}}$)\textbf{:} Excluding inpatient deaths and hospice discharges upfront independent of $Y$ ($2,423$ of $101,766$ encounters) leaves $99,343$ eligible admissions. At admission intake, only \textbf{7 fields} are known (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type}, \texttt{Admission Source}, \texttt{Payer Code}, \texttt{Weight Flag}); length of stay and lab/procedure counts move to Stage-2 candidate channels. On those 7 intake fields, calibrated \texttt{LightGBM} achieves only \textbf{\texttt{0.1272} AUPRC} ($5.92\%$ certified sensitivity at $5\%$ FPR) because look-alike arrivals share identical $X_{\text{base}}$.
 \end{itemize}
 
-\textbf{Step 1: Defining the Information Gap (\emph{Principle 1: You Can't Re-Sort a Tie})}\\[0.5pt]
-Picture \textbf{100 patients} who share the \textbf{exact same 7 intake numbers} (e.g., 65-year-old female, 4-day stay, 45 labs). In reality, \textbf{15 will be readmitted ($15\%$ true risk)} and \textbf{85 will recover fine ($85\%$ High-Signal False Positives)}. Suppose our care team requires at least \textbf{$28\%$ confidence (precision)} before paying for a home-health nurse:
+\textbf{Step 1: Identifying the Baseline Overlap Bottleneck (\emph{Lemma 1})}\\[0.5pt]
+Consider \textbf{100 emergency arrivals} sharing identical 7-field admission intake covariates: \textbf{15 true $<30$-day readmissions ($15\%$ risk)} and \textbf{85 non-readmitted look-alikes}. If care-transition nursing requires \textbf{$28\%$ precision} ($q_{\text{target}}$):
 \vspace{-3pt}
 \[
-  \text{Information Gap} = \text{Target Confidence Needed } (28\%) \;-\; \text{Current Space Confidence } (15\%) \;=\; +13\% \text{ gap}
+  D_q(x) = \max\{0,\; \operatorname{logit}(0.28) - \operatorname{logit}(0.15)\} > 0 \quad (\text{positive baseline evidence deficit}).
 \]
 \vspace{-5pt}
 \begin{itemize}
-  \item \textbf{Why \texttt{SMOTE} Hits a Brick Wall:} Generating fake copies of the 15 readmitted patients (\texttt{SMOTE}) or multiplying their weight by $3\times$ simply inflates \textbf{all 100 identical-looking patients together} from $15\%$ to $35\%$. It \textbf{never changes who ranks above whom}---the 85 High-Signal False Positives stay mixed right in with the 15 True Positives (\texttt{SMOTE} gets \textbf{\texttt{0.1295} AUPRC}).
-  \item \textbf{Rule 1:} When $\text{Information Gap} > 0$, stop tweaking the algorithm on the intake space; you must bring in \textbf{Stage-2 features} to break the tie.
+  \item Resampling or reweighting those 100 identical baseline rows shifts their scores together without changing who ranks above whom (\texttt{SMOTE} gets \textbf{\texttt{0.1267} AUPRC}). Breaking the tie requires acquiring Stage-2 clinical channels.
 \end{itemize}
 
-\textbf{Step 2: Using ``High-Signal False Positives'' to Pick Stage-2 Features (\emph{Principle 2: Rescuing Signal Lost in True-Negative Abundance})}\\[0.5pt]
-\textbf{The Choice:} The hospital EHR has \textbf{7 candidate Stage-2 modules} (\emph{1: Prior Inpatient/ER Visits}, \emph{2: Discharge Disposition \& Specialty}, \emph{3: Diagnosis Count}, \emph{4: Medication Changes}, \emph{5: HbA1c/Glucose}, \emph{6: A ``Copycat Acuity Index'' that secretly repackages Length-of-Stay + Lab Count}, and \emph{7: Ward Noise}). Our budget allows \textbf{2 modules}.
+\textbf{Step 2: Horvitz--Thompson Stratified-Pilot Conditional Log-Likelihood Gain (\emph{Lemma 2})}\\[0.5pt]
+\textbf{The Discovery Budget:} Six native Stage-2 EHR modules are candidates (\emph{Prior Inpatient/ED/Outpatient Visits}, \emph{Discharge Care-Transition Routing}, \emph{Inpatient Stay/Lab Workup}, \emph{Comorbidities}, \emph{Medications}, \emph{HbA1c/Glucose}), with budget for \textbf{2 modules}.
 \begin{itemize}
-  \item \textbf{Why Global Selection Fails (Drowned in True-Negative Abundance):} If you score features globally or against random healthy patients (Unmatched Case-Control MI), the $89\%$ sea of easy True Negatives dominates the math---making a ``Copycat'' or general-illness feature look great because readmitted patients stayed longer than random healthy patients! Unmatched MI picks a suboptimal channel on 4 of 5 splits and stalls at \textbf{\texttt{0.1979} AUPRC}.
-  \item \textbf{What \texttt{CREDO} Does Instead:} We pit every True Positive directly against \textbf{$m(\pi)$ ``High-Signal False Positives''} ($m=2$ at $11.2\%$ prevalence, measuring only $33.5\%$ of charts; $m=4\text{--}8$ for rarer events)---patients who got the \textbf{exact same high risk score on the 7 intake fields}, but were \emph{not} readmitted:
+  \item \textbf{Known-Probability Stratified Case-Cohort Pilot:} We sample $100\%$ of training cases ($w_i=1$) plus a baseline-score-stratified control subcohort ($34.2\%$ of Diabetes charts, saving \textbf{$65.7\%$ of discovery accesses}; $44\%$--$98.4\%$ saved across all 9 cohorts) with strictly positive stratum inclusion probabilities $\pi_{0,b} = n_{0,b}/N_{0,b} > 0$ and exact Horvitz--Thompson weights $w_i = N_{0,b}/n_{0,b}$ summing to $N_0$.
+  \item \textbf{Offset-Anchored Conditional Gain} ($\hat{G}_m$)\textbf{:} Fitting shallow regularized GBDTs over full $[X_{\text{base}}, Z_m]$ anchored at baseline log-odds $\operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base}}))$ estimates $I(Y; Z_m \mid X_{\text{base}})$, preserving pure $[X_{\text{base}}, Z_m]$ interactions (\textbf{Sim 3}) while rejecting baseline echoes (\textbf{$0.0\%$ false proxy selection across 40 stress runs} vs.\ $30\%$--$50\%$ under marginal MI on large multi-table cohorts):
 \end{itemize}
 \vspace{-3pt}
 \[
-  \text{Relative Evidence Gain (REG)} = \tfrac{\text{\% of True Positives flagged by the Stage-2 feature}}{\text{\% of High-Signal False Positives flagged by the Stage-2 feature}}
+  \hat{G}_m = \frac{1}{N}\sum_{i \in \mathcal{P}} w_i \left[\ell(Y_i, \hat{p}_{\text{base},\mathcal{P}}(X_{\text{base},i})) - \ell(Y_i, \hat{p}_{m,\mathcal{P}}(X_{\text{base},i}, Z_{m,i}))\right]_+.
 \]
 \vspace{-5pt}
 \begin{itemize}
-  \item \textbf{Result:} Inside this matched upper-tail set, the ``Copycat Index'' flags both groups equally ($\text{REG} = \tfrac{30\%}{30\%} = \mathbf{1.0} \to \text{Rejected}$), while \emph{Prior Visits} + \emph{Discharge Routing} rescue the signal that was lost in True-Negative abundance ($\text{REG} \gg \mathbf{1.0} \to \text{Selected on 5 / 5 splits}$), lifting AUPRC from \textbf{\texttt{0.1305} $\to$ \texttt{0.2231}} ($p = 0.030$, and winning across our 9 multi-table cohorts up to $1.0\text{M}$ rows).
+  \item \textbf{Result:} A \textbf{single calibrated GBDT} trained on the 2 selected channels (\emph{Prior Utilization} + \emph{Discharge Routing}) lifts Diabetes AUPRC from \textbf{\texttt{0.1272} $\to$ \texttt{0.2307}} (Holm $p=0.00233$; certified sensitivity $5.92\% \to \mathbf{17.38\%}$), recovering \textbf{$98.7\%$} of the unrestricted all-6-channels GBDT (\texttt{0.2338}) and improving significantly over $X_{\text{base}}$ on \textbf{all 9 / 9 native cohorts} up to $1.0\text{M}$ rows.
 \end{itemize}
 
-\textbf{Step 3: Two-Stage Screening at Discharge (\emph{Principle 3: Focusing Stage-2 on the Upper-Tail Screening Set})}\\[0.5pt]
-\textbf{The Live Triage Problem:} Standard two-stage ``Conformal Prediction'' splits Stage-1 predictions into \textbf{Green $\{0\}$} (easy True Negatives $\to$ skip Stage-2), \textbf{Yellow $\{0,1\}$} (uncertain middle $\to$ pull Stage-2), and \textbf{Red $\{1\}$} (top alerts $\to$ standard methods call this \emph{``Confident Positive''} and \textbf{skip Stage-2}).
-\begin{itemize}
-  \item \textbf{Why Skipping the Red Bucket Fails (The Base-Rate Trap):} Look inside that Stage-1 \textbf{Red Bucket $\{1\}$}:
-\end{itemize}
+\textbf{Step 3: Six-Policy Selective Runtime Routing \& Honest Boundary Conditions (\emph{Proposition 1})}\\[0.5pt]
+\textbf{Why Literal Conformal $\{0,1\}$ Routing Struggles Under Rarity:} Mondrian calibration bounds negative singleton errors by $\alpha_0$, leaving Stage-1 $\{1\}$ positive singletons with only \textbf{$3.8\%$--$38.8\%$ realized PPV} ($12.8\%$ on Diabetes; $3.8\%$ on BAF-1M):
 \vspace{-3pt}
 \[
-  \text{True Precision Inside the Red Bucket} = \tfrac{\text{True Positives}}{\text{True Positives} + \text{High-Signal False Positives}}
+  \operatorname{PPV}(\mathcal{S}_{\{1\}}) = \frac{\pi \gamma_1}{\pi \gamma_1 + (1-\pi)\gamma_0}.
 \]
 \vspace{-5pt}
 \begin{itemize}
-  \item Because readmission is $11.2\%$ overall and the 7 intake fields are weak, \textbf{roughly 80\% of the Stage-1 Red Bucket are High-Signal False Positives}! Standard Yellow-Only routing leaves those unverified false alarms at the top of the list (\textbf{\texttt{0.1981} AUPRC}).
-  \item \textbf{Our Fix (\texttt{CREDO} Two-Stage Foveation):} Sweeps away the Green Bucket of easy True Negatives ($26.0\%$ saved on Diabetes; \textbf{41\%--79\% saved} on rarer cohorts) and \textbf{applies Stage-2 features directly to the Red + Yellow upper-tail screening set}, weeding out the High-Signal False Positives and lifting AUPRC to \textbf{\texttt{0.2091}} at the exact same query budget (winning on \textbf{9 / 9 cohorts}, including \texttt{0.55} $\to$ \texttt{0.89} on $76\text{k}$ trucks and \texttt{0.23} $\to$ \texttt{0.48} on $590\text{k}$ transactions).
+  \item \textbf{Equal-Budget 6-Policy Finding:} Querying upper-tail conformal candidates beats corrected \textbf{Literal $\{0,1\}$} routing on \textbf{9 / 9 cohorts} (Holm $p \le 0.005$ on 5 cohorts; saving $24.3\%\text{--}79.0\%$ of simulated Stage-2 accesses while retaining $76.3\%\text{--}98.4\%$ of incremental Stage-2 AUPRC gain). Crucially, because Stage-1 probabilities on rare-event cohorts rarely exceed $0.85$, upper-tail conformal routing \textbf{tracks simple Top-Risk-$K$ prioritization} ($p_2 \ge 0.215$), providing calibrated query-volume sizing $K$ rather than superior ranking at fixed $K$---while \textbf{VOI-$K$} and \textbf{Literal $\{0,1\}$} win decisively whenever top-risk pockets have irreducible ambiguity (\textbf{Sim 6}: \texttt{0.8674} vs.\ \texttt{0.8052}).
 \end{itemize}
 
 \end{document}

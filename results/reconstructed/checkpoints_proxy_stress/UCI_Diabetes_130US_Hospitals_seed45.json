@@ -1,0 +1,1547 @@
+{
+  "cohort_name": "UCI_Diabetes_130US_Hospitals",
+  "dataset_provenance": "real_observational",
+  "include_synthetic_proxies": true,
+  "eligibility_audit": {
+    "n_raw_rows_before_eligibility": 101766,
+    "n_excluded_ineligible": 2423,
+    "n_excluded_ineligible_positives": 43,
+    "eligibility_note": "Discharged-alive non-hospice encounters (excluding disposition IDs {11,13,14,19,20,21} upfront independent of readmission status)"
+  },
+  "seed": 45,
+  "disjoint_test_blocks": false,
+  "split_protocol": {
+    "split_hash": "0854268d79d47b936b10ee8fc34552b2fbff68924f3a8d458a6900ad1956889f",
+    "grouped_by": "__grp__",
+    "ordered_by": null,
+    "temporal_burnin_fraction": 0.0,
+    "temporal_cv_feasible": true
+  },
+  "split_hash": "0854268d79d47b936b10ee8fc34552b2fbff68924f3a8d458a6900ad1956889f",
+  "n_train": 54565,
+  "n_cal_evaluated": 14881,
+  "n_val_evaluated": 14915,
+  "n_test_evaluated": 14982,
+  "n_pos_test": 1705,
+  "gate_c": {
+    "prevalence": 0.11430404105195638,
+    "target_precision": 0.28,
+    "required_lr": 3.0133433096396067,
+    "required_log_lr_nats": 1.1030501964516035,
+    "required_specificity_at_tpr80": 0.7345141532858799,
+    "achieved_ppv_at_tpr80_fpr01": 0.9116954875677888,
+    "bayes_optimal_threshold": 0.09090909090909091,
+    "graded_action_threshold": 0.025974025974025976,
+    "n_pos_test": 1705,
+    "recall_ci_half_width_at_80": 0.018986542715513314,
+    "required_n_pos_for_resolution": 246,
+    "thermometer_adequate": true,
+    "one_stage_plausible": true,
+    "gate_recommendation": "PROCEED_STANDARD"
+  },
+  "receipt_audit": {
+    "observed_prevalence": 0.11430404105195638,
+    "estimated_true_prevalence": 0.29304499221112434,
+    "hidden_positive_fraction_among_negatives": 0.20180847541797717,
+    "observation_intensity_auc": 0.5007130109555205,
+    "future_positive_censoring_rate": 0.40361695083595434,
+    "competing_event_censoring_rate": 0.0,
+    "chapman_multi_trap_total_positives": null,
+    "ascertainment_distortion_index": 0.506780332828859,
+    "receipt_limited": true
+  },
+  "four_ceilings": {
+    "task_name": "Diabetes130_Recorded_Readmission_30d",
+    "prevalence": 0.11430404105195638,
+    "achieved_auprc": 0.12706435945684766,
+    "achieved_np_tpr": 0.05303476723629935,
+    "observed_channel_auprc_ceiling_bound": 0.8949745468377224,
+    "knn_plugin_auprc_reference": 0.8949745468377224,
+    "finite_positive_projected_asymptote": 0.15660875550820932,
+    "learning_curve_slope_delta": 0.0029614286286726854,
+    "headroom_index": 0.016345331750490143,
+    "receipt_adi": 0.506780332828859,
+    "bottleneck_regime": "receipt_limited",
+    "recommended_action": "Audit selective observation / eligibility definition before channel search."
+  },
+  "cost_accounting": {
+    "n_candidate_channels": 8,
+    "n_selected_channels": 2,
+    "discovery_pilot_channel_accesses": 149688,
+    "discovery_full_table_channel_accesses": 436520,
+    "discovery_access_savings_fraction": 0.6570878768441308,
+    "downstream_train_cal_val_selected_channel_accesses": 168722,
+    "downstream_unrestricted_all_channel_accesses": 506166,
+    "deployment_selective_channel_accesses_per_1k": 1525.0300360432518,
+    "deployment_all_selected_channel_accesses_per_1k": 2000.0,
+    "deployment_unrestricted_all_native_accesses_per_1k": 6000.0
+  },
+  "arms": {
+    "calibrated_gbdt": {
+      "arm_name": "calibrated_gbdt",
+      "auprc": 0.13254302309713087,
+      "auroc": 0.5405052328492573,
+      "brier_score": 0.10062466829424224,
+      "ece": 0.0087544348515862,
+      "np_tpr_at_fpr_budget": 0.07096774193548387,
+      "np_realized_fpr": 0.04699856895382993,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.05971978449585002,
+      "np_tpr_wilson_high": 0.08414461998223086,
+      "np_fpr_wilson_low": 0.0435278620211867,
+      "np_fpr_wilson_high": 0.05073133553811122,
+      "recall_at_target_precision": 0.0,
+      "realized_precision_at_q_threshold": 0.0,
+      "recall_at_q_wilson_low": 0.0,
+      "recall_at_q_wilson_high": 0.002247990181222074,
+      "net_utility_hard_per_1k": 249.96662661860898,
+      "net_utility_with_graded_per_1k": 283.0663462822053
+    },
+    "smote_gbdt": {
+      "arm_name": "smote_gbdt",
+      "auprc": 0.12952289631307984,
+      "auroc": 0.5390012539047858,
+      "brier_score": 0.10066406663392939,
+      "ece": 0.006673423943310825,
+      "np_tpr_at_fpr_budget": 0.06510263929618769,
+      "np_realized_fpr": 0.04677261429539806,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.05434239239211354,
+      "np_tpr_wilson_high": 0.07781817619366498,
+      "np_fpr_wilson_low": 0.04331020193788747,
+      "np_fpr_wilson_high": 0.05049721701848052,
+      "recall_at_target_precision": 0.0,
+      "realized_precision_at_q_threshold": 0.0,
+      "recall_at_q_wilson_low": 0.0,
+      "recall_at_q_wilson_high": 0.002247990181222074,
+      "net_utility_hard_per_1k": 263.115738886664,
+      "net_utility_with_graded_per_1k": 290.9624883193165
+    },
+    "cost_sensitive_gbdt": {
+      "arm_name": "cost_sensitive_gbdt",
+      "auprc": 0.13363332511429954,
+      "auroc": 0.5379955458439473,
+      "brier_score": 0.10068680396776854,
+      "ece": 0.007720015623095006,
+      "np_tpr_at_fpr_budget": 0.06627565982404691,
+      "np_realized_fpr": 0.04775175114860285,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.055415826972117166,
+      "np_tpr_wilson_high": 0.07908550879212178,
+      "np_fpr_wilson_low": 0.04425355978207078,
+      "np_fpr_wilson_high": 0.05151156645366027,
+      "recall_at_target_precision": 0.00469208211143695,
+      "realized_precision_at_q_threshold": 0.5333333333333333,
+      "recall_at_q_wilson_low": 0.002379448806920213,
+      "recall_at_q_wilson_high": 0.009231610088143764,
+      "net_utility_hard_per_1k": 249.89987985582698,
+      "net_utility_with_graded_per_1k": 281.8715792284074
+    },
+    "latent_copula_gbdt": {
+      "arm_name": "latent_copula_gbdt",
+      "auprc": 0.12314224085329242,
+      "auroc": 0.5315451256632586,
+      "brier_score": 0.10074282758303335,
+      "ece": 0.011037379656472088,
+      "np_tpr_at_fpr_budget": 0.05454545454545454,
+      "np_realized_fpr": 0.04940875197710326,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.04473331416328915,
+      "np_tpr_wilson_high": 0.06636034981634507,
+      "np_fpr_wilson_low": 0.04585096089004267,
+      "np_fpr_wilson_high": 0.053227208433841246,
+      "recall_at_target_precision": 0.0,
+      "realized_precision_at_q_threshold": 0.0,
+      "recall_at_q_wilson_low": 0.0,
+      "recall_at_q_wilson_high": 0.002247990181222074,
+      "net_utility_hard_per_1k": 254.90588706447738,
+      "net_utility_with_graded_per_1k": 258.3299959951942
+    },
+    "soft_avg_ensemble": {
+      "arm_name": "soft_avg_ensemble",
+      "auprc": 0.1277812235424486,
+      "auroc": 0.5318344713157961,
+      "brier_score": 0.10075618379283471,
+      "ece": 0.0068509191761090904,
+      "np_tpr_at_fpr_budget": 0.06686217008797654,
+      "np_realized_fpr": 0.046621977856443474,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.05595293826665301,
+      "np_tpr_wilson_high": 0.07971878108681618,
+      "np_fpr_wilson_low": 0.043165107987136984,
+      "np_fpr_wilson_high": 0.050341125233944385,
+      "recall_at_target_precision": 0.0011730205278592375,
+      "realized_precision_at_q_threshold": 0.3333333333333333,
+      "recall_at_q_wilson_low": 0.0003217435004749659,
+      "recall_at_q_wilson_high": 0.004267013859207584,
+      "net_utility_hard_per_1k": 243.62568415431852,
+      "net_utility_with_graded_per_1k": 286.750767587772
+    },
+    "receipt_repaired_xbase": {
+      "arm_name": "receipt_repaired_xbase",
+      "auprc": 0.13176759311114497,
+      "auroc": 0.5397377600714927,
+      "brier_score": 0.1006473521989437,
+      "ece": 0.010116609350771905,
+      "np_tpr_at_fpr_budget": 0.0686217008797654,
+      "np_realized_fpr": 0.047601114709648264,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.05756581041283641,
+      "np_tpr_wilson_high": 0.08161705970832349,
+      "np_fpr_wilson_low": 0.044108400194250615,
+      "np_fpr_wilson_high": 0.051355540306193805,
+      "recall_at_target_precision": 0.0,
+      "realized_precision_at_q_threshold": 0.0,
+      "recall_at_q_wilson_low": 0.0,
+      "recall_at_q_wilson_high": 0.002247990181222074,
+      "net_utility_hard_per_1k": 251.96902950206916,
+      "net_utility_with_graded_per_1k": 284.66826858897343
+    },
+    "monolithic_matched_pilot_cmi": {
+      "arm_name": "monolithic_matched_pilot_cmi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_unmatched_pilot_cmi": {
+      "arm_name": "monolithic_unmatched_pilot_cmi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_credo_reg": {
+      "arm_name": "monolithic_credo_reg",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_pilot_mi": {
+      "arm_name": "monolithic_pilot_mi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_global_mi": {
+      "arm_name": "monolithic_global_mi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_unmatched_case_control_mi": {
+      "arm_name": "monolithic_unmatched_case_control_mi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_full_cohort_cmi": {
+      "arm_name": "monolithic_full_cohort_cmi",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_global_shap_gain": {
+      "arm_name": "monolithic_global_shap_gain",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_global_residual": {
+      "arm_name": "monolithic_global_residual",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "monolithic_random": {
+      "arm_name": "monolithic_random",
+      "auprc": 0.14372911415373624,
+      "auroc": 0.5715605912988241,
+      "brier_score": 0.1001255033925254,
+      "ece": 0.003488784673283249,
+      "np_tpr_at_fpr_budget": 0.07859237536656892,
+      "np_realized_fpr": 0.04933343375762597,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.06674567334839848,
+      "np_tpr_wilson_high": 0.0923337177896755,
+      "np_fpr_wilson_low": 0.045778326500777455,
+      "np_fpr_wilson_high": 0.05314924995546316,
+      "recall_at_target_precision": 0.011730205278592375,
+      "realized_precision_at_q_threshold": 0.39215686274509803,
+      "recall_at_q_wilson_low": 0.007606255534590456,
+      "recall_at_q_wilson_high": 0.018049406431236377,
+      "net_utility_hard_per_1k": 280.0026698705113,
+      "net_utility_with_graded_per_1k": 344.23975437191297
+    },
+    "unrestricted_all_native_gbdt": {
+      "arm_name": "unrestricted_all_native_gbdt",
+      "auprc": 0.24257532500197873,
+      "auroc": 0.665555763423043,
+      "brier_score": 0.09531716785408637,
+      "ece": 0.010142706691207079,
+      "np_tpr_at_fpr_budget": 0.19237536656891496,
+      "np_realized_fpr": 0.04865556978233035,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.17436551594185412,
+      "np_tpr_wilson_high": 0.21176829150688603,
+      "np_fpr_wilson_low": 0.04512472425240838,
+      "np_fpr_wilson_high": 0.05244751639504243,
+      "recall_at_target_precision": 0.21994134897360704,
+      "realized_precision_at_q_threshold": 0.32299741602067183,
+      "recall_at_q_wilson_low": 0.20092205982628628,
+      "recall_at_q_wilson_high": 0.24021977631627503,
+      "net_utility_hard_per_1k": 365.8390068081698,
+      "net_utility_with_graded_per_1k": 510.05206247496994
+    },
+    "monolithic_credo_ensemble": {
+      "arm_name": "monolithic_credo_ensemble",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "pure_orthogonal_lattice": {
+      "arm_name": "pure_orthogonal_lattice",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    },
+    "full_credo_lattice": {
+      "arm_name": "full_credo_lattice",
+      "auprc": 0.23893021721337088,
+      "auroc": 0.6634845565623263,
+      "brier_score": 0.09545260335497972,
+      "ece": 0.011709944416384241,
+      "np_tpr_at_fpr_budget": 0.20117302052785924,
+      "np_realized_fpr": 0.0482036604654666,
+      "np_certified": true,
+      "np_violation_bound": 0.048160065668674666,
+      "np_tpr_wilson_low": 0.18282613819354576,
+      "np_tpr_wilson_high": 0.22086342309364793,
+      "np_fpr_wilson_low": 0.04468909793541005,
+      "np_fpr_wilson_high": 0.05197958550618087,
+      "recall_at_target_precision": 0.22756598240469209,
+      "realized_precision_at_q_threshold": 0.3201320132013201,
+      "recall_at_q_wilson_low": 0.2082905728422526,
+      "recall_at_q_wilson_high": 0.2480662499603018,
+      "net_utility_hard_per_1k": 351.3549592844747,
+      "net_utility_with_graded_per_1k": 508.0696836203444
+    }
+  },
+  "discovery_strategies": {
+    "matched_pilot_cmi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 0.34291212315586916,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.012401887942679922,
+          "conditional_logloss_gain_nats": 0.012401887942679922,
+          "p_value": 6.953545027986507e-29,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.005740360648391273,
+          "conditional_logloss_gain_nats": 0.005740360648391273,
+          "p_value": 2.2108009367263184e-20,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.002518082036190586,
+          "conditional_logloss_gain_nats": 0.002518082036190586,
+          "p_value": 3.436876312084394e-07,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.0019614514005039728,
+          "conditional_logloss_gain_nats": 0.0019614514005039728,
+          "p_value": 2.895586076500191e-06,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0012938952632499943,
+          "conditional_logloss_gain_nats": 0.0012938952632499943,
+          "p_value": 0.0012624500556534832,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.00016256535624793533,
+          "conditional_logloss_gain_nats": 0.00016256535624793533,
+          "p_value": 0.1573175725085813,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": -0.00027811125316943154,
+          "conditional_logloss_gain_nats": -0.00027811125316943154,
+          "p_value": 0.9610539430960894,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": -0.0010048315221209605,
+          "conditional_logloss_gain_nats": -0.0010048315221209605,
+          "p_value": 0.9999996430676477,
+          "fdr_survives": false
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_matched_pilot_cmi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "unmatched_pilot_cmi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 0.34291212315586916,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.011849967397473259,
+          "conditional_logloss_gain_nats": 0.011849967397473259,
+          "p_value": 8.950601606725248e-28,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.005178192324681073,
+          "conditional_logloss_gain_nats": 0.005178192324681073,
+          "p_value": 2.179362465313022e-17,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.00241602065397738,
+          "conditional_logloss_gain_nats": 0.00241602065397738,
+          "p_value": 4.611330682657899e-07,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.0016761805537716618,
+          "conditional_logloss_gain_nats": 0.0016761805537716618,
+          "p_value": 1.44056873909408e-05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.001593377229160848,
+          "conditional_logloss_gain_nats": 0.001593377229160848,
+          "p_value": 5.129582738679772e-05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.00013431428755581213,
+          "conditional_logloss_gain_nats": 0.00013431428755581213,
+          "p_value": 0.23476605417559027,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": -0.0003881875090918606,
+          "conditional_logloss_gain_nats": -0.0003881875090918606,
+          "p_value": 0.9695307389483362,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": -0.0006957146578875877,
+          "conditional_logloss_gain_nats": -0.0006957146578875877,
+          "p_value": 0.9979150960117541,
+          "fdr_survives": false
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_unmatched_pilot_cmi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "credo_reg": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 0.34291212315586916,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.6359407237603126,
+          "conditional_logloss_gain_nats": 0.012401887942679922,
+          "p_value": 2.729669133109628e-64,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.33921277865368493,
+          "conditional_logloss_gain_nats": 0.005740360648391273,
+          "p_value": 3.180101440305003e-30,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.18557832694082269,
+          "conditional_logloss_gain_nats": 0.0019614514005039728,
+          "p_value": 4.3169083609434056e-08,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.1630583402992555,
+          "conditional_logloss_gain_nats": 0.002518082036190586,
+          "p_value": 1.0310628936253182e-06,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.11058369466911819,
+          "conditional_logloss_gain_nats": 0.0012938952632499943,
+          "p_value": 0.001839957278078902,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.05910568305953563,
+          "conditional_logloss_gain_nats": 0.00016256535624793533,
+          "p_value": 0.07676190675787126,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": -0.00027811125316943154,
+          "conditional_logloss_gain_nats": -0.00027811125316943154,
+          "p_value": 1.0,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": -0.0010048315221209605,
+          "conditional_logloss_gain_nats": -0.0010048315221209605,
+          "p_value": 1.0,
+          "fdr_survives": false
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_credo_reg",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "pilot_mi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 0.34291212315586916,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.0066101055447207145,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.002785265272404985,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.0009041371390484264,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0006394733333383025,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.0005936896349865426,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 8.218224691363703e-05,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 0.0,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 0.0,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_pilot_mi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "global_mi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 1.0,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.006628977252657462,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.0027809751503196367,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.0009505236235661514,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.0009327852472066185,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0009303355391489298,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 0.00022245049800880646,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.0001189534849687802,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 4.043407350596429e-06,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_global_mi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "unmatched_case_control_mi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 0.34291212315586916,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.012885846249583777,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.007795393427197483,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.006722946228907345,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.0052522793601560425,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.005068692077938475,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 0.0033054930853958497,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0024740054118610466,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 0.0001607064865946084,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_unmatched_case_control_mi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "full_cohort_cmi": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 1.0,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.012324763547925935,
+          "conditional_logloss_gain_nats": 0.012324763547925935,
+          "p_value": 1.2307645158177794e-34,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.005837024200615446,
+          "conditional_logloss_gain_nats": 0.005837024200615446,
+          "p_value": 4.272047412361853e-26,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.0023060871015417182,
+          "conditional_logloss_gain_nats": 0.0023060871015417182,
+          "p_value": 7.358688198037984e-08,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0018110979492370611,
+          "conditional_logloss_gain_nats": 0.0018110979492370611,
+          "p_value": 1.804829150246633e-07,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.0017757519983365078,
+          "conditional_logloss_gain_nats": 0.0017757519983365078,
+          "p_value": 1.160236301214234e-06,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.0003099921813159403,
+          "conditional_logloss_gain_nats": 0.0003099921813159403,
+          "p_value": 0.03617416663297923,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": -0.000479185910993148,
+          "conditional_logloss_gain_nats": -0.000479185910993148,
+          "p_value": 0.998367120987205,
+          "fdr_survives": false
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": -0.0006510466465692032,
+          "conditional_logloss_gain_nats": -0.0006510466465692032,
+          "p_value": 0.9998894688400696,
+          "fdr_survives": false
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_full_cohort_cmi",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "global_shap_gain": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 1.0,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 15795.610737800598,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 9342.799847602844,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 2720.8345193862915,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 2596.2680706977844,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 1902.3209564685822,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 1500.5342073440552,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 1369.3594915866852,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 294.3969511985779,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_global_shap_gain",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "global_residual": {
+      "chosen_channels": [
+        "ch_prior_utilization",
+        "ch_discharge_routing"
+      ],
+      "hidden_channel_precision": 1.0,
+      "false_proxy_selection_rate": 0.0,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 1.0,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.16639952038704559,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.11152579801498302,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.06607828999899691,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.05456385225465415,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.0503051967261966,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.014135811608568223,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 0.012942953024415485,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 0.007611424970838403,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.05,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_global_residual",
+        "auprc": 0.23893021721337088,
+        "auroc": 0.6634845565623263,
+        "brier_score": 0.09545260335497972,
+        "ece": 0.011709944416384241,
+        "np_tpr_at_fpr_budget": 0.20117302052785924,
+        "np_realized_fpr": 0.0482036604654666,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.18282613819354576,
+        "np_tpr_wilson_high": 0.22086342309364793,
+        "np_fpr_wilson_low": 0.04468909793541005,
+        "np_fpr_wilson_high": 0.05197958550618087,
+        "recall_at_target_precision": 0.22756598240469209,
+        "realized_precision_at_q_threshold": 0.3201320132013201,
+        "recall_at_q_wilson_low": 0.2082905728422526,
+        "recall_at_q_wilson_high": 0.2480662499603018,
+        "net_utility_hard_per_1k": 351.3549592844747,
+        "net_utility_with_graded_per_1k": 508.0696836203444
+      }
+    },
+    "random": {
+      "chosen_channels": [
+        "ch_diagnosis_burden",
+        "ch_redundant_intake_proxy"
+      ],
+      "hidden_channel_precision": 0.5,
+      "false_proxy_selection_rate": 0.5,
+      "false_decoy_selection_rate": 0.0,
+      "pilot_fraction_measured": 1.0,
+      "temporal_cv_used": false,
+      "channel_scores": [
+        {
+          "channel_id": "ch_diagnosis_burden",
+          "raw_score": 0.8135758393395109,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_redundant_intake_proxy",
+          "raw_score": 0.7981521714154443,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_glycemic_biomarkers",
+          "raw_score": 0.7815462756738095,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_discharge_routing",
+          "raw_score": 0.7660137374039068,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_decoy_ward",
+          "raw_score": 0.598807454297459,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_inpatient_workup",
+          "raw_score": 0.5773993503780306,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_prior_utilization",
+          "raw_score": 0.5332062337185007,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        },
+        {
+          "channel_id": "ch_medication_intensification",
+          "raw_score": 0.5151265666487165,
+          "conditional_logloss_gain_nats": 0.0,
+          "p_value": 0.5,
+          "fdr_survives": true
+        }
+      ],
+      "metrics": {
+        "arm_name": "monolithic_random",
+        "auprc": 0.14372911415373624,
+        "auroc": 0.5715605912988241,
+        "brier_score": 0.1001255033925254,
+        "ece": 0.003488784673283249,
+        "np_tpr_at_fpr_budget": 0.07859237536656892,
+        "np_realized_fpr": 0.04933343375762597,
+        "np_certified": true,
+        "np_violation_bound": 0.048160065668674666,
+        "np_tpr_wilson_low": 0.06674567334839848,
+        "np_tpr_wilson_high": 0.0923337177896755,
+        "np_fpr_wilson_low": 0.045778326500777455,
+        "np_fpr_wilson_high": 0.05314924995546316,
+        "recall_at_target_precision": 0.011730205278592375,
+        "realized_precision_at_q_threshold": 0.39215686274509803,
+        "recall_at_q_wilson_low": 0.007606255534590456,
+        "recall_at_q_wilson_high": 0.018049406431236377,
+        "net_utility_hard_per_1k": 280.0026698705113,
+        "net_utility_with_graded_per_1k": 344.23975437191297
+      }
+    }
+  },
+  "lattice_coincidence": [],
+  "mean_kappa0": 1.0,
+  "orthogonal_lattice_weight": 0.0,
+  "conformal_foveation": {
+    "alpha_neg": 0.2,
+    "alpha_pos": 0.2,
+    "stage1_class0_coverage": 0.8012352187994276,
+    "stage1_class1_coverage": 0.8005865102639296,
+    "stage1_class1_coverage_gap": 0.0,
+    "stage1_singleton_pos_rate": 0.20364437324789747,
+    "stage1_singleton_pos_ppv": 0.13503769255981646,
+    "stage1_passive_abstention_rate": 0.5588706447737285,
+    "unbudgeted_conformal_01_query_rate": 0.5588706447737285,
+    "unbudgeted_conformal_01_auprc": 0.1961701931521078,
+    "foveated_stage2_query_rate": 0.7625150180216259,
+    "stage2_sensor_savings_fraction": 0.2374849819783741,
+    "post_foveation_unresolved_rate": 6.674676278200507e-05,
+    "foveated_precision": 0.22592012529365701,
+    "foveated_recall": 0.33841642228739005,
+    "foveated_fpr": 0.1489041199066054,
+    "foveated_unqueried_positive_fraction": 0.19941348973607037,
+    "foveated_unqueried_missed_positive_fraction": 0.19941348973607037,
+    "stage1_only_auprc": 0.13254302309713087,
+    "literal_conformal_01_auprc": 0.2164207213783981,
+    "classical_midband_conformal_auprc": 0.2164207213783981,
+    "top_risk_k_auprc": 0.21978797837113218,
+    "uncertainty_k_auprc": 0.21978797837113218,
+    "voi_k_auprc": 0.22539864764384793,
+    "random_routing_auprc": 0.22190991056398848,
+    "credo_deficit_foveated_auprc": 0.21978797837113218,
+    "full_stage2_auprc": 0.23893021721337088,
+    "raw_ap_retention": 0.9198835581974791,
+    "incremental_ap_gain_retention": 0.8200700845505555,
+    "net_utility_stage1_only_per_1k": 675.7041783473502,
+    "net_utility_literal_conformal_01_per_1k": 482.0184221065279,
+    "net_utility_classical_midband_per_1k": 482.0184221065279,
+    "net_utility_top_risk_k_per_1k": 552.6898945401148,
+    "net_utility_uncertainty_k_per_1k": 552.6898945401148,
+    "net_utility_voi_k_per_1k": 557.3488185822987,
+    "net_utility_random_k_per_1k": 558.356694700307,
+    "net_utility_foveated_net_of_query_cost_per_1k": 552.6898945401148,
+    "net_utility_full_stage2_everywhere_per_1k": 517.3808570284341,
+    "policies": {
+      "credo_foveation": {
+        "policy_name": "credo_foveation",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.21978797837113218,
+        "raw_ap_retention": 0.9198835581974791,
+        "incremental_ap_gain_retention": 0.8200700845505555,
+        "precision": 0.22592012529365701,
+        "recall": 0.33841642228739005,
+        "fpr": 0.1489041199066054,
+        "net_utility_per_1k": 552.6898945401148,
+        "unqueried_positive_fraction": 0.19941348973607037,
+        "unqueried_missed_positive_fraction": 0.19941348973607037,
+        "additional_tp_per_100_queries": 4.831932773109243
+      },
+      "literal_conformal_01": {
+        "policy_name": "literal_conformal_01",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.2164207213783981,
+        "raw_ap_retention": 0.9057905019402749,
+        "incremental_ap_gain_retention": 0.7884191229784798,
+        "precision": 0.1728748806112703,
+        "recall": 0.530791788856305,
+        "fpr": 0.32612789033667244,
+        "net_utility_per_1k": 482.0184221065279,
+        "unqueried_positive_fraction": 0.26510263929618766,
+        "unqueried_missed_positive_fraction": 0.02346041055718475,
+        "additional_tp_per_100_queries": 7.703081232492997
+      },
+      "top_risk_k": {
+        "policy_name": "top_risk_k",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.21978797837113218,
+        "raw_ap_retention": 0.9198835581974791,
+        "incremental_ap_gain_retention": 0.8200700845505555,
+        "precision": 0.22592012529365701,
+        "recall": 0.33841642228739005,
+        "fpr": 0.1489041199066054,
+        "net_utility_per_1k": 552.6898945401148,
+        "unqueried_positive_fraction": 0.19941348973607037,
+        "unqueried_missed_positive_fraction": 0.19941348973607037,
+        "additional_tp_per_100_queries": 4.831932773109243
+      },
+      "uncertainty_k": {
+        "policy_name": "uncertainty_k",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.21978797837113218,
+        "raw_ap_retention": 0.9198835581974791,
+        "incremental_ap_gain_retention": 0.8200700845505555,
+        "precision": 0.22592012529365701,
+        "recall": 0.33841642228739005,
+        "fpr": 0.1489041199066054,
+        "net_utility_per_1k": 552.6898945401148,
+        "unqueried_positive_fraction": 0.19941348973607037,
+        "unqueried_missed_positive_fraction": 0.19941348973607037,
+        "additional_tp_per_100_queries": 4.831932773109243
+      },
+      "voi_k": {
+        "policy_name": "voi_k",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.22539864764384793,
+        "raw_ap_retention": 0.9433660182151055,
+        "incremental_ap_gain_retention": 0.8728082859790608,
+        "precision": 0.23313659359190556,
+        "recall": 0.3243401759530792,
+        "fpr": 0.13700384122919335,
+        "net_utility_per_1k": 557.3488185822987,
+        "unqueried_positive_fraction": 0.23401759530791788,
+        "unqueried_missed_positive_fraction": 0.23401759530791788,
+        "additional_tp_per_100_queries": 4.621848739495798
+      },
+      "random_k": {
+        "policy_name": "random_k",
+        "query_rate": 0.7625150180216259,
+        "auprc": 0.22190991056398848,
+        "raw_ap_retention": 0.9287645286230882,
+        "incremental_ap_gain_retention": 0.8400154568341581,
+        "precision": 0.23506825938566553,
+        "recall": 0.32316715542521995,
+        "fpr": 0.13504556752278377,
+        "net_utility_per_1k": 558.356694700307,
+        "unqueried_positive_fraction": 0.21583577712609972,
+        "unqueried_missed_positive_fraction": 0.212316715542522,
+        "additional_tp_per_100_queries": 4.6043417366946775
+      }
+    }
+  },
+  "subtype_np_recall": {},
+  "paired_bootstrap_credo_vs_gbdt": {
+    "delta_auprc": 0.10638719411624001,
+    "ci_low": 0.08447242028724211,
+    "ci_high": 0.1252417613023832,
+    "p_value": 0.019801980198019802,
+    "significant": true
+  },
+  "paired_bootstrap_smote_vs_gbdt": {
+    "delta_auprc": -0.0030201267840510304,
+    "ci_low": -0.010591892065679748,
+    "ci_high": 0.003547306194246057,
+    "p_value": 0.49504950495049505,
+    "significant": false
+  }
+}

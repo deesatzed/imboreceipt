@@ -106,4 +106,3 @@ def test_proposition1_adaptive_controls_per_positive_regimes() -> None:
     p_adapt = sample_case_cohort_pilot(y_mod, scores_mod, controls_per_positive=None, seed=7)
     assert abs(p_m4.fraction_of_cohort_measured - 0.75) < 0.01
     assert abs(p_adapt.fraction_of_cohort_measured - 0.45) < 0.01
-

@@ -58,11 +58,7 @@ class TabularPreprocessor:
         self._fitted = False
 
     def fit(self, X_train: pd.DataFrame) -> TabularPreprocessor:
-        self.semantic_types_ = (
-            dict(self.declared_types)
-            if self.declared_types is not None
-            else infer_semantic_types(X_train)
-        )
+        self.semantic_types_ = infer_semantic_types(X_train, overrides=self.declared_types)
         self.miss_cols_ = []
         self.num_cols_ = []
         self.ord_cols_ = []

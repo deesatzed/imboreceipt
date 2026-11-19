@@ -35,7 +35,7 @@ def _estimate_observation_intensity_auc(
     """Measure how strongly missingness patterns + ordering/receipt flags alone predict Y_tilde."""
     indicators: dict[str, np.ndarray] = {}
     for col in X.columns:
-        miss = X[col].isna().to_numpy(dtype=float)
+        miss = (X[col].isna() | (X[col].astype(str) == "__MISSING__")).to_numpy(dtype=float)
         if 0.005 < miss.mean() < 0.995:
             indicators[f"miss__{col}"] = miss
 

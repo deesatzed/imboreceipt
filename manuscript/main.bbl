@@ -1,18 +1,17 @@
-\begin{thebibliography}{20}
+\begin{thebibliography}{31}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
 
-\bibitem[Abbott et~al.(2016)Abbott, Abbott, Abbott, Abernathy, Acernese,
-  Ackley, Adams, Adams, Addesso, and Adhikari]{abbott2016observation}
-B.~P. Abbott, R.~Abbott, T.~D. Abbott, M.~R. Abernathy, F.~Acernese, K.~Ackley,
-  C.~Adams, T.~Adams, P.~Addesso, and R.~X. Adhikari.
-\newblock Observation of gravitational waves from a binary black hole merger.
-\newblock \emph{Physical Review Letters}, 116\penalty0 (6):\penalty0 061102,
-  2016.
-\newblock \doi{10.1103/PhysRevLett.116.061102}.
+\bibitem[Barber et~al.(2023)Barber, Candes, Ramdas, and
+  Tibshirani]{barber2023conformal}
+Rina~Foygel Barber, Emmanuel~J. Candes, Aaditya Ramdas, and Ryan~J. Tibshirani.
+\newblock Conformal prediction beyond exchangeability.
+\newblock \emph{The Annals of Statistics}, 51\penalty0 (2):\penalty0 816--845,
+  2023.
+\newblock \doi{10.1214/23-AOS2276}.
 
 \bibitem[Benjamini and Hochberg(1995)]{benjamini1995controlling}
 Yoav Benjamini and Yosef Hochberg.
@@ -29,6 +28,15 @@ Nitesh~V. Chawla, Kevin~W. Bowyer, Lawrence~O. Hall, and W.~Philip Kegelmeyer.
 \newblock \emph{Journal of Artificial Intelligence Research}, 16:\penalty0
   321--357, 2002.
 \newblock \doi{10.1613/jair.953}.
+
+\bibitem[Covert et~al.(2023)Covert, Qiu, Lu, Kim, White, and
+  Lee]{covert2023learning}
+Ian Covert, Wei Qiu, Mingyu Lu, Nayoon Kim, Nathan White, and Su-In Lee.
+\newblock Learning to maximize mutual information for dynamic feature
+  selection.
+\newblock In \emph{Proceedings of the 40th International Conference on Machine
+  Learning (PMLR)}, volume 202, pages 6424--6447, 2023.
+\newblock \doi{10.48550/arXiv.2301.00557}.
 
 \bibitem[Dal~Pozzolo et~al.(2014)Dal~Pozzolo, Caelen, Le~Borgne, Waterschoot,
   and Bontempi]{dalpozzolo2014learned}
@@ -47,12 +55,26 @@ Jesse Davis and Mark Goadrich.
   Learning}, pages 233--240, 2006.
 \newblock \doi{10.1145/1143844.1143874}.
 
+\bibitem[Elkan(2001)]{elkan2001foundations}
+Charles Elkan.
+\newblock The foundations of cost-sensitive learning.
+\newblock In \emph{Proceedings of the Seventeenth International Joint
+  Conference on Artificial Intelligence (IJCAI)}, pages 973--978, 2001.
+
 \bibitem[Elkan and Noto(2008)]{elkan2008learning}
 Charles Elkan and Keith Noto.
 \newblock Learning classifiers from only positive and unlabeled data.
 \newblock In \emph{Proceedings of the 14th ACM SIGKDD International Conference
   on Knowledge Discovery and Data Mining}, pages 213--220, 2008.
 \newblock \doi{10.1145/1401890.1401920}.
+
+\bibitem[Gadgil et~al.(2024)Gadgil, Covert, and Lee]{gadgil2024estimating}
+Soham Gadgil, Ian Covert, and Su-In Lee.
+\newblock Estimating conditional mutual information for dynamic feature
+  selection.
+\newblock In \emph{International Conference on Learning Representations
+  (ICLR)}, 2024.
+\newblock \doi{10.48550/arXiv.2306.03301}.
 
 \bibitem[He et~al.(2008)He, Bai, Garcia, and Li]{he2008adasyn}
 Haibo He, Yang Bai, Edwardo~A. Garcia, and Shutao Li.
@@ -61,6 +83,20 @@ Haibo He, Yang Bai, Edwardo~A. Garcia, and Shutao Li.
 \newblock In \emph{2008 IEEE International Joint Conference on Neural Networks
   (IEEE World Congress on Computational Intelligence)}, pages 1322--1328, 2008.
 \newblock \doi{10.1109/IJCNN.2008.4633969}.
+
+\bibitem[Holm(1979)]{holm1979simple}
+Sture Holm.
+\newblock A simple sequentially rejective multiple test procedure.
+\newblock \emph{Scandinavian Journal of Statistics}, 6(2):65--70, 1979.
+\newblock URL \url{https://www.jstor.org/stable/4615733}.
+
+\bibitem[Horvitz and Thompson(1952)]{horvitz1952generalization}
+D.~G. Horvitz and D.~J. Thompson.
+\newblock A generalization of sampling without replacement from a finite
+  universe.
+\newblock \emph{Journal of the American Statistical Association}, 47\penalty0
+  (260):\penalty0 663--685, 1952.
+\newblock \doi{10.1080/01621459.1952.10483446}.
 
 \bibitem[Jesus et~al.(2022)Jesus, Pombal, Alves, Cruz, Saleiro, Ribeiro, Gama,
   and Bizarro]{jesus2022turning}
@@ -71,6 +107,14 @@ Sergio Jesus, Jose Pombal, Duarte Alves, Andre Cruz, Pedro Saleiro, Rita~P.
 \newblock \emph{Advances in Neural Information Processing Systems},
   35:\penalty0 33563--33575, 2022.
 \newblock \doi{10.48550/arXiv.2211.13358}.
+
+\bibitem[Ke et~al.(2017)Ke, Meng, Finley, Wang, Chen, Ma, Ye, and
+  Liu]{ke2017lightgbm}
+Guolin Ke, Qi~Meng, Thomas Finley, Taifeng Wang, Wei Chen, Weidong Ma, Qiwei
+  Ye, and Tie-Yan Liu.
+\newblock {LightGBM}: A highly efficient gradient boosting decision tree.
+\newblock In \emph{Advances in Neural Information Processing Systems
+  (NeurIPS)}, volume~30, pages 3146--3154, 2017.
 
 \bibitem[Lakkaraju et~al.(2017)Lakkaraju, Kleinberg, Leskovec, Ludwig, and
   Mullainathan]{lakkaraju2017selective}
@@ -90,6 +134,15 @@ Jing Lei, Max G'Sell, Alessandro Rinaldo, Ryan~J. Tibshirani, and Larry
 \newblock \emph{Journal of the American Statistical Association}, 113\penalty0
   (523):\penalty0 1094--1111, 2018.
 \newblock \doi{10.1080/01621459.2017.1307116}.
+
+\bibitem[Lemaitre et~al.(2017)Lemaitre, Nogueira, and
+  Aridas]{lemaitre2017imbalanced}
+Guillaume Lemaitre, Fernando Nogueira, and Christos~K. Aridas.
+\newblock {Imbalanced-learn}: A {Python} toolbox to tackle the curse of
+  imbalanced datasets in machine learning.
+\newblock \emph{Journal of Machine Learning Research}, 18\penalty0
+  (17):\penalty0 1--5, 2017.
+\newblock \doi{10.48550/arXiv.1609.06570}.
 
 \bibitem[Liu et~al.(2009)Liu, Wu, and Zhou]{liu2009exploratory}
 Xu-Ying Liu, Jianxin Wu, and Zhi-Hua Zhou.
@@ -158,6 +211,38 @@ Beata Strack, Jonathan~P. DeShazo, Chris Gennings, Juan~L. Olmo, Sebastian
   of 70,000 clinical database patient records.
 \newblock \emph{BioMed Research International}, 2014:\penalty0 781670, 2014.
 \newblock \doi{10.1155/2014/781670}.
+
+\bibitem[Tong et~al.(2018)Tong, Feng, and Li]{tong2018neyman}
+Xin Tong, Yang Feng, and Jingyi~Jessica Li.
+\newblock {Neyman-Pearson} classification algorithms and {NP} receiver
+  operating characteristics.
+\newblock \emph{Science Advances}, 4\penalty0 (2):\penalty0 eaao1659, 2018.
+\newblock \doi{10.1126/sciadv.aao1659}.
+
+\bibitem[Vanschoren et~al.(2014)Vanschoren, van Rijn, Bischl, and
+  Torgo]{vanschoren2014openml}
+Joaquin Vanschoren, Jan~N. van Rijn, Bernd Bischl, and Luis Torgo.
+\newblock {OpenML}: networked science in machine learning.
+\newblock \emph{ACM SIGKDD Explorations Newsletter}, 15\penalty0 (2):\penalty0
+  49--60, 2014.
+\newblock \doi{10.1145/2641190.2641198}.
+
+\bibitem[von Kleist et~al.(2025)von Kleist, Zamanian, Shpitser, and
+  Ahmidi]{vonkleist2025evaluation}
+Henrik von Kleist, Alireza Zamanian, Ilya Shpitser, and Narges Ahmidi.
+\newblock Evaluation of active feature acquisition methods for time-varying
+  feature settings.
+\newblock \emph{Journal of Machine Learning Research}, 26\penalty0
+  (60):\penalty0 1--84, 2025.
+\newblock \doi{10.48550/arXiv.2312.01530}.
+\newblock URL \url{https://jmlr.org/papers/v26/23-1635.html}.
+
+\bibitem[Wilson(1927)]{wilson1927probable}
+Edwin~B. Wilson.
+\newblock Probable inference, the law of succession, and statistical inference.
+\newblock \emph{Journal of the American Statistical Association}, 22\penalty0
+  (158):\penalty0 209--212, 1927.
+\newblock \doi{10.1080/01621459.1927.10502953}.
 
 \bibitem[Yeh and Lien(2009)]{yeh2009comparisons}
 I-Cheng Yeh and Che-hui Lien.

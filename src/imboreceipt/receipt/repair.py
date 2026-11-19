@@ -87,8 +87,8 @@ class ReceiptRepairer:
         keep_mask = np.ones(n, dtype=bool)
         if competing_censor_mask is not None:
             cc = np.asarray(competing_censor_mask, dtype=bool).ravel()
-            # Never drop observed positives; drop apparent negatives that died/entered hospice
-            keep_mask = ~(cc & (y == 0))
+            # Apply eligibility / competing-event exclusion independently of observed outcome Y
+            keep_mask = ~cc
 
         keep_idx = np.flatnonzero(keep_mask)
         X_clean = X_train.iloc[keep_idx].reset_index(drop=True)
