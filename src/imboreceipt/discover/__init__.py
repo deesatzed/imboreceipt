@@ -24,6 +24,15 @@ from imboreceipt.discover.strata import (
     make_leak_free_cv_splits,
     sample_case_cohort_pilot,
 )
+from imboreceipt.discover.two_phase import (
+    DiscoverySelectionResult,
+    SequentialChannelStep,
+    TwoPhasePilot,
+    discover_competitor_method,
+    discover_sequential_conditional_gain,
+    sample_two_phase_pilot,
+    two_phase_variance_decomposition,
+)
 
 __all__ = [
     "CandidateChannelSpec",
@@ -33,15 +42,22 @@ __all__ = [
     "ConservationMismatchCompiler",
     "ConservationRule",
     "CriticalSlowingDownCompiler",
+    "DiscoverySelectionResult",
     "MissingLineSilenceCompiler",
+    "SequentialChannelStep",
+    "TwoPhasePilot",
     "TypedFeatureDAGCompiler",
     "adaptive_controls_per_positive",
     "benjamini_hochberg_mask",
     "build_consensus_residual_strata",
+    "discover_competitor_method",
+    "discover_sequential_conditional_gain",
     "make_leak_free_cv_splits",
     "sample_case_cohort_pilot",
+    "sample_two_phase_pilot",
     "score_channels_baseline_strategy",
     "score_channels_conditional_gain",
     "score_channels_credo_reg",
     "select_channels_within_budget",
+    "two_phase_variance_decomposition",
 ]

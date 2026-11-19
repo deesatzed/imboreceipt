@@ -58,6 +58,8 @@ class TabularPreprocessor:
         self._fitted = False
 
     def fit(self, X_train: pd.DataFrame) -> TabularPreprocessor:
+        if any(type(c) is not str for c in X_train.columns):
+            X_train = X_train.rename(columns=str)
         self.semantic_types_ = infer_semantic_types(X_train, overrides=self.declared_types)
         self.miss_cols_ = []
         self.num_cols_ = []
@@ -130,6 +132,8 @@ class TabularPreprocessor:
         """Transform rows WITHOUT label access."""
         if not self._fitted:
             raise RuntimeError("TabularPreprocessor must be fit on X_train before transform.")
+        if any(type(c) is not str for c in X.columns):
+            X = X.rename(columns=str)
 
         blocks: list[np.ndarray] = []
         if self.num_cols_ and self._num_imp is not None and self._num_scl is not None:
@@ -155,6 +159,10 @@ class TabularPreprocessor:
         if not blocks:
             return np.zeros((len(X), 1), dtype=float)
         return np.hstack(blocks).astype(np.float64, copy=False)
+
+    def fit_transform(self, X_train: pd.DataFrame) -> np.ndarray:
+        """Fit strictly on ``X_train`` and transform ``X_train``."""
+        return self.fit(X_train).transform(X_train)
 
 
 _PLATT_EPS = 1e-15

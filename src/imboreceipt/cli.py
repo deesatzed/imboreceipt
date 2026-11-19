@@ -17,6 +17,12 @@ from imboreceipt.bench.runner import (
     run_tier2_credo_bench,
     run_wave2_paper_campaign,
 )
+from imboreceipt.bench.two_phase_campaign import (
+    aggregate_two_phase_campaign,
+    run_single_cohort_split,
+    run_statistical_theory_simulations,
+    run_supplement_fixed_table_tost,
+)
 
 console = Console()
 
@@ -224,6 +230,75 @@ def cmd_bench_reconstructed(out: Path, cache_dir: Path, n_seeds: int, uncapped: 
         )
     console.print(tbl)
     console.print(f"[green]Saved reconstructed campaign receipts & manifests to {out}[/green]")
+
+
+@main.command("bench-two-phase")
+@click.option("--out", type=click.Path(path_type=Path), default=Path("results/two_phase"))
+@click.option("--cache-dir", type=click.Path(path_type=Path), default=DEFAULT_CACHE_DIR)
+@click.option("--n-splits", type=int, default=20)
+@click.option("--run-sims/--skip-sims", default=True)
+@click.option("--run-supplement/--skip-supplement", default=True)
+def cmd_bench_two_phase(
+    out: Path,
+    cache_dir: Path,
+    n_splits: int,
+    run_sims: bool,
+    run_supplement: bool,
+) -> None:
+    """Run Two-Phase Stratified Pilot Discovery & Streaming Selective Acquisition campaign."""
+    import json
+
+    out.mkdir(parents=True, exist_ok=True)
+    ckpt = out / "checkpoints"
+    ckpt.mkdir(parents=True, exist_ok=True)
+
+    if run_sims:
+        sim_out = run_statistical_theory_simulations()
+        (out / "theory_simulations.json").write_text(json.dumps(sim_out, indent=2))
+
+    if run_supplement:
+        supp_out = run_supplement_fixed_table_tost(n_splits=n_splits, cache_dir=cache_dir)
+        (out / "supplement_fixed_table_tost.json").write_text(json.dumps(supp_out, indent=2))
+
+    cohorts = (
+        "UCI_Diabetes_Discharge",
+        "Home_Credit_7Table",
+        "IEEE_CIS_Fraud",
+        "Scania_APS_Fleet",
+        "NeurIPS_BAF",
+        "UCI_Taiwan_Credit",
+    )
+    for c_key in cohorts:
+        for s_idx in range(n_splits):
+            p = ckpt / f"{c_key}_split{s_idx:02d}.json"
+            if not p.exists():
+                r = run_single_cohort_split(
+                    c_key, split_idx=s_idx, n_splits=n_splits, cache_dir=cache_dir
+                )
+                p.write_text(json.dumps(r, indent=2))
+
+    summary = aggregate_two_phase_campaign(out, cohort_keys=cohorts, n_splits=n_splits)
+    tbl = Table(title=f"Two-Phase Pilot Discovery & TOST Non-Inferiority ({n_splits} Splits)")
+    tbl.add_column("Cohort", style="cyan")
+    tbl.add_column("Base AUPRC", justify="right")
+    tbl.add_column("Neyman 15%", justify="right", style="bold green")
+    tbl.add_column("Full 100%", justify="right")
+    tbl.add_column("Delta (90% CI)", justify="right")
+    tbl.add_column("TOST NI p", justify="right")
+
+    for c in summary["cohorts"]:
+        ns = c["native_summary"]
+        tost = c["tost_neyman15_vs_full_auprc"]
+        tbl.add_row(
+            c["cohort_key"],
+            f"{ns['base_only']['auprc']['mean']:.4f}",
+            f"{ns['neyman_15pct_seq']['auprc']['mean']:.4f}",
+            f"{ns['full_100pct_seq']['auprc']['mean']:.4f}",
+            f"{tost['mean_delta']:+.4f} [{tost['ci90_low']:+.4f}, {tost['ci90_high']:+.4f}]",
+            f"{tost['p_noninferiority']:.4g}",
+        )
+    console.print(tbl)
+    console.print(f"[green]Saved two-phase summary & figures to {out}[/green]")
 
 
 if __name__ == "__main__":

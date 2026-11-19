@@ -1,0 +1,314 @@
+{
+  "sim_A_coverage_and_null_fwer": {
+    "n_replicates": 80,
+    "cmi_dgp_truth_nats": 0.029189635408377372,
+    "g_target_crossfit_mean": 0.017816140861381762,
+    "g_census_100pct_mean": 0.022497872305521336,
+    "bias_vs_census": {
+      "mean": -0.0046817314441395756,
+      "sd": 0.002589537079703348,
+      "se": 0.00028951904702364883,
+      "ci95_low": -0.005249188776305928,
+      "ci95_high": -0.0041142741119732235
+    },
+    "empirical_sd_g_hat": 0.004091947487177964,
+    "mean_estimated_se_total": 0.002794623692383401,
+    "mean_estimated_se_phase1": 0.0019251113870585909,
+    "mean_estimated_se_phase2": 0.0020161121191620045,
+    "empirical_95ci_coverage_two_phase_se": {
+      "mean": 0.7875,
+      "sd": 0.41165765548141536,
+      "se": 0.04602472505573168,
+      "ci95_low": 0.6972915388907659,
+      "ci95_high": 0.8777084611092341
+    },
+    "empirical_95ci_coverage_vs_census": {
+      "mean": 0.6125,
+      "sd": 0.4902530991904312,
+      "se": 0.05481196279848756,
+      "ci95_low": 0.5050685529149644,
+      "ci95_high": 0.7199314470850356
+    },
+    "empirical_95ci_coverage_naive_phase1_only": {
+      "mean": 0.6125,
+      "sd": 0.4902530991904312,
+      "se": 0.05481196279848756,
+      "ci95_low": 0.5050685529149644,
+      "ci95_high": 0.7199314470850356
+    },
+    "family_wise_null_error_rate_holm_lcb": {
+      "mean": 0.025,
+      "sd": 0.15710997518871125,
+      "se": 0.017565429223263186,
+      "ci95_low": -0.009428241277595846,
+      "ci95_high": 0.05942824127759585
+    },
+    "family_wise_null_error_rate_untruncated_no_lcb": {
+      "mean": 0.9875,
+      "sd": 0.11180339887498948,
+      "se": 0.012499999999999999,
+      "ci95_low": 0.9630000000000001,
+      "ci95_high": 1.012
+    },
+    "family_wise_null_error_rate_pospart_no_lcb": {
+      "mean": 1.0,
+      "sd": 0.0,
+      "se": 0.0,
+      "ci95_low": 1.0,
+      "ci95_high": 1.0
+    }
+  },
+  "sim_B_allocation_rmse": {
+    "5pct": {
+      "neyman": {
+        "mean": 0.005152114197612191,
+        "sd": 0.0015526092010736943,
+        "se": 0.00024548906957636094,
+        "ci95_low": 0.004670955621242524,
+        "ci95_high": 0.005633272773981858
+      },
+      "srs": {
+        "mean": 0.010099049298031666,
+        "sd": 0.0041320275421449235,
+        "se": 0.0006533309193862673,
+        "ci95_low": 0.008818520696034582,
+        "ci95_high": 0.01137957790002875
+      },
+      "bcc": {
+        "mean": 0.006363274086510056,
+        "sd": 0.0028241288839699497,
+        "se": 0.00044653398396072143,
+        "ci95_low": 0.005488067477947042,
+        "ci95_high": 0.0072384806950730705
+      }
+    },
+    "10pct": {
+      "neyman": {
+        "mean": 0.0039074445458587344,
+        "sd": 0.0011618393414698281,
+        "se": 0.00018370292971173893,
+        "ci95_low": 0.003547386803623726,
+        "ci95_high": 0.004267502288093743
+      },
+      "srs": {
+        "mean": 0.007313327407956802,
+        "sd": 0.002331925457285313,
+        "se": 0.0003687097889375638,
+        "ci95_low": 0.006590656221639177,
+        "ci95_high": 0.008035998594274427
+      },
+      "bcc": {
+        "mean": 0.0045918225922252824,
+        "sd": 0.0017002510957304456,
+        "se": 0.0002688333028352598,
+        "ci95_low": 0.004064909318668174,
+        "ci95_high": 0.005118735865782391
+      }
+    },
+    "20pct": {
+      "neyman": {
+        "mean": 0.0024966908594207075,
+        "sd": 0.0007232257344168864,
+        "se": 0.00011435202916026946,
+        "ci95_low": 0.0022725608822665795,
+        "ci95_high": 0.0027208208365748355
+      },
+      "srs": {
+        "mean": 0.004764467080523227,
+        "sd": 0.0012683096949887267,
+        "se": 0.00020053737073189108,
+        "ci95_low": 0.0043714138338887204,
+        "ci95_high": 0.005157520327157733
+      },
+      "bcc": {
+        "mean": 0.003073074102441022,
+        "sd": 0.0009596233895179674,
+        "se": 0.00015172978034238635,
+        "ci95_low": 0.002775683732969945,
+        "ci95_high": 0.0033704644719120993
+      }
+    }
+  },
+  "sim_C_twin_echo_null_mechanisms": {
+    "neyman_seq_cmi": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 1.0,
+        "ci95_high": 1.0
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "baseline_echo_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    },
+    "oneshot_neyman_cmi": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 1.0,
+        "ci95_high": 1.0
+      },
+      "baseline_echo_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    },
+    "loco_pilot": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 0.05,
+        "sd": 0.22072142786315221,
+        "se": 0.03489912202260563,
+        "ci95_low": -0.018402279164307034,
+        "ci95_high": 0.11840227916430704
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "baseline_echo_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    },
+    "cpi_pilot": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 1.0,
+        "ci95_high": 1.0
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "baseline_echo_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    },
+    "crt_knockoff_pilot": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 0.825,
+        "sd": 0.3848076442547927,
+        "se": 0.06084343084444759,
+        "ci95_low": 0.7057468755448827,
+        "ci95_high": 0.9442531244551172
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 0.175,
+        "sd": 0.38480764425479264,
+        "se": 0.060843430844447585,
+        "ci95_low": 0.055746875544882724,
+        "ci95_high": 0.29425312445511725
+      },
+      "baseline_echo_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    },
+    "global_mi": {
+      "both_orthogonal_mechanisms_recovered": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      },
+      "stage2_twin_duplicate_rate": {
+        "mean": 0.325,
+        "sd": 0.47434164902525694,
+        "se": 0.075,
+        "ci95_low": 0.17800000000000002,
+        "ci95_high": 0.472
+      },
+      "baseline_echo_rate": {
+        "mean": 0.675,
+        "sd": 0.47434164902525683,
+        "se": 0.07499999999999998,
+        "ci95_low": 0.528,
+        "ci95_high": 0.8220000000000001
+      },
+      "pure_noise_null_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "se": 0.0,
+        "ci95_low": 0.0,
+        "ci95_high": 0.0
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Paired entity/cluster bootstrap inference for rare-event frontier comparisons."""
+"""Resampling, equivalence (TOST), meta-analytic, and cluster bootstrap inference utilities."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.stats import norm
 from scipy.stats import t as student_t
 
 
@@ -16,12 +17,45 @@ class NadeauBengioResult:
     mean_delta: float
     sample_sd: float
     corrected_se: float
+    ci90_low: float
+    ci90_high: float
     ci95_low: float
     ci95_high: float
     t_stat: float
     df: int
     p_value_one_sided: float
     p_value_two_sided: float
+
+
+@dataclass(frozen=True, slots=True)
+class TOSTResult:
+    """Schuirmann (1987) Two One-Sided Tests (TOST) for equivalence or non-inferiority."""
+
+    mean_delta: float
+    corrected_se: float
+    margin: float
+    ci90_low: float
+    ci90_high: float
+    df: int
+    p_noninferiority: float
+    p_tost_equivalence: float
+    noninferior_at_05: bool
+    equivalent_at_05: bool
+
+
+@dataclass(frozen=True, slots=True)
+class MetaAnalysisResult:
+    """DerSimonian & Laird (1986) random-effects meta-analysis across studies/cohorts."""
+
+    k_studies: int
+    pooled_effect: float
+    pooled_se: float
+    ci95_low: float
+    ci95_high: float
+    z_stat: float
+    p_value_two_sided: float
+    tau2_between: float
+    i2_heterogeneity: float
 
 
 def nadeau_bengio_ttest(
@@ -31,11 +65,10 @@ def nadeau_bengio_ttest(
     *,
     disjoint_test_blocks: bool = False,
 ) -> NadeauBengioResult:
-    """Compute Nadeau & Bengio (2003) overlap-corrected t-statistic across K splits.
+    """Compute Nadeau & Bengio (2003) overlap-corrected t-statistic across R splits.
 
-    When K splits are drawn from a finite dataset, naive ``sd / sqrt(K)`` underestimates SE
-    due to shared observations. Nadeau & Bengio replace ``1 / K`` with ``1 / K + n_test / n_train``
-    (or ``1 / K`` when test blocks are strictly disjoint chronological eras).
+    Uses standard ``(1 / R + n_test / n_train) * s^2`` on finite observational datasets
+    and ``(1 / R) * s^2`` only for independent Monte Carlo simulation replicates.
     """
     arr = np.asarray(deltas, dtype=float).ravel()
     k = int(arr.size)
@@ -45,6 +78,8 @@ def nadeau_bengio_ttest(
             mean_delta=mean_d,
             sample_sd=0.0,
             corrected_se=0.0,
+            ci90_low=mean_d,
+            ci90_high=mean_d,
             ci95_low=mean_d,
             ci95_high=mean_d,
             t_stat=0.0,
@@ -65,6 +100,8 @@ def nadeau_bengio_ttest(
             mean_delta=mean_d,
             sample_sd=sd,
             corrected_se=0.0,
+            ci90_low=mean_d,
+            ci90_high=mean_d,
             ci95_low=mean_d,
             ci95_high=mean_d,
             t_stat=0.0,
@@ -74,19 +111,142 @@ def nadeau_bengio_ttest(
         )
 
     t_val = float(mean_d / se_nb)
-    t_crit = float(student_t.ppf(0.975, df=df))
+    t_crit90 = float(student_t.ppf(0.95, df=df))
+    t_crit95 = float(student_t.ppf(0.975, df=df))
     p_one = float(student_t.sf(t_val, df=df))
     p_two = float(2.0 * student_t.sf(abs(t_val), df=df))
     return NadeauBengioResult(
         mean_delta=mean_d,
         sample_sd=sd,
         corrected_se=se_nb,
-        ci95_low=mean_d - t_crit * se_nb,
-        ci95_high=mean_d + t_crit * se_nb,
+        ci90_low=mean_d - t_crit90 * se_nb,
+        ci90_high=mean_d + t_crit90 * se_nb,
+        ci95_low=mean_d - t_crit95 * se_nb,
+        ci95_high=mean_d + t_crit95 * se_nb,
         t_stat=t_val,
         df=df,
         p_value_one_sided=p_one,
         p_value_two_sided=p_two,
+    )
+
+
+def tost_equivalence_and_noninferiority(
+    deltas: list[float] | np.ndarray,
+    margin: float,
+    n_test: int,
+    n_train: int,
+    *,
+    independent_replicates: bool = False,
+) -> TOSTResult:
+    """Compute Schuirmann (1987) TOST equivalence and non-inferiority p-values with NB SE.
+
+    - Non-inferiority tests ``H_0: mu <= -margin`` vs ``H_1: mu > -margin``.
+    - Equivalence tests ``H_0: |mu| >= margin`` vs ``H_1: |mu| < margin`` at alpha = 0.05
+      (checking whether the 90% NB confidence interval lies inside ``(-margin, +margin)``).
+    """
+    if margin <= 0.0:
+        raise ValueError("Equivalence/non-inferiority margin must be strictly positive.")
+    nb = nadeau_bengio_ttest(
+        deltas,
+        n_test=n_test,
+        n_train=n_train,
+        disjoint_test_blocks=independent_replicates,
+    )
+    if nb.df < 1:
+        return TOSTResult(
+            mean_delta=nb.mean_delta,
+            corrected_se=0.0,
+            margin=margin,
+            ci90_low=nb.mean_delta,
+            ci90_high=nb.mean_delta,
+            df=0,
+            p_noninferiority=1.0,
+            p_tost_equivalence=1.0,
+            noninferior_at_05=False,
+            equivalent_at_05=False,
+        )
+    if nb.corrected_se <= 1e-15:
+        ni_ok = bool(nb.mean_delta > -margin)
+        eq_ok = bool(abs(nb.mean_delta) < margin)
+        return TOSTResult(
+            mean_delta=nb.mean_delta,
+            corrected_se=0.0,
+            margin=margin,
+            ci90_low=nb.mean_delta,
+            ci90_high=nb.mean_delta,
+            df=nb.df,
+            p_noninferiority=0.0 if ni_ok else 1.0,
+            p_tost_equivalence=0.0 if eq_ok else 1.0,
+            noninferior_at_05=ni_ok,
+            equivalent_at_05=eq_ok,
+        )
+
+    t_lower = float((nb.mean_delta + margin) / nb.corrected_se)
+    t_upper = float((margin - nb.mean_delta) / nb.corrected_se)
+    p_ni = float(student_t.sf(t_lower, df=nb.df))
+    p_up = float(student_t.sf(t_upper, df=nb.df))
+    p_tost = float(max(p_ni, p_up))
+    return TOSTResult(
+        mean_delta=nb.mean_delta,
+        corrected_se=nb.corrected_se,
+        margin=margin,
+        ci90_low=nb.ci90_low,
+        ci90_high=nb.ci90_high,
+        df=nb.df,
+        p_noninferiority=p_ni,
+        p_tost_equivalence=p_tost,
+        noninferior_at_05=bool(p_ni < 0.05),
+        equivalent_at_05=bool(p_tost < 0.05),
+    )
+
+
+def random_effects_meta_analysis(
+    estimates: list[float] | np.ndarray,
+    standard_errors: list[float] | np.ndarray,
+) -> MetaAnalysisResult:
+    """DerSimonian & Laird (1986) random-effects meta-analysis across cohorts/datasets."""
+    y = np.asarray(estimates, dtype=float).ravel()
+    se = np.maximum(1e-9, np.asarray(standard_errors, dtype=float).ravel())
+    k = int(y.size)
+    if k == 0:
+        return MetaAnalysisResult(0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    w_fe = 1.0 / (se**2)
+    mu_fe = float(np.sum(w_fe * y) / np.sum(w_fe))
+    if k == 1:
+        se0 = float(se[0])
+        z0 = mu_fe / se0
+        return MetaAnalysisResult(
+            k_studies=1,
+            pooled_effect=mu_fe,
+            pooled_se=se0,
+            ci95_low=mu_fe - 1.96 * se0,
+            ci95_high=mu_fe + 1.96 * se0,
+            z_stat=z0,
+            p_value_two_sided=float(2.0 * norm.sf(abs(z0))),
+            tau2_between=0.0,
+            i2_heterogeneity=0.0,
+        )
+
+    q_stat = float(np.sum(w_fe * ((y - mu_fe) ** 2)))
+    c_denom = float(np.sum(w_fe) - np.sum(w_fe**2) / np.sum(w_fe))
+    tau2 = max(0.0, (q_stat - float(k - 1)) / max(1e-12, c_denom))
+    i2 = max(0.0, (q_stat - float(k - 1)) / max(1e-12, q_stat)) if q_stat > 0 else 0.0
+
+    w_re = 1.0 / (se**2 + tau2)
+    mu_re = float(np.sum(w_re * y) / np.sum(w_re))
+    se_re = float(np.sqrt(1.0 / np.sum(w_re)))
+    z_re = mu_re / max(1e-12, se_re)
+    p_two = float(2.0 * norm.sf(abs(z_re)))
+    return MetaAnalysisResult(
+        k_studies=k,
+        pooled_effect=mu_re,
+        pooled_se=se_re,
+        ci95_low=mu_re - 1.96 * se_re,
+        ci95_high=mu_re + 1.96 * se_re,
+        z_stat=z_re,
+        p_value_two_sided=p_two,
+        tau2_between=tau2,
+        i2_heterogeneity=i2,
     )
 
 
@@ -137,11 +297,7 @@ def paired_cluster_bootstrap(
     alpha: float = 0.05,
     seed: int = 42,
 ) -> PairedBootstrapResult:
-    """Compute paired bootstrap CIs over independent units/clusters.
-
-    Unlike independent single-model CIs, paired resampling eliminates shared
-    sample-to-sample baseline variance while respecting patient/entity clustering.
-    """
+    """Compute paired bootstrap CIs over independent units/clusters."""
     y = np.asarray(y_true, dtype=int).ravel()
     sa = np.asarray(score_a, dtype=float).ravel()
     sb = np.asarray(score_b, dtype=float).ravel()
@@ -172,11 +328,9 @@ def paired_cluster_bootstrap(
         g_arr = np.asarray(groups)
         unique_groups, inv = np.unique(g_arr, return_inverse=True)
         n_units = int(unique_groups.size)
-        group_rows: list[np.ndarray] = [[] for _ in range(n_units)]  # type: ignore[list-item]
         order = np.argsort(inv, kind="mergesort")
         counts = np.bincount(inv, minlength=n_units)
-        splits = np.split(order, np.cumsum(counts)[:-1])
-        group_rows = list(splits)
+        group_rows = list(np.split(order, np.cumsum(counts)[:-1]))
 
         deltas_list: list[float] = []
         attempts = 0
@@ -207,7 +361,6 @@ def paired_cluster_bootstrap(
 
     ci_low = float(np.quantile(deltas, alpha / 2.0))
     ci_high = float(np.quantile(deltas, 1.0 - alpha / 2.0))
-    # Two-sided bootstrap p-value with +1 finite-sample correction
     p_le_zero = (np.sum(deltas <= 0.0) + 1.0) / (deltas.size + 1.0)
     p_ge_zero = (np.sum(deltas >= 0.0) + 1.0) / (deltas.size + 1.0)
     p_two = float(min(1.0, 2.0 * min(p_le_zero, p_ge_zero)))

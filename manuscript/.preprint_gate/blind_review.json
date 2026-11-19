@@ -2,34 +2,38 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent cold screening of main.tex and references.bib for arXiv found zero blockers across AI authorship, Google Antigravity for Science workflow and acknowledgment disclosures, retrospective claim grounding, ethics/code/data availability statements, and citation integrity. All 31 bibliography entries and 3 embedded figure PDFs align with manuscript tables and claims, and clinical/financial experiments are consistently framed as retrospective masked-column simulations on public de-identified datasets.",
+  "summary": "Independent cold screening of the 20-page manuscript (main.tex, references.bib, main.pdf, and Figures 1-3) for arXiv passes all hard compliance gates with zero blockers. Only a human author is listed, Google Antigravity/Gemini workflow roles with explicit human verification and Google Antigravity for Science support are transparently disclosed, bibliographic spot-checks confirm zero hallucinated citations, mathematical proofs match stated assumptions with explicit finite-sample CV caveats, and clinical readmission analyses on de-identified public data are properly framed as retrospective methodological benchmarks.",
   "blockers": [],
   "warnings": [
     {
       "id": "W1",
-      "category": "INTERNAL_COHERENCE",
-      "location": "main.tex:L46,L284",
-      "detail": "Abstract states 'Holm p <= 0.018 for AUPRC and (alpha,delta)-certified Neyman-Pearson sensitivity' (three-decimal rounding), whereas Section 3.2 (L284) reports the exact NP sensitivity ceiling as 0.01807 (strictly <= 0.0181)."
+      "category": "DATABASE_TOOL_ATTRIBUTION",
+      "location": "main.tex:L80,L213,L400,L448-L452",
+      "detail": "Three public benchmark cohorts (Scania APS, Home Credit Default Risk, and IEEE-CIS Fraud Detection) are named in the text, Ethics/Data statement, and Table 6 without dedicated dataset bibliography entries or persistent repository URLs/DOIs in references.bib (unlike UCI Diabetes, UCI Taiwan, NeurIPS BAF, and OpenML)."
     },
     {
       "id": "W2",
-      "category": "DATABASE_TOOL_ATTRIBUTION",
-      "location": "main.tex:L97,L113,L407",
-      "detail": "LightGBM, imbalanced-learn, and OpenML are properly cited; consider optionally adding a scikit-learn citation (Pedregosa et al., 2011) for Platt logistic calibration/k-NN diagnostics and listing the UCI Scania APS ID (421) plus the remaining 7 OpenML dataset IDs in Data and Code Availability."
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L99,L108",
+      "detail": "In Theorem 1 Eq. (3), the cluster count C and cluster partition index g appear in the Phase-1 variance estimator V_I before being explicitly defined in Appendix A (L420); defining C via the Phase-1 cluster identifier G_i inside Theorem 1 would improve self-containedness."
     },
     {
       "id": "W3",
-      "category": "SERVER_SCREENING",
-      "location": "main.tex:L183-185,L401-403",
-      "detail": "Minor duplication between Section 2.6 (Ethics Statement) and the unnumbered Institutional Review Board and Informed Consent Statement section, both stating the 45 CFR 46.104(d)(4) exemption."
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L334,L345",
+      "detail": "In Table 4 (Scania APS, Streaming VOI at q=20%, 14.98) and Figure 2 (panel 4), non-strict thresholding R(x) >= gamma_0.20 = 0 across point-mass ties at VOI=0 results in a 100% realized query rate (matching Full Stage-2 = 14.98); noting this tie-induced jump to 100% realized queries in Footnote dagger would clarify the alignment between Table 4 and Figure 2."
     }
   ],
   "checked_files": [
     "main.tex",
-    "references.bib"
+    "references.bib",
+    "main.pdf",
+    "fig1_discovery_noninferiority_and_stress.pdf",
+    "fig2_streaming_budget_curves.pdf",
+    "fig3_conformal_fdr_selection.pdf"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "104fba2ddbb62a0147791a836c1c08be8e187b0965dbb989e976faba0de34cf7",
-  "file_count": 10,
-  "recorded_at": "2026-11-19T00:38:14.997354+00:00"
+  "manuscript_sha256": "b49b764affa806337c5acfb1dfe08ce90f7b381a8edc9b3e20b1a6bd89defa07",
+  "file_count": 7,
+  "recorded_at": "2026-11-19T21:23:13.287269+00:00"
 }

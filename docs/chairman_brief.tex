@@ -1,77 +1,53 @@
 \documentclass[11pt]{article}
-\usepackage[margin=0.30in,top=0.16in,bottom=0.16in]{geometry}
+\usepackage[margin=0.34in,top=0.22in,bottom=0.22in]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
-\usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{microtype}
 \usepackage{enumitem}
 
 \pagestyle{empty}
-\linespread{0.78}
+\linespread{0.86}
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{0.8pt}
-\setlist[itemize]{leftmargin=1.1em,itemsep=0pt,topsep=0pt,parsep=0pt}
+\setlength{\parskip}{1.5pt}
+\setlist[itemize]{leftmargin=1.2em,itemsep=0.5pt,topsep=1pt,parsep=0pt}
 
 \emergencystretch=3em
 \hbadness=2000
 \begin{document}
 \small
-\setlength{\abovedisplayskip}{1.8pt}
-\setlength{\belowdisplayskip}{1.8pt}
-\setlength{\abovedisplayshortskip}{1pt}
-\setlength{\belowdisplayshortskip}{1pt}
+\setlength{\abovedisplayskip}{2.5pt}
+\setlength{\belowdisplayskip}{2.5pt}
 
-{\large\textbf{1-Page Executive Walkthrough: Budgeted Channel Discovery \& Selective Acquisition (\texttt{CREDO})}}\\[2pt]
-{\scriptsize \textbf{Author:} Wayne A. Satz, MD (Temple Emergency Medicine) \hfill \textbf{Clinical Case:} UCI Admission-Time Readmission ($99,343$ eligible stays, $11.39\%$ $<30\text{d}$)}
-\vspace{-3pt}
+{\large\textbf{1-Page Executive Walkthrough: Two-Phase Pilot Discovery \& Streaming VOI Acquisition}}\\[2pt]
+\textbf{Author:} Wayne A. Satz, MD (Temple Emergency Medicine) \hfill \textbf{Clinical Case:} Hospital Discharge Readmission ($99{,}343$ stays, $69{,}990$ patients)\\[-6pt]
 \noindent\rule{\textwidth}{0.6pt}
 
-\textbf{Core Question:}
-When an inexpensive arrival intake table $X_{\text{base}}$ leaves severe conditional risk overlap under class imbalance, can a small score-stratified case-cohort pilot identify genuinely informative Stage-2 channels without measuring $100\%$ of training charts or buying baseline echoes---and when does selective Stage-2 routing help at deployment?
+\textbf{Core Problem:}
+When routine baseline covariates $X_{\text{base}}$ exhibit severe risk overlap on rare outcomes ($\pi \in [1\%, 22\%]$), resampling $X_{\text{base}}$ leaves population ranking unchanged (across 10 benchmarks $\times 20$ splits, HPO-tuned calibrated \texttt{SMOTE} yields $\Delta\text{AUPRC} = -0.0040$, $95\%$ CI $[-0.0097, +0.0017]$ vs.\ stabilized calibrated LightGBM). Improving decisions under explicit budgets requires solving two linked statistical design problems: \textbf{(Stage A)} discovering non-redundant Stage-2 feature channels from a small two-phase pilot without measuring all $M$ channels on $100\%$ of training records, and \textbf{(Stage B)} selectively querying discovered channels in real time at deployment.
 
-\textbf{Why Admission-Time Screening Needs Two Stages (After Upfront Eligibility Filtering):}
+\textbf{Clinical Anchor — Hospital Discharge Readmission Landmark (\texttt{UCI Diabetes 130-US}):}
 \begin{itemize}
-  \item \textbf{Fixed-Table Resampling Check (10 Benchmarks, 50 Splits):} Once gradient-boosted trees bound small-Hessian steps (\texttt{max\_delta\_step}$=1.0$) and Platt-calibrate on natural prevalence, \texttt{SMOTE}, \texttt{ADASYN}, copulas, \texttt{EasyEnsemble}, and \texttt{RUSBoost} yield \textbf{0 out of 10 detectable AUPRC gains} ($p_{\text{NB}} \ge 0.068$), consistent with population prior-shift ranking invariance (\textbf{Lemma 1}), while small minority sets ($n_+ \le 12$) carry wide Wilson $95\%$ intervals ($\pm 0.18\text{--}0.22$).
-  \item \textbf{True Admission-Time Intake} ($X_{\text{base}}$)\textbf{:} Excluding inpatient deaths and hospice discharges upfront independent of $Y$ ($2,423$ of $101,766$ encounters) leaves $99,343$ eligible admissions. At admission intake, only \textbf{7 fields} are known (\texttt{Age}, \texttt{Gender}, \texttt{Race}, \texttt{Admission Type}, \texttt{Admission Source}, \texttt{Payer Code}, \texttt{Weight Flag}); length of stay and lab/procedure counts move to Stage-2 candidate channels. On those 7 intake fields, calibrated \texttt{LightGBM} achieves only \textbf{\texttt{0.1272} AUPRC} ($5.92\%$ certified sensitivity at $5\%$ FPR) because look-alike arrivals share identical $X_{\text{base}}$.
+  \item \textbf{Outcome-Independent Risk Set \& Discharge Landmark:} Excluding $2{,}423$ inpatient deaths and hospice discharges upfront without inspecting $Y$ leaves $99{,}343$ discharged-alive encounters ($\pi = 11.39\%$ $<30$-day readmission). At the moment a discharge summary is signed, all \textbf{13 local stay-summary fields} (age, sex, race, admission type/source, disposition, payer + missingness flag, weight flag, length of stay, lab/procedure/medication/diagnosis counts) are already known in $X_{\text{base}}$ (\texttt{0.1782} AUPRC), while \textbf{$M=16$ candidate Stage-2 feeds} (3 regional Health Information Exchange [HIE] utilization queries, 3 ICD-9 groupers, specialty, HbA1c, glucose, 7 drug-class feeds) incur HL7/FHIR integration and per-query costs.
 \end{itemize}
 
-\textbf{Step 1: Identifying the Baseline Overlap Bottleneck (\emph{Lemma 1})}\\[0.5pt]
-Consider \textbf{100 emergency arrivals} sharing identical 7-field admission intake covariates: \textbf{15 true $<30$-day readmissions ($15\%$ risk)} and \textbf{85 non-readmitted look-alikes}. If care-transition nursing requires \textbf{$28\%$ precision} ($q_{\text{target}}$):
-\vspace{-3pt}
+\textbf{Stage A: Constrained Neyman Two-Phase Pilot \& Sequential Conditional Gain (\emph{Theorem 1, Proposition 1})}
+\begin{itemize}
+  \item \textbf{Water-Filling Constrained Neyman Pilot:} Classical $100\%$-case subsampling violates any pilot budget $\rho < \pi$. Solving $n_h^* = \min(N_h, \max(\ell_h, \lambda N_h \tilde{\sigma}_h))$ across joint Phase-1 $(Y, \text{score\_bin})$ strata enforces exact pilot size $n_{\text{pilot}} = \lfloor \rho N \rceil$ with known Horvitz--Thompson weights $w_i = N_h/n_h$, cutting gain RMSE by \textbf{46.6\%--49.0\%} vs.\ simple random pilots and beating $15\%$ SRS by \textbf{+0.0689 AUPRC} on \texttt{Scania} ($\pi=1.8\%$) and \textbf{+0.0394} on \texttt{IEEE-CIS} ($\pi=3.7\%$).
+  \item \textbf{Sequential Untruncated Gain, Two-Phase Variance, and Holm LCB:} Fitting capacity-matched cross-fitted GBDTs from shared Phase-1 offsets estimates untruncated conditional gain and exact two-phase variance $\widehat{V}_{\text{total}} = \widehat{V}_{\text{I}} + \widehat{V}_{\text{II}}$:
+\end{itemize}
 \[
-  D_q(x) = \max\{0,\; \operatorname{logit}(0.28) - \operatorname{logit}(0.15)\} > 0 \quad (\text{positive baseline evidence deficit}).
+  \hat{G}_{m \mid \mathcal{S}_{t-1}} = \frac{1}{N}\sum_{i \in \mathcal{P}} w_i \left[\ell\!\left(Y_i, \hat{\eta}_{\mathcal{S}_{t-1}\cup\{m\}}^{(-k(i))}\right) - \ell\!\left(Y_i, \hat{\eta}_{\mathcal{S}_{t-1}}^{(-k(i))}\right)\right], \qquad p_{\text{Holm},m}^{(t)} < 0.05.
 \]
-\vspace{-5pt}
 \begin{itemize}
-  \item Resampling or reweighting those 100 identical baseline rows shifts their scores together without changing who ranks above whom (\texttt{SMOTE} gets \textbf{\texttt{0.1267} AUPRC}). Breaking the tie requires acquiring Stage-2 clinical channels.
+  \item \textbf{Empirical Stage-A Result} ($R=20$ splits $\times 6$ cohorts, $M=15\text{--}26$ native / $M=25\text{--}36$ stress)\textbf{:} A \textbf{15\% Neyman pilot} saves \textbf{85\%} of discovery accesses, retains \textbf{98.3\%} of $100\%$-cohort Stage-2 AUPRC (\textbf{95.5\%} of incremental lift; pooled $\Delta_{15-100} = -0.0059$), matches or exceeds $100\%$-cohort Net Benefit on \textbf{4 / 6 cohorts} ($p_{\text{NI,NB}} \le 0.012$), isolates \texttt{hie\_prior\_inpatient} on \texttt{Diabetes} (\texttt{0.1782} $\to$ \textbf{\texttt{0.2214}}, ECE $= 0.0080$, race-blind \texttt{0.2219}), and records \textbf{0.0\% pure-noise null, 0.0\% duplicate Stage-2 twin, and 0.0\% echo selection across all 120/120 stress splits} (where One-Shot CMI wastes $26.7\%\text{--}40.0\%$ on twins and LOCO suffers twin cancellation).
 \end{itemize}
 
-\textbf{Step 2: Horvitz--Thompson Stratified-Pilot Conditional Log-Likelihood Gain (\emph{Lemma 2})}\\[0.5pt]
-\textbf{The Discovery Budget:} Six native Stage-2 EHR modules are candidates (\emph{Prior Inpatient/ED/Outpatient Visits}, \emph{Discharge Care-Transition Routing}, \emph{Inpatient Stay/Lab Workup}, \emph{Comorbidities}, \emph{Medications}, \emph{HbA1c/Glucose}), with budget for \textbf{2 modules}.
+\textbf{Stage B: Calibration-Only Streaming VOI \& Conformal FDR Selection (\texttt{CfBH})}
 \begin{itemize}
-  \item \textbf{Known-Probability Stratified Case-Cohort Pilot:} We sample $100\%$ of training cases ($w_i=1$) plus a baseline-score-stratified control subcohort ($34.2\%$ of Diabetes charts, saving \textbf{$65.7\%$ of discovery accesses}; $44\%$--$98.4\%$ saved across all 9 cohorts) with strictly positive stratum inclusion probabilities $\pi_{0,b} = n_{0,b}/N_{0,b} > 0$ and exact Horvitz--Thompson weights $w_i = N_{0,b}/n_{0,b}$ summing to $N_0$.
-  \item \textbf{Offset-Anchored Conditional Gain} ($\hat{G}_m$)\textbf{:} Fitting shallow regularized GBDTs over full $[X_{\text{base}}, Z_m]$ anchored at baseline log-odds $\operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base}}))$ estimates $I(Y; Z_m \mid X_{\text{base}})$, preserving pure $[X_{\text{base}}, Z_m]$ interactions (\textbf{Sim 3}) while rejecting baseline echoes (\textbf{$0.0\%$ false proxy selection across 40 stress runs} vs.\ $30\%$--$50\%$ under marginal MI on large multi-table cohorts):
-\end{itemize}
-\vspace{-3pt}
-\[
-  \hat{G}_m = \frac{1}{N}\sum_{i \in \mathcal{P}} w_i \left[\ell(Y_i, \hat{p}_{\text{base},\mathcal{P}}(X_{\text{base},i})) - \ell(Y_i, \hat{p}_{m,\mathcal{P}}(X_{\text{base},i}, Z_{m,i}))\right]_+.
-\]
-\vspace{-5pt}
-\begin{itemize}
-  \item \textbf{Result:} A \textbf{single calibrated GBDT} trained on the 2 selected channels (\emph{Prior Utilization} + \emph{Discharge Routing}) lifts Diabetes AUPRC from \textbf{\texttt{0.1272} $\to$ \texttt{0.2307}} (Holm $p=0.00233$; certified sensitivity $5.92\% \to \mathbf{17.38\%}$), recovering \textbf{$98.7\%$} of the unrestricted all-6-channels GBDT (\texttt{0.2338}) and improving significantly over $X_{\text{base}}$ on \textbf{all 9 / 9 native cohorts} up to $1.0\text{M}$ rows.
-\end{itemize}
-
-\textbf{Step 3: Six-Policy Selective Runtime Routing \& Honest Boundary Conditions (\emph{Proposition 1})}\\[0.5pt]
-\textbf{Why Literal Conformal $\{0,1\}$ Routing Struggles Under Rarity:} Mondrian calibration bounds negative singleton errors by $\alpha_0$, leaving Stage-1 $\{1\}$ positive singletons with only \textbf{$3.8\%$--$38.8\%$ realized PPV} ($12.8\%$ on Diabetes; $3.8\%$ on BAF-1M):
-\vspace{-3pt}
-\[
-  \operatorname{PPV}(\mathcal{S}_{\{1\}}) = \frac{\pi \gamma_1}{\pi \gamma_1 + (1-\pi)\gamma_0}.
-\]
-\vspace{-5pt}
-\begin{itemize}
-  \item \textbf{Equal-Budget 6-Policy Finding:} Querying upper-tail conformal candidates beats corrected \textbf{Literal $\{0,1\}$} routing on \textbf{9 / 9 cohorts} (Holm $p \le 0.005$ on 5 cohorts; saving $24.3\%\text{--}79.0\%$ of simulated Stage-2 accesses while retaining $76.3\%\text{--}98.4\%$ of incremental Stage-2 AUPRC gain). Crucially, because Stage-1 probabilities on rare-event cohorts rarely exceed $0.85$, upper-tail conformal routing \textbf{tracks simple Top-Risk-$K$ prioritization} ($p_2 \ge 0.215$), providing calibrated query-volume sizing $K$ rather than superior ranking at fixed $K$---while \textbf{VOI-$K$} and \textbf{Literal $\{0,1\}$} win decisively whenever top-risk pockets have irreducible ambiguity (\textbf{Sim 6}: \texttt{0.8674} vs.\ \texttt{0.8052}).
+  \item \textbf{Streaming Value of Information vs.\ Top-Risk Waste:} Calibrating thresholds strictly on $\mathcal{D}_{\text{cal}}$ without batch test ranking, querying top-risk patients who already exceed Bayes action threshold $\tau^*$ wastes query fees (\texttt{Diabetes} $q=20\%$ Net Benefit drops $18.75 \to 17.93$), whereas \textbf{Streaming VOI} queries boundary-ambiguous arrivals ($18.75 \to \mathbf{20.86}$). On \texttt{Scania APS}, autonomous stopping $\operatorname{VOI}_{\mathcal{K}}(x) > c_{\text{query}}$ queries only \textbf{7.2\%} of trucks and beats $100\%$ querying ($\mathbf{16.25}$ vs.\ $14.98$ Net Benefit).
+  \item \textbf{Jin--Cand\`es Conformal BH (\texttt{CfBH}):} Standard Mondrian $\{1\}$ singletons ($\alpha=0.20$) incur \textbf{60.7\%--96.5\% false discoveries} under rarity; applying \texttt{CfBH} controls realized FDP near contract $\text{FDR} = 1 - q_{\text{target}}$ across all 6 cohorts while $20\%$ VOI querying boosts certified recall $5.0\% \to \mathbf{26.7\%}$ on \texttt{IEEE-CIS} and $58.7\% \to \mathbf{91.3\%}$ on \texttt{Scania}.
 \end{itemize}
 
 \end{document}

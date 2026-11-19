@@ -5,7 +5,7 @@
   \usepackage[utf8]{inputenc}
   \usepackage[T1]{fontenc}
 \fi
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.95in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{booktabs}
 \usepackage{graphicx}
@@ -14,6 +14,7 @@
 \usepackage{natbib}
 \usepackage{microtype}
 \usepackage{array}
+\usepackage{multirow}
 \emergencystretch=3em
 \hbadness=2000
 
@@ -24,11 +25,10 @@
   urlcolor=blue
 }
 
+\newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
-\newtheorem{lemma}{Lemma}
-\newtheorem{definition}{Definition}
 
-\title{\textbf{CREDO: Budgeted Channel Discovery and Selective Feature Acquisition for Imbalanced Prediction}}
+\title{\textbf{Two-Phase Stratified Pilot Discovery and Streaming Selective Feature Acquisition for Cost-Constrained Prediction}}
 
 \author{
   Wayne A. Satz, MD\\
@@ -43,180 +43,195 @@
 \maketitle
 
 \begin{abstract}
-Imbalanced prediction in clinical screening, industrial monitoring, and fraud detection is routinely addressed by resampling or reweighting a fixed baseline table $X_{\text{base}}$. When $X_{\text{base}}$ lacks conditional resolution among high-risk arrivals, improving precision requires identifying and selectively acquiring additional channels under explicit budgets. We present CREDO, a two-stage framework evaluated across 10 fixed-table benchmarks (50 splits), 9 multi-channel cohorts ($N = 10,000$ to $1,000,000$; 45 native-channel splits plus 40 echo-stress runs), and 7 failure-mode simulations. First, under Newton-stabilized gradient-boosted trees (\texttt{max\_delta\_step}$=1.0$) with natural-prevalence Platt calibration, SMOTE, ADASYN, copulas, EasyEnsemble, and RUSBoost yield no detectable AUPRC gains across 10 benchmarks ($p_{\text{NB}} \ge 0.068$, Holm $p \ge 0.88$), while small minority counts carry wide Wilson $95\%$ intervals. Second, an offset-anchored Horvitz--Thompson conditional log-likelihood gain estimator ($\hat{G}_m$) on a score-stratified case-cohort pilot improves over $X_{\text{base}}$ on $9/9$ native cohorts (Holm $p \le 0.018$ for AUPRC and $(\alpha,\delta)$-certified Neyman--Pearson sensitivity), matches $100\%$-row conditional discovery within $0.0009$ AUPRC on $8/9$ cohorts while saving $44.0\%$--$98.4\%$ of pilot accesses, and records $0.0\%$ false selection of injected echoes ($40/40$ runs vs.\ $30\%$--$50\%$ under marginal mutual information on large multi-table cohorts). Third, because class-conditional conformal coverage does not bound $\{1\}$ singleton precision under rarity (PPV $3.8\%$--$38.8\%$), upper-tail conformal acquisition achieves higher mean AUPRC than literal $\{0,1\}$ routing on $9/9$ cohorts (Holm $p \le 0.005$ on $5/9$) while tracking top-risk-$K$ ($p_2 \ge 0.215$) when Stage-1 risk stays below target precision.
+Predicting rare outcomes in hospital discharge planning, credit underwriting, fleet maintenance, and fraud screening frequently hits severe risk overlap on baseline covariates $X_{\text{base}}$. Rather than resampling $X_{\text{base}}$, resolving overlap under explicit budgets poses a two-stage design problem: (i) discovering non-redundant Stage-2 feature channels from a small two-phase pilot without measuring all $M$ channels on $100\%$ of training rows, and (ii) selectively querying discovered channels for arriving instances at deployment. First, we develop a constrained Neyman two-phase stratified pilot design and a sequential forward Horvitz--Thompson conditional log-likelihood gain estimator ($\hat{G}_{m \mid \mathcal{S}}$) with two-phase variance ($V_{\text{I}} + V_{\text{II}}$) and Holm lower-confidence-bound stopping. Across six benchmarks ($N = 30{,}000$ to $1{,}000{,}000$; $M = 15\text{--}26$ native channels; $120$ splits), a $15\%$ Neyman pilot cuts discovery accesses by $85\%$, retains $98.3\%$ of full-cohort Stage-2 AUPRC ($95.5\%$ of lift over $X_{\text{base}}$; pooled $\Delta\text{AUPRC} = -0.0059$, $95\%$ CI $[-0.0089, -0.0029]$) while matching or beating full-cohort Net Benefit on $4/6$ cohorts, and records $0.0\%$ false selection of pure-noise nulls, duplicate Stage-2 twins, and echoes across $120$ stress runs ($M = 25\text{--}36$). Second, at deployment, calibration-only streaming Value-of-Information (VOI) routing outperforms top-risk querying in Net Benefit, while pairing VOI with conformal Benjamini--Hochberg selection controls false discoveries near target precision where Mondrian $\{1\}$ singletons incur $60.7\%\text{--}96.5\%$ false discoveries.
 \end{abstract}
 
 \vspace{4pt}
-\noindent\textbf{Keywords:} Imbalanced classification; case-cohort design; conditional mutual information; active feature acquisition; Mondrian conformal prediction; Neyman--Pearson classification.
+\noindent\textbf{Keywords:} Two-phase stratified sampling; conditional variable importance; active feature acquisition; Value of Information; conformal false discovery rate control; clinical risk prediction.
 
 \section{Introduction}
+\label{sec:intro}
 
-Prediction of rare adverse outcomes in clinical triage and hospital readmission screening \citep{strack2014impact}, physical equipment monitoring \citep{matzka2020explainable}, and financial or onboarding fraud detection \citep{dalpozzolo2014learned,jesus2022turning} operates under low event prevalence ($\pi = \mathbb{P}(Y=1) \in [10^{-3}, 0.20]$) alongside strict false-positive budgets ($\alpha_{\text{FPR}}$) or target positive predictive values ($q_{\text{target}}$) \citep{davis2006relationship,saito2015precision}. Standard machine-learning workflows typically attempt to improve rare-event performance on a fixed baseline feature table $X_{\text{base}}$ by modifying class proportions or loss weights via SMOTE \citep{chawla2002smote}, ADASYN \citep{he2008adasyn}, EasyEnsemble \citep{liu2009exploratory}, or RUSBoost \citep{seiffert2010rusboost}.
+Rare-event screening in hospital discharge care coordination \citep{strack2014impact}, consumer lending, industrial fleet telemetry, and real-time payment or onboarding fraud \citep{dalpozzolo2014learned,jesus2022turning} operates under low outcome prevalence ($\pi = \mathbb{P}(Y=1) \in [0.01, 0.22]$) paired with asymmetric false-positive and false-negative costs ($C_{\text{FP}}, C_{\text{FN}}$) or minimum positive predictive value targets ($q_{\text{target}}$) \citep{davis2006relationship,saito2015precision,vickers2006decision}. When risk models are restricted to a routine baseline feature table $X_{\text{base}}$, practitioners frequently attempt to boost minority sensitivity via synthetic oversampling or bagged undersampling such as SMOTE \citep{chawla2002smote}, ADASYN \citep{he2008adasyn}, EasyEnsemble \citep{liu2009exploratory}, or RUSBoost \citep{seiffert2010rusboost}. Yet at the population level, pure prior shifts are monotone transformations of the Bayes posterior $\eta_{\text{base}}(x) = \mathbb{P}(Y=1 \mid X_{\text{base}}=x)$ that leave ranking curves invariant while distorting probability calibration \citep{elkan2001foundations,saerens2002adjusting,vandengoorbergh2022harm,elor2022to}. As confirmed in our 20-split equivalence supplement across 10 public fixed-table benchmarks (Appendix~\ref{app:fixed_table}), hyperparameter-tuned and Platt-calibrated SMOTE yields a pooled random-effects AUPRC difference of $-0.0040$ ($95\%$ CI $[-0.0097, +0.0017]$) relative to Newton-stabilized, calibrated gradient-boosted trees \citep{ke2017lightgbm}.
 
-When two individuals share identical baseline intake covariates $X_{\text{base}} = x$ whose true conditional event probability satisfies $\eta_{\text{base}}(x) = \mathbb{P}(Y=1 \mid X_{\text{base}} = x) \ll q_{\text{target}}$, however, the limitation is informational rather than algorithmic. Overcoming baseline overlap requires answering two practical design questions under explicit measurement budgets \citep{covert2023learning,gadgil2024estimating,vonkleist2025evaluation}:
+When two individuals share identical baseline covariates $X_{\text{base}} = x$ whose conditional risk $\eta_{\text{base}}(x)$ falls short of operational action thresholds, performance is limited by missing information rather than class weighting. Resolving this informational bottleneck under explicit acquisition budgets requires coupling two methodological stages that have largely evolved in separate literatures:
 \begin{enumerate}
-  \item \textbf{Budgeted Channel Discovery:} Given $M$ candidate Stage-2 feature channels $Z_1, \dots, Z_M$ (such as longitudinal utilization histories, relational credit-bureau tables, or secondary sensor suites) with acquisition costs $c_m > 0$, can a small, deliberately sampled pilot subset $\mathcal{P} \subset \mathcal{D}_{\text{train}}$ estimate conditional predictive utility above $X_{\text{base}}$ without measuring all $M$ channels across $100\%$ of training records---and without being misled by channels that merely repackage baseline risk?
-  \item \textbf{Selective Runtime Acquisition:} Once a Stage-2 channel subset $\mathcal{S} \subseteq \{1,\dots,M\}$ is trained, how should a fixed deployment query budget $K$ be allocated across arriving instances, and when does class-conditional (Mondrian) conformal set construction \citep{lei2018distribution,sadinle2019least} add operational value beyond simple baseline-risk, uncertainty, or value-of-information (VOI) prioritization?
+  \item \textbf{Stage A --- Two-Phase Stratified Pilot Discovery (Development Time):} Suppose an organization can unlock $M$ candidate Stage-2 feature channels $Z_1, \dots, Z_M$ (such as external Health Information Exchange [HIE] utilization feeds, multi-bureau credit histories, or high-frequency diagnostic sensor blocks) with acquisition costs $c_m > 0$ and budget $\sum_{m \in \mathcal{S}} c_m \le B$. Measuring all $M$ channels across all $N_{\text{train}}$ historical records via manual chart abstraction, commercial bureau backfills, or vendor APIs is often cost-prohibitive. Two-phase epidemiologic designs \citep{prentice1986casecohort,breslow2009using,lumley2010complex,mcisaac2015adaptive,tao2020optimal} sample a Phase-2 subset $\mathcal{P} \subset \mathcal{D}_{\text{train}}$ stratified by Phase-1 outcomes and baseline covariates, while nonparametric conditional variable importance and dynamic feature-selection methods \citep{candes2018panning,williamson2021nonparametric,covert2023learning,chamma2023statistically,gadgil2024estimating} seek features informative conditional on $X_{\text{base}}$. However, combining these paradigms raises three concrete statistical challenges: (a) naive $100\%$-case subsampling is infeasible whenever target pilot fraction $\rho < \pi$; (b) per-record positive-part truncation or unweighted pilot scoring biases conditional mutual information (CMI) upward on pure-noise channels; and (c) real multi-table candidate pools contain \emph{Stage-2-to-Stage-2 collinear twins} ($Z_{m'} \approx Z_m$), where one-shot CMI buys redundant duplicates while Leave-One-Channel-Out (LOCO) importance \citep{williamson2021nonparametric} suffers twin cancellation ($\Delta\ell_{\text{LOCO}}(Z_m) \approx 0$).
+  \item \textbf{Stage B --- Streaming Selective Acquisition and Certified Positive Selection (Deployment Time):} Once a compact Stage-2 channel set $\mathcal{S}$ is selected and integrated, querying $\mathcal{S}$ for $100\%$ of arriving instances may still incur unnecessary per-query latency or API expense \citep{saartsechansky2009active,shim2018joint,li2021active,vonkleist2025evaluation}. Deployment policies must decide \emph{in real time} on each arriving $X_{\text{base}}$---using thresholds calibrated strictly on $\mathcal{D}_{\text{cal}}$, without peeking at batch test-set ranks---whether the expected decision-loss reduction justifies the query cost $c_{\text{query}}$. Furthermore, when operations require a set of positive alerts with controlled false discovery rate ($\text{FDR} = 1 - \text{PPV}$), class-conditional (Mondrian) conformal prediction sets $\mathcal{C}_1(x) = \{1\}$ \citep{sadinle2019least} guarantee class-conditional coverage $1 - \alpha$ rather than precision, producing severe false-discovery inflation under rarity unless replaced by conformal FDR selection \citep{jin2023selection}.
 \end{enumerate}
 
-Addressing these two questions rigorously requires separating population identities from finite-sample estimation and disentangling native database schemas from synthetic redundancy tests. In epidemiology, the case-cohort design of \citet{prentice1986casecohort} measures expensive covariates on all observed cases ($Y=1$) and a subcohort of controls ($Y=0$). Yet marginal mutual information $I(Y; Z_m)$---whether computed on the full cohort or on an unmatched case-control sample---rewards any channel correlated with baseline risk $X_{\text{base}}$. Conversely, conditioning only on a compressed scalar baseline score $S(X_{\text{base}})$ can miss pure $[X_{\text{base}}, Z_m]$ interactions, while aggressive collinearity penalties risk discarding correlated channels that still carry informative conditional residuals. Similarly, at deployment, two-stage conformal cascades designed for balanced classification query Stage-2 features strictly on the multi-label ambiguity region $\mathcal{C}_1(x) = \{0,1\}$ while accepting singleton sets $\{1\}$ and $\{0\}$ unverified. Under severe class imbalance, class-conditional coverage $\mathbb{P}(0 \in \mathcal{C}_1(X) \mid Y=0) \ge 1 - \alpha_0$ bounds the false-positive rate of $\{1\}$ singletons only by $\alpha_0$, which permits low singleton precision whenever $\pi \ll \alpha_0$ unless the Stage-1 score achieves near-perfect tail separation.
+\subsection{Contributions}
 
-In this paper, we introduce \textbf{CREDO} (\emph{Calibrated Receipt-Repaired Evidence Discovery and Orchestration}) and evaluate both its strengths and its exact failure modes across \textbf{CREDO-Bench}. Rather than claiming universal optimality, we establish precise population lemmas, finite-sample distribution-free operating-point guarantees, and controlled single-factor empirical comparisons:
+This paper develops and empirically evaluates an integrated two-stage framework---implemented in the open-source \texttt{imboreceipt} package---that connects two-phase survey sampling theory to streaming active feature acquisition:
 \begin{itemize}
-  \item \textbf{Fixed-Table Baseline Evaluation and Uncertainty Accounting (Section~\ref{sec:fixed_table}, Lemma~\ref{lem:prior_shift}):} At the population level, shifting class priors while preserving class-conditional distributions is strictly rank-preserving \citep{elkan2001foundations}. Because finite-sample resampling algorithms alter empirical class-conditional distributions and estimator variance, we test empirically whether SMOTE, ADASYN, copula augmentation, EasyEnsemble, or RUSBoost improve out-of-sample AUPRC over Newton-stabilized, natural-prevalence Platt-calibrated LightGBM across 10 public fixed-table datasets ($50$ four-way splits), paired with exact Wilson $95\%$ operating-point sensitivity intervals \citep{wilson1927probable}.
-  \item \textbf{Horvitz--Thompson Stratified-Pilot Conditional Log-Likelihood Gain (Section~\ref{sec:discovery}, Lemma~\ref{lem:ht_cmi}):} We construct a baseline-score-stratified case-cohort pilot with strictly positive known stratum inclusion probabilities $\pi_{0,b} = n_{0,b}/N_{0,b} > 0$ and exact Horvitz--Thompson weights summing to $N_0$, and score each candidate channel via cross-fitted offset-anchored gradient-boosted conditional log-likelihood gain $\hat{G}_m$ over $[X_{\text{base}}, Z_m]$. We evaluate native-only channels (including an unrestricted all-native-channels GBDT reference and explicit discovery + training + deployment access accounting) separately from injected baseline-echo stress tests and downstream ensemble complexity ablations.
-  \item \textbf{Conformal Singleton Precision Analysis and Six-Policy Runtime Routing (Section~\ref{sec:routing}, Proposition~\ref{prop:singleton}):} We characterize when Mondrian $\{1\}$ singletons fail precision targets under low prevalence, implement distribution-free $(\alpha,\delta)$ Neyman--Pearson thresholds via strict-inequality order statistics \citep{tong2018neyman}, and benchmark CREDO upper-tail conformal acquisition at identical query budgets against five comparators: literal $\{0,1\}$ conformal ambiguity routing, top-risk-$K$ prioritization, uncertainty-$K$ routing, decision-focused VOI-$K$ loss-reduction routing, and random-$K$ routing, supplemented by 7 adversarial simulations that expose exact failure boundaries (including pure XOR interactions, Stage-1 underfitting, irreducible top-risk pockets where VOI-$K$ and literal $\{0,1\}$ dominate upper-tail routing, and temporal covariate drift \citep{barber2023conformal}).
+  \item \textbf{Constrained Neyman Two-Phase Pilot Design and Sequential Conditional Gain Inference (Section~\ref{sec:stage_a}, Theorem~\ref{thm:two_phase}, Proposition~\ref{prop:neyman_twins}):} We formulate a water-filling constrained Neyman allocation across joint Phase-1 $(Y, \text{score\_bin})$ strata that achieves exact arbitrary pilot fractions $\rho \in (0,1]$ even when $\pi > \rho$. On this single Phase-2 pilot, we estimate forward stepwise untruncated Horvitz--Thompson conditional log-likelihood gain $\hat{G}_{m \mid \mathcal{S}_{t-1}}$, derive its exact two-phase variance decomposition $V_{\text{I}} + V_{\text{II}}$ across superpopulation and finite-population stratified sampling, and enforce Holm step-down lower-confidence-bound (LCB) stopping. Proposition~\ref{prop:neyman_twins} and Monte Carlo simulations verify $2.5\%$ family-wise null error rate ($\le 5\%$), $46.6\%\text{--}49.0\%$ lower RMSE than simple random pilots, and $100\%$ orthogonal mechanism recovery under Stage-2 twin collinearity where one-shot CMI ($0\%$) and LOCO ($5\%$) fail.
+  \item \textbf{Fine-Grained Multi-Channel Evaluation, TOST Non-Inferiority, and Stress Testing (Sections~\ref{sec:res_native}--\ref{sec:res_stress}):} Across six public multi-channel benchmarks partitioned into $M = 15\text{--}26$ native channels ($R = 20$ four-way splits per cohort; $120$ splits total) plus augmented stress pools ($M = 25\text{--}36$ adding pure-noise nulls, Stage-2 twins, and baseline echoes), $15\%$ Neyman sequential discovery retains $98.3\%$ of full-cohort Stage-2 AUPRC ($95.5\%$ of incremental lift over $X_{\text{base}}$) at $85\%$ lower discovery access cost, matches or exceeds full-cohort Net Benefit on $4/6$ cohorts, outperforms $15\%$ simple random pilots by $+0.022$ to $+0.069$ AUPRC on low-prevalence cohorts, and achieves $0.0\%$ false null, twin, and echo selection across all $120/120$ stress runs.
+  \item \textbf{Streaming VOI Budget Frontiers, Conformal FDR Selection, and Clinical Discharge Audit (Sections~\ref{sec:stage_b}, \ref{sec:res_streaming}, and \ref{sec:clinical_case}):} We replace batch rank routing with streaming calibration-quantile thresholds across $q \in [0\%, 100\%]$ and an autonomous Bayes Value-of-Information stopping rule $\widehat{\operatorname{VOI}}_{\mathcal{K}}(x) > c_{\text{query}}$, paired with smoothed conformal Benjamini--Hochberg selection (\texttt{CfBH}; \citealp{jin2023selection}). We ground the end-to-end pipeline in a discharge-landmark hospital readmission case study on \texttt{UCI Diabetes 130-US} ($99{,}343$ eligible encounters across $69{,}990$ patients), reporting fixed-interface versus per-query HIE cost accounting, covariate missingness, race/sex subgroup calibration slopes \citep{vancalster2019calibration}, and a 20-split race-blind sensitivity audit.
 \end{itemize}
 
-\subsection{Motivating Clinical Admission-Time Screening Problem}
-\label{sec:clinical_motivation}
+\section{Methodology and Statistical Theory}
+\label{sec:methods}
 
-To ground the methodology in a concrete clinical workflow, consider admission-time screening for unplanned $<30$-day hospital readmission on \texttt{UCI Diabetes 130-US Hospitals} \citep{strack2014impact}. Out of $101,766$ raw inpatient encounters across $71,518$ unique patients, encounters ending in inpatient death or hospice discharge (\texttt{discharge\_disposition\_id} $\in \{11, 13, 14, 19, 20, 21\}$; $2,423$ encounters, including $43$ carrying a recorded \texttt{<30} code) cannot enter the post-discharge readmission risk set and are excluded upfront using disposition codes alone, independent of $Y$, leaving $99,343$ eligible encounters ($\pi = 11.39\%$).
+\subsection{Data Partitioning, Eligibility, and Operational Decision Contracts}
+\label{sec:setup}
 
-At the moment of hospital admission, only seven inexpensive intake variables reside in $X_{\text{base}}$: patient age bucket, gender, race, admission type, admission source, primary payer code, and weight documentation flag. Variables accumulated during or at the end of the stay---such as length of stay (\texttt{time\_in\_hospital}), cumulative inpatient laboratory and procedure counts, historical outpatient/emergency/inpatient utilization lookups, medication changes, diagnostic comorbidity coding, HbA1c/glucose results, and discharge care-transition routing---are unavailable at admission intake and represent candidate Stage-2 channels in a retrospective feature-access simulation \citep{vonkleist2025evaluation}. Two patients arriving through the emergency department with identical intake fields $X_{\text{base}} = x$ cannot be separated by resampling $X_{\text{base}}$. Meanwhile, auditing all six candidate EHR and utilization channels across $100\%$ of training charts during development or $100\%$ of arrivals at deployment incurs substantial chart-abstraction or interface burden, motivating budgeted pilot discovery followed by selective Stage-2 retrieval.
+Consider a target population in which each arrival carries baseline covariates $X_{\text{base}} \in \mathcal{X}$ observed at zero marginal cost at the prediction landmark, $M$ candidate Stage-2 feature channels $Z_1 \in \mathcal{Z}_1, \dots, Z_M \in \mathcal{Z}_M$ with channel acquisition costs $c_1, \dots, c_M > 0$, and binary outcome $Y \in \{0,1\}$ with prevalence $\pi = \mathbb{P}(Y=1) \in (0, 0.5)$. An operational decision contract $\mathcal{K} = (C_{\text{FP}}, C_{\text{FN}}, q_{\text{target}}, c_{\text{query}})$ specifies false-positive action cost $C_{\text{FP}} > 0$, false-negative miss cost $C_{\text{FN}} > 0$ (inducing Bayes action probability threshold $\tau^* = C_{\text{FP}} / (C_{\text{FP}} + C_{\text{FN}})$), target positive predictive value $q_{\text{target}} \in (\pi, 1)$ for alert-list selection (corresponding to target $\text{FDR} = 1 - q_{\text{target}}$), and deployment Stage-2 query cost $c_{\text{query}} \ge 0$ in units of $C_{\text{FP}}$.
 
-\section{Statistical Framework and Methodology}
+\textbf{Outcome-Independent Eligibility and Four-Way Leak-Free Splitting:} Any structural risk-set eligibility filter (such as excluding inpatient deaths and hospice discharges prior to post-discharge readmission follow-up) is defined strictly from baseline or administrative disposition fields before splitting and without inspecting $Y$. Each eligible dataset of size $N_{\text{total}}$ is partitioned $R = 20$ times into $\mathcal{D}_{\text{train}}$ ($55\%$), $\mathcal{D}_{\text{cal}}$ ($15\%$), $\mathcal{D}_{\text{val}}$ ($15\%$), and $\mathcal{D}_{\text{test}}$ ($15\%$) with cryptographic SHA-256 index logging: (i) patient-grouped disjoint splits when repeated entity identifiers exist (\texttt{UCI Diabetes}); (ii) strict forward chronological splits across $R=20$ staggered eras on timestamped streams (\texttt{IEEE-CIS}, \texttt{NeurIPS BAF}), paired inside $\mathcal{D}_{\text{train}}$ with expanding-window out-of-fold (OOF) cross-validation where an explicit causal validity mask excludes the initial burn-in block rather than predicting backward in time; and (iii) outcome-stratified splits on cross-sectional cohorts (\texttt{Home Credit}, \texttt{Scania APS}, \texttt{UCI Taiwan Credit}). All imputers, scalers, encoders, and relational child-table aggregations are fit strictly on training folds.
 
-\subsection{Problem Formulation, Eligibility, and Strict Chronological/Grouped Splitting}
-\label{sec:splits}
+\subsection{Stage A: Constrained Neyman Two-Phase Pilot and Sequential Conditional Gain}
+\label{sec:stage_a}
 
-Let $(X_{\text{base}}, Z_1, \dots, Z_M, Y, \tilde{Y})$ denote an observational or simulated screening cohort where $X_{\text{base}} \in \mathcal{X}$ is observed at baseline for all eligible arrivals, $Z_m \in \mathcal{Z}_m$ ($m=1,\dots,M$) are candidate Stage-2 feature channels with per-instance acquisition costs $c_m > 0$ and discovery pilot budget $\sum_{m \in \mathcal{S}} c_m \le B$, $Y \in \{0,1\}$ is the target rare outcome ($\pi = \mathbb{P}(Y=1) < 0.5$), and $\tilde{Y} \in \{0,1\}$ is the recorded outcome receipt when ascertainment is incomplete \citep{elkan2008learning,lakkaraju2017selective}. An operational decision contract $\mathcal{K} = (q_{\text{target}}, \alpha_{\text{FPR}}, C_{\text{FP}}, C_{\text{FN}}, C_{\text{graded}})$ specifies target precision $q_{\text{target}}$, false-positive rate ceiling $\alpha_{\text{FPR}}$, false-positive cost $C_{\text{FP}}$, false-negative cost $C_{\text{FN}}$, and optional reversible review cost $C_{\text{graded}} < C_{\text{FP}}$.
+In Phase 1, $(X_{\text{base},i}, Y_i)$ are observed across $\mathcal{D}_{\text{train}}$. Using $K_{\text{I}}$-fold leak-free CV on $\mathcal{D}_{\text{train}}$, we compute OOF baseline risk estimates $\hat{\eta}_{\text{base}}(X_{\text{base},i})$ on the causal-valid training subset $\mathcal{I}_{\text{valid}}$ of size $N = |\mathcal{I}_{\text{valid}}|$. Partition $\operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base},i}))$ into $B_{\text{score}}$ empirical quantile bins, forming $H \le 2 B_{\text{score}}$ non-empty joint Phase-1 strata $\mathcal{U}_h = \{i \in \mathcal{I}_{\text{valid}} : (Y_i, b_i) = (y_h, b_h)\}$ with known population counts $N_h = |\mathcal{U}_h|$ ($\sum_{h=1}^H N_h = N$).
 
-\textbf{Upfront Outcome-Independent Eligibility:} Whenever a cohort contains structurally ineligible records (e.g., inpatient death/hospice discharges in \texttt{UCI Diabetes 130-US}, or accounts already delinquent at baseline month 6 with \texttt{PAY\_6} $> 0$ in \texttt{UCI Taiwan Credit}, where $3,079$ of $30,000$ accounts including $1,611$ defaults are excluded upfront), eligibility masks are defined strictly from pre-outcome or administrative disposition fields \emph{prior} to data splitting and without inspecting $Y$. Every exclusion count (total and $Y=1$) is logged in the campaign audit manifest.
+\textbf{Constrained Neyman Two-Phase Pilot Design:} Given a target Phase-2 pilot budget $n_{\text{pilot}} = \lfloor \rho N \rceil$ for any $\rho \in (0, 1]$, classical case-cohort designs that sample $100\%$ of cases ($Y_i=1$) violate the budget whenever $\pi > \rho$ (e.g., $\pi = 22.1\%$ at $\rho = 10\%$). Instead, we draw $n_h$ records without replacement independently within each joint stratum $\mathcal{U}_h$ ($h=1,\dots,H$) by solving a constrained Neyman water-filling allocation using Phase-1 conditional log-loss Taylor dispersion proxy $\tilde{\sigma}_h = |y_h - \bar{\eta}_h| + \tfrac{1}{4}\bar{\eta}_h(1 - \bar{\eta}_h)$, where $\bar{\eta}_h = N_h^{-1}\sum_{i \in \mathcal{U}_h}\hat{\eta}_{\text{base}}(X_{\text{base},i})$. Every sampled record $i \in \mathcal{P} = \bigcup_{h=1}^H \mathcal{P}_h$ has strictly positive known Phase-2 inclusion probability $\pi_i = n_{h(i)} / N_{h(i)} > 0$ and exact Horvitz--Thompson weight $w_i = N_{h(i)} / n_{h(i)}$ satisfying $\sum_{i \in \mathcal{P}} w_i = \sum_{h=1}^H n_h (N_h / n_h) = N$ identically \citep{horvitz1952generalization,lumley2010complex}.
 
-\textbf{Four-Way Split and Causal Cross-Fitting Protocol:} Each eligible cohort is partitioned into $\mathcal{D}_{\text{train}}$ ($55\%$), $\mathcal{D}_{\text{cal}}$ ($15\%$), $\mathcal{D}_{\text{val}}$ ($15\%$), and $\mathcal{D}_{\text{test}}$ ($15\%$) with SHA-256 index verification under dataset-specific dependency constraints:
+\textbf{Sequential Forward Untruncated Conditional Log-Likelihood Gain:} On the single Phase-2 pilot $\mathcal{P}$ (accessing $n_{\text{pilot}} \times M$ channel cells once), let $\mathcal{S}_{t-1} \subset \{1,\dots,M\}$ denote the channels selected prior to step $t \ge 1$ ($\mathcal{S}_0 = \emptyset$), and let $W_{i,t-1} = (X_{\text{base},i}, Z_{i,\mathcal{S}_{t-1}})$. Across fixed $K$-fold pilot splits ($K=4$), both the null conditioning model $\hat{\eta}_{\mathcal{S}_{t-1}}^{(-k)}$ on $W_{t-1}$ and each candidate augmented model $\hat{\eta}_{\mathcal{S}_{t-1}\cup\{m\}}^{(-k)}$ on $W_{t,m} = (W_{t-1}, Z_m)$ are fit from the \emph{identical} Phase-1 offset $\operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base},i}))$ with matched tree capacity and HT sample weights, preventing spurious log-likelihood drift from unequal boosting depth. Letting $\ell(y, p) = y \log p + (1-y)\log(1-p)$, define the \emph{untruncated} per-record OOF log-likelihood increment and HT estimator:
+\begin{equation}
+  \psi_{i, m \mid \mathcal{S}_{t-1}} = \ell\!\Big(Y_i, \hat{\eta}_{\mathcal{S}_{t-1}\cup\{m\}}^{(-k(i))}(W_{i,t,m})\Big) - \ell\!\Big(Y_i, \hat{\eta}_{\mathcal{S}_{t-1}}^{(-k(i))}(W_{i,t-1})\Big), \qquad
+  \hat{G}_{m \mid \mathcal{S}_{t-1}} = \frac{1}{N} \sum_{i \in \mathcal{P}} w_i \, \psi_{i, m \mid \mathcal{S}_{t-1}}.
+  \label{eq:seq_gain}
+\end{equation}
+Crucially, Eq.~\eqref{eq:seq_gain} applies no per-record positive-part $[\cdot]_+$ truncation; applying $[\psi_i]_+$ inside the sum would render every summand nonnegative and bias pure-noise channels strictly above zero.
+
+\begin{theorem}[Two-Phase Variance Decomposition and Null Error Control]
+\label{thm:two_phase}
+Let $\mathcal{F}_{\text{I}} = \{(X_{\text{base},i}, Z_{i,1:M}, Y_i, G_i)\}_{i=1}^N$ denote the Phase-1 sample from superpopulation $\mathbb{P}$, and let $\mathcal{P} \subset \{1,\dots,N\}$ be drawn via stratified without-replacement sampling across $\mathcal{F}_{\text{I}}$-measurable strata $\mathcal{U}_1,\dots,\mathcal{U}_H$ with sizes $N_h$ and sample counts $n_h \ge 2$.
 \begin{enumerate}
-  \item \textbf{Entity-Grouped Splits:} When repeated entity identifiers $G$ exist without a global calendar clock (\texttt{UCI Diabetes 130-US}, $71,518$ patients), group-disjoint splitting ensures zero patient overlap across all four partitions.
-  \item \textbf{Strict Forward Chronological Splits and Expanding-Block Cross-Fitting:} On timestamped cohorts (\texttt{ULB Credit Card}, \texttt{IEEE-CIS}, \texttt{NeurIPS BAF}), $\mathcal{D}_{\text{train}}$, $\mathcal{D}_{\text{cal}}$, $\mathcal{D}_{\text{val}}$, and $\mathcal{D}_{\text{test}}$ are ordered strictly forward in time across 5 staggered windows or disjoint future eras. Inside $\mathcal{D}_{\text{train}}$, out-of-fold (OOF) nuisance predictions are generated exclusively via causal expanding-block cross-validation satisfying $\max_{i \in \text{train}_k} T_i < \min_{j \in \text{val}_k} T_j$ on every fold $k$. The earliest chronological burn-in block (which has no prior training history) is excluded via an explicit causal mask (\texttt{oof\_valid\_mask}) from OOF-dependent selection rather than predicted backward from future blocks or silently replaced by random CV. When both $G$ and $T$ are present, forward chronological splits purge any training entity reappearing in later folds.
-  \item \textbf{Stratified Splits:} On cross-sectional tables without timestamps or repeated entity IDs (Tier-1 datasets, \texttt{Gate 0.5}, \texttt{UCI AI4I}, \texttt{UCI Taiwan Credit}, \texttt{Scania APS}, \texttt{Home Credit}), four-way splits stratify on $Y$, and all relational child-table aggregations ($20.8\text{M}$ rows across 6 auxiliary tables in \texttt{Home Credit}) and stateful feature compilers \citep{scheffer2009early} are fit strictly on $\mathcal{D}_{\text{train}}$.
+  \item \emph{Exact Conditional Design Unbiasedness and Total Variance:} For any $\mathcal{F}_{\text{I}}$-measurable score differences $\{\psi_i\}_{i=1}^N$ with finite second moments, $\mathbb{E}_{\text{II}}[\hat{G} \mid \mathcal{F}_{\text{I}}] = N^{-1}\sum_{i=1}^N \psi_i \equiv \bar{\psi}_N$, and
+  \begin{equation}
+    \operatorname{Var}(\hat{G}) = \underbrace{\operatorname{Var}_{\text{I}}(\bar{\psi}_N)}_{V_{\text{I}}} + \underbrace{\mathbb{E}_{\text{I}}\!\left[\frac{1}{N^2}\sum_{h=1}^H N_h^2 \left(1 - \frac{n_h}{N_h}\right)\frac{S_{h,\text{I}}^2}{n_h}\right]}_{V_{\text{II}}},
+    \label{eq:var_decomp}
+  \end{equation}
+  where $S_{h,\text{I}}^2 = (N_h - 1)^{-1}\sum_{i \in \mathcal{U}_h}(\psi_i - \bar{\psi}_{\mathcal{U}_h})^2$. Using pilot residuals $r_i = \psi_i - \hat{G}$ and within-stratum pilot variances $s_h^2 = (n_h - 1)^{-1}\sum_{i \in \mathcal{P}_h}(\psi_i - \bar{\psi}_{\mathcal{P}_h})^2$, the two-phase estimator $\widehat{V}_{\text{total}} = \widehat{V}_{\text{I}} + \widehat{V}_{\text{II}}$ defined by
+  \begin{align}
+    \widehat{V}_{\text{I}} &= \frac{1}{N^2}\max\!\left\{\frac{n_{\text{pilot}}}{n_{\text{pilot}}-1}\sum_{i \in \mathcal{P}} w_i r_i^2,\; \frac{C}{C-1}\left(\sum_{g=1}^C \Big(\sum_{i \in \mathcal{P} \cap g} w_i r_i\Big)^2 - \sum_{i \in \mathcal{P}} w_i(w_i - 1)r_i^2\right)\right\}, \nonumber\\
+    \widehat{V}_{\text{II}} &= \frac{1}{N^2}\sum_{h=1}^H N_h^2 \left(1 - \frac{n_h}{N_h}\right)\frac{s_h^2}{n_h},
+    \label{eq:var_hat}
+  \end{align}
+  satisfies $\widehat{V}_{\text{I}} + \widehat{V}_{\text{II}} = s^2 / n_{\text{pilot}}$ identically under unclustered simple random sampling ($H=1, w_i = N/n_{\text{pilot}}$).
+  \item \emph{Stepwise Null FWER Control:} Suppose that for every conditional null channel $m \in \mathcal{H}_0(\mathcal{S}_{t-1})$ satisfying $Y \perp Z_m \mid (X_{\text{base}}, Z_{\mathcal{S}_{t-1}})$, the capacity-matched cross-fitted learner satisfies $\mathbb{E}[\psi_{i, m \mid \mathcal{S}_{t-1}}] \le 0$ and regular asymptotic linearity or bounded non-positive drift relative to $\widehat{\text{SE}}_{m \mid \mathcal{S}_{t-1}} = (\widehat{V}_{\text{total},m} + \varepsilon_{n_{\text{pilot}}})^{1/2}$ \citep{williamson2021nonparametric}. If forward selection at each step $t$ admits only affordable channels with $p_{\text{Holm},m}^{(t)} < \alpha$ (where $p_m^{(t)} = 1 - \Phi(\hat{G}_{m \mid \mathcal{S}_{t-1}} / \widehat{\text{SE}}_{m \mid \mathcal{S}_{t-1}})$) and terminates immediately when no candidate passes, then at any step where all remaining affordable channels belong to $\mathcal{H}_0(\mathcal{S}_{t-1})$, the asymptotic probability of selecting any null channel is bounded by $\alpha$.
 \end{enumerate}
+\end{theorem}
 
-\subsection{Stabilized Fixed-Table Baselines and Exploratory Bottleneck Diagnostics}
-\label{sec:fixed_table}
-
-In binary log-loss gradient boosting, Newton--Raphson leaf steps take the form $\sum g_i / \sum h_i$ with gradient $g_i = \hat{p}_i - y_i$ and Hessian $h_i = \hat{p}_i(1-\hat{p}_i)$. Under rare prevalence, leaves with $\hat{p}_i \ll 10^{-2}$ have near-zero Hessians, causing unclipped leaf updates to overshoot unless regularized. Our baseline fixed-table model bounds leaf step magnitude via \texttt{max\_delta\_step}$=1.0$ in regularized LightGBM \citep{ke2017lightgbm} and applies monotonic logit-scale Platt calibration on natural-prevalence $\mathcal{D}_{\text{cal}}$ ($\varepsilon_{\text{clip}} = 10^{-15}$).
-
-\begin{lemma}[Prior-Shift Invariance of Population Oracle Ranking]
-\label{lem:prior_shift}
-Let $\eta_{\text{base}}(x) = \mathbb{P}(Y=1 \mid X_{\text{base}}=x)$ denote the population posterior under $(\mathcal{X}, \mathbb{P})$ with class prior $\pi \in (0,1)$. Any prior-shift or cost-reweighting operator \citep{elkan2001foundations} that changes the effective prior from $\pi$ to $\tilde{\pi} \in (0,1)$ while leaving the class-conditional distributions $\mathbb{P}(X_{\text{base}} \mid Y=1)$ and $\mathbb{P}(X_{\text{base}} \mid Y=0)$ unchanged induces the Bayes-optimal posterior
-\begin{equation}
-  \tilde{\eta}(x) = \frac{\gamma \eta_{\text{base}}(x)}{\gamma \eta_{\text{base}}(x) + 1 - \eta_{\text{base}}(x)}, \qquad \gamma = \frac{\tilde{\pi}(1-\pi)}{\pi(1-\tilde{\pi})} > 0.
-\end{equation}
-Because $u \mapsto \gamma u / (\gamma u + 1 - u)$ is strictly increasing on $[0,1]$, $\tilde{\eta}(X_{\text{base}})$ induces the same population ROC and Precision--Recall curves as $\eta_{\text{base}}(X_{\text{base}})$ while distorting probability calibration on natural prevalence whenever $\tilde{\pi} \ne \pi$. Furthermore, the additional log-likelihood ratio beyond $\eta_{\text{base}}(x)$ needed to reach posterior precision $q_{\text{target}}$ is the \emph{instance log-evidence deficit}
-\begin{equation}
-  D_q(x) = \max\!\left\{0,\; \operatorname{logit}(q_{\text{target}}) - \operatorname{logit}(\eta_{\text{base}}(x))\right\}.
-\end{equation}
-\end{lemma}
-
-\textbf{Scope of Lemma~\ref{lem:prior_shift}:} Lemma~\ref{lem:prior_shift} is a population statement about pure prior shifts; it does \emph{not} imply that finite-sample resampling is universally inert. Synthetic interpolation (SMOTE, ADASYN, copulas) modifies empirical class-conditional feature distributions, and bagged undersampling (EasyEnsemble, RUSBoost) alters tree split geometries and variance. Whether those finite-sample perturbations improve or degrade out-of-sample AUPRC relative to a step-stabilized, calibrated GBDT is therefore an empirical question tested in Section~\ref{sec:res_tier1}.
-
-\textbf{Exploratory Bottleneck Diagnostic Panel:} Alongside baseline training, CREDO reports four descriptive diagnostics (explicitly treated as exploratory heuristics rather than universal Bayes bounds): (i) both the prespecified planning sensitivity half-width at $80\%$ sensitivity ($1.96\sqrt{0.16/n_{+,\text{test}}}$) and the exact observed Binomial Wilson $95\%$ sensitivity confidence interval \citep{wilson1927probable} at the test operating point; (ii) an empirical outcome-receipt discrepancy index ($\text{ADI}$) when auxiliary ascertainment proxies exist on $\mathcal{D}_{\text{train}}$; (iii) Expected Calibration Error (ECE) before versus after Platt calibration; and (iv) an out-of-sample standardized $k$-NN local label purity check from $\mathcal{D}_{\text{train}}$ to $\mathcal{D}_{\text{val}}$.
-
-\subsection{Horvitz--Thompson Stratified-Pilot Conditional Log-Likelihood Gain}
-\label{sec:discovery}
-
-When baseline covariates leave substantial overlap among high-risk arrivals, we wish to select a subset of Stage-2 channels $\mathcal{S} \subseteq \{1,\dots,M\}$ under budget $\sum_{m \in \mathcal{S}} c_m \le B$ without measuring every candidate channel across all $N_{\text{train}}$ training records. Let $\hat{\eta}_{\text{base}}(X_{\text{base}})$ denote the leak-free OOF baseline probability on the valid causal training subset of size $N = N_+ + N_0$. Partition the $N$ training records into $B_{\text{strata}}$ quantile bins of $\operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base}}))$, containing $N_{+,b}$ cases and $N_{0,b}$ controls in bin $b$.
-
-\textbf{Known-Probability Stratified Case-Cohort Pilot:} Our pilot $\mathcal{P} = \mathcal{P}_+ \cup \mathcal{P}_0$ includes all valid training cases ($\mathcal{P}_+$, inclusion probability $\pi_{+,i} = 1$, weight $w_i = 1$) and draws $n_0 = \min(N_0, m(\pi) N_+)$ controls without replacement across the $B_{\text{strata}}$ baseline score bins using a variance-controlled hybrid allocation: $35\%$ proportional to control bin size $N_{0,b}$ (guaranteeing a strictly positive inclusion floor in every bin) and $65\%$ proportional to case bin count $N_{+,b}$ (concentrating controls in the high-risk baseline strata where cases reside), subject to $1 \le n_{0,b} \le N_{0,b}$. Each sampled control $i \in \mathcal{P}_0$ in bin $b$ has exact known inclusion probability $\pi_{0,b} = n_{0,b}/N_{0,b} > 0$ and exact Horvitz--Thompson (HT) inverse-probability weight $w_i = N_{0,b}/n_{0,b}$ \citep{horvitz1952generalization}, satisfying $\sum_{i \in \mathcal{P}_0} w_i = \sum_{b=1}^{B_{\text{strata}}} n_{0,b}(N_{0,b}/n_{0,b}) = N_0$ identically \citep{prentice1986casecohort}.
-
-\textbf{Offset-Anchored Conditional Log-Likelihood Gain ($\hat{G}_m$):} To evaluate each candidate channel $Z_m$ on $\mathcal{P}$ without collapsing $X_{\text{base}}$ to a scalar summary (which would miss pure $[X_{\text{base}}, Z_m]$ interactions) and without heuristic collinearity penalties, we fit two shallow, identically regularized GBDT models across identical leak-free pilot CV folds using HT sample weights $w_i$ and baseline log-odds offset $\texttt{init\_score}_i = \operatorname{logit}(\hat{\eta}_{\text{base}}(X_{\text{base},i}))$: a baseline-only pilot model $\hat{p}_{\text{base},\mathcal{P}}(X_{\text{base}})$ and an augmented model $\hat{p}_{m,\mathcal{P}}(X_{\text{base}}, Z_m)$, each calibrated fold-internally via HT-weighted logistic regression on its raw margin. Denoting binary cross-entropy by $\ell(y, p) = -[y \log p + (1-y)\log(1-p)]$, the Horvitz--Thompson conditional log-likelihood gain estimator is
-\begin{equation}
-  \label{eq:ht_gain}
-  \hat{G}_m = \frac{1}{N} \sum_{i \in \mathcal{P}} w_i \left[\ell\!\left(Y_i, \hat{p}_{\text{base},\mathcal{P}}(X_{\text{base},i})\right) - \ell\!\left(Y_i, \hat{p}_{m,\mathcal{P}}(X_{\text{base},i}, Z_{m,i})\right)\right]_+.
-\end{equation}
-Channels with $\hat{G}_m > 0$ are selected greedily by cost-normalized utility $\hat{G}_m / c_m$ up to budget $B$.
-
-\begin{lemma}[Population Conditional Mutual Information Target and Horvitz--Thompson Unbiasedness]
-\label{lem:ht_cmi}
-Let $\eta_{\text{base}}(x) = \mathbb{P}(Y=1 \mid X_{\text{base}}=x)$ and $\eta_m(x, z) = \mathbb{P}(Y=1 \mid X_{\text{base}}=x, Z_m=z)$ denote the true population posteriors, and let $g_m(x, z, y) = \ell(y, \eta_{\text{base}}(x)) - \ell(y, \eta_m(x, z))$. Then:
+\begin{proposition}[Constrained Neyman Allocation and Stage-2 Twin Dynamics]
+\label{prop:neyman_twins}
+\leavevmode
 \begin{enumerate}
-  \item At the population posteriors, $\mathbb{E}[g_m(X_{\text{base}}, Z_m, Y)] = I(Y; Z_m \mid X_{\text{base}}) \ge 0$ \citep{covert2023learning,gadgil2024estimating}, with equality $I(Y; Z_m \mid X_{\text{base}}) = 0$ if and only if $Y \perp Z_m \mid X_{\text{base}}$ (which holds for any baseline echo $Z_{\text{red}} = h(X_{\text{base}}, \varepsilon)$ with $\varepsilon \perp Y \mid X_{\text{base}}$), whereas $I(Y; Z_m \mid X_{\text{base}}) > 0$ both for pure interaction channels ($I(Y; Z_m) = 0$ but $I(Y; Z_m \mid X_{\text{base}}) > 0$) and for baseline-correlated channels carrying informative conditional residuals.
-  \item Under stratified case-cohort sampling with $\pi_{+,i} = 1$ and $\pi_{0,b} = n_{0,b}/N_{0,b} > 0$, the Horvitz--Thompson functional $\frac{1}{N}\sum_{i \in \mathcal{P}} w_i \psi_i$ is design-unbiased for the full-cohort empirical average $\frac{1}{N}\sum_{i=1}^{N} \psi_i$ for any fixed per-record loss difference $\psi_i$: $\mathbb{E}_{\mathcal{P}}\!\left[\frac{1}{N}\sum_{i \in \mathcal{P}} w_i \psi_i \,\middle|\, \mathcal{D}_{\text{train}}\right] = \frac{1}{N}\sum_{i=1}^{N} \psi_i$.
+  \item \emph{Water-Filling Neyman Pilot Optimality:} Given stratum counts $(N_1,\dots,N_H)$, dispersions $(\sigma_1,\dots,\sigma_H)$, floor $\ell_h = \min(2, N_h)$, and budget $n_{\text{pilot}} \in [\sum_h \ell_h, N]$, the continuous relaxation minimizing $\sum_{h=1}^H N_h^2 (1 - n_h/N_h)\sigma_h^2 / n_h$ subject to $\sum_{h=1}^H n_h = n_{\text{pilot}}$ and $\ell_h \le n_h \le N_h$ is uniquely solved by iterative boundary clamping $n_h^* = \min\!\big(N_h, \max(\ell_h, \lambda N_h \sigma_h)\big)$, achieving strictly smaller $V_{\text{II}}$ than simple random sampling whenever $\sigma_h$ varies across $(Y, \text{score\_bin})$ strata.
+  \item \emph{Stage-2 Twin Redundancy vs.\ LOCO Cancellation:} Suppose two candidate channels $Z_1, Z_2$ represent near-collinear measurements of Mechanism A ($Z_2 = Z_1 + \varepsilon$, $\operatorname{Var}(\varepsilon) = \delta^2 \ll \operatorname{Var}(Z_1)$) while $Z_3 \perp (Z_1, Z_2) \mid X_{\text{base}}$ represents an independent Mechanism B with $0 < I(Y; Z_3 \mid X_{\text{base}}) < I(Y; Z_1 \mid X_{\text{base}})$, under unit costs and budget $B = 2$:
+  (i) Population One-Shot CMI scores $G_1^* \approx G_2^* > G_3^*$ and buys $\{Z_1, Z_2\}$, missing Mechanism B;
+  (ii) Population LOCO importance satisfies $\Delta\ell_{\text{LOCO}}(Z_1) = I(Y; Z_1 \mid X_{\text{base}}, Z_2, Z_3) = O(\delta^2) \to 0$ and $\Delta\ell_{\text{LOCO}}(Z_2) = O(\delta^2) \to 0$, cancelling Mechanism A;
+  (iii) Population Sequential Forward CMI selects $Z_1$ at Step 1 and updates $G_{2 \mid \{1\}}^* = I(Y; Z_2 \mid X_{\text{base}}, Z_1) = O(\delta^2) \to 0 < G_{3 \mid \{1\}}^*$ at Step 2, recovering $\{Z_1, Z_3\}$.
 \end{enumerate}
-\end{lemma}
-
-\textbf{Prespecified Matching-Ratio Heuristic and Failure Conditions:} Motivated by the classical two-sample stratum relative efficiency $m/(m+1)$ ($80\%$ at $m=4$) \citep{prentice1986casecohort}, we prespecify the control-to-case ratio heuristic $m(\pi) = 2$ for $\pi \ge 0.10$ (limiting pilot size when cases are common), $m(\pi) = 4$ for $\pi \in [0.005, 0.10)$, and $m(\pi) = 8$ for ultra-rare $\pi < 0.005$ (stabilizing small case counts while still sampling $<2\%$ of records); we test sensitivity across $m \in \{1,2,4,8,16\}$ directly in Simulation~5. Importantly, Lemma~\ref{lem:ht_cmi}(1) holds at the true conditional risk $\eta_{\text{base}}(x)$: if the Stage-1 model severely misspecifies nonlinear structure in $X_{\text{base}}$, a nonlinear transformation $h(X_{\text{base}})$ can still yield apparent empirical gain $\hat{G}_m > 0$ (verified in Simulation~4).
-
-\textbf{Downstream Estimator Complexity and Total Access Accounting:} Our primary downstream estimator (\textbf{Arm A5}) trains a \emph{single} stabilized, Platt-calibrated GBDT on $[X_{\text{base}}, Z_{\mathcal{S}}]$ across $\mathcal{D}_{\text{train}}$, isolating channel discovery from ensemble complexity. As secondary architectural ablations, we also evaluate an equal-capacity 6-learner heterogeneous ensemble (\textbf{Arm A6e}), a separate-branch orthogonal log-odds lattice (\textbf{Arm A6}), and a Platt-recalibrated hybrid lattice (\textbf{Arm A7}) weighted by the calibration negative-tail coincidence ratio $\kappa_0$ computed via circular index shifts on $Y=0$. Furthermore, because selective discovery measures all $M$ candidate channels on the pilot $\mathcal{P}$ and then measures only the selected subset $\mathcal{S}$ on non-pilot training/calibration records and queried test arrivals, we explicitly audit all three components of channel access volume:
-\begin{equation}
-  C_{\text{total}} = \underbrace{|\mathcal{P}|\, M}_{\text{pilot discovery}} + \underbrace{(|\mathcal{D}_{\text{train}} \setminus \mathcal{P}| + |\mathcal{D}_{\text{cal}}| + |\mathcal{D}_{\text{val}}|)\, |\mathcal{S}|}_{\text{selected-channel model fitting \& calibration}} + \underbrace{K_{\text{query}}\, |\mathcal{S}|}_{\text{selective deployment}}.
-\end{equation}
-
-\subsection{Conformal Singleton Precision, Certified NP Thresholds, and Runtime Routing}
-\label{sec:routing}
-
-At deployment, Stage 1 produces calibrated baseline risk $\hat{p}_1(x)$ on $X_{\text{base}}$. Using $\mathcal{D}_{\text{cal}}$, Mondrian conformal prediction \citep{lei2018distribution,sadinle2019least} constructs prediction sets $\mathcal{C}_1(x) \subseteq \{0,1\}$ at class-conditional miscoverage targets $(\alpha_0, \alpha_1)$ via finite-sample order statistics $\hat{q}_{1-\alpha_0}^{(0)}$ on calibration negatives ($Y=0$) and $\hat{q}_{1-\alpha_1}^{(1)}$ on calibration positives ($Y=1$):
-\begin{equation}
-  0 \in \mathcal{C}_1(x) \iff \hat{p}_1(x) \le \hat{q}_{1-\alpha_0}^{(0)}, \qquad 1 \in \mathcal{C}_1(x) \iff 1 - \hat{p}_1(x) \le \hat{q}_{1-\alpha_1}^{(1)}.
-\end{equation}
-
-\begin{proposition}[Class-Conditional Coverage Does Not Guarantee Positive-Singleton Precision]
-\label{prop:singleton}
-Let $\mathcal{S}_{\{1\}} = \{x : \mathcal{C}_1(x) = \{1\}\}$ be a non-empty positive singleton region with class-conditional capture rates $\gamma_1 = \mathbb{P}(X \in \mathcal{S}_{\{1\}} \mid Y=1) \le 1 - \alpha_1$ and $\gamma_0 = \mathbb{P}(X \in \mathcal{S}_{\{1\}} \mid Y=0) \le \alpha_0$. By Bayes' rule, the precision inside $\mathcal{S}_{\{1\}}$ is
-\begin{equation}
-  \operatorname{PPV}(\mathcal{S}_{\{1\}}) = \frac{\pi \gamma_1}{\pi \gamma_1 + (1-\pi)\gamma_0},
-\end{equation}
-which falls strictly below $q_{\text{target}}$ whenever $\pi < q_{\text{target}}\gamma_0 / [q_{\text{target}}\gamma_0 + (1-q_{\text{target}})\gamma_1]$. Because Mondrian calibration constrains only the upper bound $\gamma_0 \le \alpha_0$, two distinct regimes arise at $\pi = 0.01, \alpha_0 = 0.05, \gamma_1 = 0.95$: if the threshold binds near the nominal boundary ($\gamma_0 = 0.05$), $\operatorname{PPV}(\mathcal{S}_{\{1\}}) = 16.1\%$ (dominated by false positives), whereas if Stage 1 achieves extreme tail separation ($\gamma_0 = 10^{-4} \ll \alpha_0$), $\operatorname{PPV}(\mathcal{S}_{\{1\}}) = 99.0\%$. Thus class-conditional coverage alone cannot certify singleton precision without inspecting $\hat{p}_1(x)$ relative to $q_{\text{target}}$.
 \end{proposition}
+Proofs of Theorem~\ref{thm:two_phase} and Proposition~\ref{prop:neyman_twins} appear in Appendix~\ref{app:proofs}. Two theoretical remarks connect Theorem~\ref{thm:two_phase} to Eq.~\eqref{eq:seq_gain}: first, while Part~1 states exact finite-population design moments for $\mathcal{F}_{\text{I}}$-measurable influence scores $\{\psi_i\}_{i=1}^N$, cross-fitting $\hat{\eta}^{(-k)}$ on the HT-weighted Phase-2 pilot $\mathcal{P}$ connects to oracle scores $\psi_i^*$ via the first-order orthogonality of conditional log-likelihood at the true conditional risk ($\frac{\partial}{\partial \eta}\mathbb{E}[\ell(Y,\eta) \mid W]\big|_{\eta=\eta^*} = 0$), rendering plug-in two-phase variance asymptotically valid under $L_4(\mathbb{P})$ nuisance convergence \citep{breslow2009using,williamson2021nonparametric}; second, as audited directly in Section~\ref{sec:res_sim}, on \emph{non-null} channels ($G_m^* > 0$) finite-pilot $K$-fold CV refitting of nonparametric tree learners introduces positive between-fold covariance not captured by plug-in influence-function SEs \citep{bates2024crossvalidation}, whereas adding $\widehat{V}_{\text{II}}$ substantially narrows finite-pilot undercoverage and preserves nominal null FWER control under $\mathcal{H}_0$.
 
-\textbf{Six Equal-Budget Runtime Routing Policies:} Given the query budget $K = |\mathcal{Q}_{\text{CREDO}}|$ induced by CREDO's upper-tail evidence-deficit rule $\mathcal{Q}_{\text{CREDO}} = \{x : 1 \in \mathcal{C}_1(x) \text{ and } \hat{p}_1(x) < \max(q_{\text{target}}, 0.85)\}$, we compare six policies at the \emph{exact same} Stage-2 query count $K$:
-\begin{enumerate}
-  \item \textbf{CREDO Upper-Tail ($\mathcal{Q}_{\text{CREDO}}$):} Queries instances with $1 \in \mathcal{C}_1(x)$ whose Stage-1 probability has not yet certified $\max(q_{\text{target}}, 0.85)$; unqueried $\{0\}$ singletons are assigned hard negative decisions.
-  \item \textbf{Literal Conformal Ambiguity ($\{0,1\}$):} Queries $\mathcal{M}_{01} = \{x : \mathcal{C}_1(x) = \{0,1\}\}$ first; if $|\mathcal{M}_{01}| > K$, selects the $K$ instances closest to the boundary; if $|\mathcal{M}_{01}| < K$, pads from $\{0\}$ singletons closest to $\hat{q}_{1-\alpha_0}^{(0)}$---never artificially skipping top-risk records when $\mathcal{S}_{\{1\}}$ is empty.
-  \item \textbf{Top-Risk-$K$:} Queries the $K$ instances with highest Stage-1 risk $\hat{p}_1(x)$ directly, testing whether conformal machinery adds ranking value beyond simple risk prioritization.
-  \item \textbf{Uncertainty-$K$:} Queries the $K$ instances minimizing $|\hat{p}_1(x) - \tau^*|$, where $\tau^* = C_{\text{FP}}/(C_{\text{FP}} + C_{\text{FN}})$ is the Bayes cost-optimal decision threshold.
-  \item \textbf{Estimated VOI-$K$ (Expected Bayes Loss Reduction):} Queries the $K$ instances maximizing estimated Bayes action-loss reduction $\widehat{\operatorname{VOI}}(x) = \ell_{\mathcal{K}}(\hat{p}_1(x)) - \mathbb{E}[\ell_{\mathcal{K}}(\hat{p}_2) \mid \hat{p}_1(x)]$, where $\ell_{\mathcal{K}}(p) = \min\{p C_{\text{FN}}, (1-p) C_{\text{FP}}\}$ and the conditional posterior variance is fit on $\mathcal{D}_{\text{cal}}$.
-  \item \textbf{Random-$K$:} Queries $K$ instances uniformly at random without replacement.
-\end{enumerate}
-Notice an immediate structural consequence of $\mathcal{Q}_{\text{CREDO}}$: whenever $\max_x \hat{p}_1(x) < \max(q_{\text{target}}, 0.85)$ across test arrivals, the upper probability cutoff never binds, so $\mathcal{Q}_{\text{CREDO}}$ reduces to a baseline-risk threshold $\{1 \in \mathcal{C}_1(x)\}$ whose ordering coincides with \textbf{Top-Risk-$K$} (differing only in that Mondrian calibration determines the query count $K$). Conversely, if a high-risk pocket already satisfies $\hat{p}_1(x) > \tau^*$ with zero Stage-2 uncertainty while a mid-risk pocket near $\tau^*$ resolves cleanly at Stage 2, \textbf{VOI-$K$} and \textbf{Literal $\{0,1\}$} will outperform both \textbf{Top-Risk-$K$} and \textbf{CREDO Upper-Tail} (demonstrated in Simulation~6). Moreover, Mondrian coverage guarantees assume exchangeability between $\mathcal{D}_{\text{cal}}$ and $\mathcal{D}_{\text{test}}$ and can degrade under temporal drift \citep{barber2023conformal} (quantified in Simulation~7).
+\subsection{Stage B: Streaming VOI Selective Acquisition and Conformal FDR Selection}
+\label{sec:stage_b}
 
-\textbf{Distribution-Free $(\alpha,\delta)$ Neyman--Pearson Operating Points:} For hard binary screening at false-positive budget $\alpha = \alpha_{\text{FPR}}$ with confidence $1-\delta$ ($\delta = 0.05$), we implement the exact Binomial order-statistic threshold of \citet{tong2018neyman} on the $m = |\mathcal{D}_{\text{cal},0}|$ negative calibration scores $S_{(1)} \le \dots \le S_{(m)}$, selecting the smallest $r \in \{1,\dots,m\}$ satisfying $\sum_{j=r}^{m} \binom{m}{j}(1-\alpha)^j \alpha^{m-j} \le \delta$ (certified feasible iff $(1-\alpha)^m \le \delta$) and classifying test instances via the \emph{strict} inequality $S(x) > S_{(r)}$. As proved in Appendix~\ref{app:proofs}, strict inequality ensures that discrete or tied negative scores never exceed false-positive rate $\alpha$ with probability at least $1-\delta$ under exchangeability.
+Once Stage A selects $\mathcal{S} \subseteq \{1,\dots,M\}$, we train a single stabilized LightGBM Stage-1 model on $(X_{\text{base}}, Y) \in \mathcal{D}_{\text{train}}$ and a single Stage-2 model on $(X_{\text{base}}, Z_{\mathcal{S}}, Y) \in \mathcal{D}_{\text{train}}$, applying separate logit-scale Platt calibration on natural-prevalence $\mathcal{D}_{\text{cal}}$ to obtain calibrated probabilities $\hat{p}_1(x)$ and $\hat{p}_2(x, z_{\mathcal{S}})$.
 
-\subsection{Statistical Inference}
-
-To account for training-set overlap across $K_{\text{seed}}=5$ repeated four-way splits, we apply the conservative Nadeau--Bengio variance correction \citep{nadeau2003inference}:
+\textbf{Streaming Threshold Calibration and Bayes Value of Information:} At deployment, arrivals are processed individually in real time without batch test-set ranking. For any priority score $R(x)$ computed strictly from $X_{\text{base}}$ and any target query rate $q \in (0, 1)$, the streaming threshold $\hat{\gamma}_q = \widehat{Q}_{1-q}(\{R(X_{\text{base},i})\}_{i \in \mathcal{D}_{\text{cal}}})$ is fixed on $\mathcal{D}_{\text{cal}}$, and test arrival $x$ queries $Z_{\mathcal{S}}$ if and only if $R(x) \ge \hat{\gamma}_q$, outputting routed posterior $\hat{p}_{\text{route}}(x) = \mathbb{I}\{R(x) \ge \hat{\gamma}_q\}\hat{p}_2(x, z_{\mathcal{S}}) + \mathbb{I}\{R(x) < \hat{\gamma}_q\}\hat{p}_1(x)$. Let $\ell_{\mathcal{K}}(p) = \min\{p C_{\text{FN}}, (1-p)C_{\text{FP}}\}$ denote the Bayes expected decision loss at posterior $p$. Modeling conditional Stage-2 logit updates $\Delta(x) = \operatorname{logit}(\hat{p}_2) - \operatorname{logit}(\hat{p}_1) \mid \hat{p}_1(x)$ via bin-specific dispersion $\hat{\sigma}_{\Delta}(\hat{p}_1(x))$ estimated on $\mathcal{D}_{\text{cal}}$ and 9-node Gauss--Hermite quadrature $(\xi_r, \omega_r)_{r=1}^9$, the expected Bayes Value of Information is
 \begin{equation}
-  \text{SE}_{\text{NB}} = \sqrt{\left(\frac{1}{K_{\text{seed}}} + \rho_{\text{overlap}} \frac{n_{\text{test}}}{n_{\text{train}}}\right) s_\Delta^2},
+  \widehat{\operatorname{VOI}}_{\mathcal{K}}(x) = \left[\ell_{\mathcal{K}}\big(\hat{p}_1(x)\big) - \sum_{r=1}^9 \omega_r \, \ell_{\mathcal{K}}\!\Big(\operatorname{expit}\big(\operatorname{logit}(\hat{p}_1(x)) + \hat{\sigma}_{\Delta}(\hat{p}_1(x))\xi_r\big)\Big)\right]_+.
+  \label{eq:voi}
 \end{equation}
-setting $\rho_{\text{overlap}} = 1$ on all real observational cohorts (including staggered chronological windows where training histories partially overlap, and $\rho_{\text{overlap}} = 0$ only on independently simulated \texttt{Gate 0.5} populations), paired with step-down Holm--Bonferroni family-wise error rate (FWER) adjustment \citep{holm1979simple} rather than weaker false-discovery-rate control \citep{benjamini1995controlling} across every primary hypothesis family.
+Besides sweeping $q \in \{0, 0.05, 0.10, 0.20, 0.30, 0.50, 1.0\}$ across five streaming policies---\texttt{Streaming VOI}, \texttt{Streaming Risk} ($R(x)=\hat{p}_1(x)$), \texttt{Boundary Uncertainty} ($R(x)=-|\hat{p}_1(x)-\tau^*|$), \texttt{Mondrian Ambiguity} ($\mathcal{C}_1(x)=\{0,1\}$ calibrated on $\mathcal{D}_{\text{cal}}$), and \texttt{Streaming Random}---Eq.~\eqref{eq:voi} yields a parameter-free autonomous rule that queries $Z_{\mathcal{S}}$ if and only if $\widehat{\operatorname{VOI}}_{\mathcal{K}}(x) > c_{\text{query}}$. Operational utility is evaluated via Vickers--Elkin Net Benefit per $1{,}000$ arrivals \emph{net of query cost} \citep{vickers2006decision}:
+\begin{equation}
+  \text{NB}_{\text{net}}(\text{per } 1{,}000) = \frac{1{,}000}{N_{\text{test}}}\left[\text{TP} - \frac{C_{\text{FP}}}{C_{\text{FN}}}\text{FP} - \frac{c_{\text{query}}}{C_{\text{FN}}}N_{\text{queried}}\right].
+  \label{eq:net_benefit}
+\end{equation}
 
-\subsection{Ethics Statement}
+\textbf{Conformal False Discovery Rate Selection (\texttt{CfBH}):} Standard Mondrian conformal sets guarantee $\mathbb{P}(0 \in \mathcal{C}_1(X) \mid Y=0) \ge 1 - \alpha$, which bounds false-positive rate $\alpha$ rather than false discovery rate; by Bayes' rule, under rarity ($\pi \ll \alpha$), unverified $\{1\}$ singletons suffer high false discovery proportions $\text{FDP} = 1 - \text{PPV}$. To select a certified high-precision alert set at target $\text{FDR} = 1 - q_{\text{target}}$, we apply \citet{jin2023selection} smoothed conformal $p$-values on routed calibration and test scores $(S_i)_{i \in \mathcal{D}_{\text{cal}}}, (S_{\text{test},j})_{j=1}^{N_{\text{test}}}$:
+\begin{equation}
+  p_j^{\text{JC}} = \frac{1 + \sum_{i \in \mathcal{D}_{\text{cal}}} \mathbb{I}\{Y_i = 0,\, S_i > S_{\text{test},j}\} + U_j \sum_{i \in \mathcal{D}_{\text{cal}}} \mathbb{I}\{Y_i = 0,\, S_i = S_{\text{test},j}\}}{1 + |\mathcal{D}_{\text{cal}}|},
+  \label{eq:cfbh}
+\end{equation}
+with independent uniform tie-breakers $U_j \sim \operatorname{Uniform}(0,1)$, followed by Benjamini--Hochberg step-up thresholding at level $1 - q_{\text{target}}$ \citep{benjamini1995controlling,jin2023selection}. Uniform tie-breaking among tied calibration negatives prevents discrete tree-leaf score ties from collapsing discovery power while preserving the $1/(1+|\mathcal{D}_{\text{cal}}|)$ conformal floor.
 
-This study performs retrospective computational and statistical analyses solely on publicly available, de-identified benchmark datasets \citep{strack2014impact,yeh2009comparisons,matzka2020explainable,dalpozzolo2014learned,jesus2022turning}. No human subjects were recruited or intervened upon, no identifiable private health information was accessed, and no clinical care recommendations are made; this work is exempt from IRB review and informed consent under 45 CFR 46.104(d)(4).
+\subsection{Inferential Protocol Across Resampled Splits}
+\label{sec:inference}
 
-\subsection{AI-Assisted Workflows and Reproducibility}
-
-Portions of the computational workflow---specifically Python benchmark scaffolding, counterexample regression tests, and LaTeX formatting---were conducted using Google Antigravity powered by Gemini 3.1 Pro with the Google DeepMind Science Plugin (v1.4.0). Zero generative AI calls occur inside the CREDO algorithms, which execute as deterministic numerical software. All generated code, dataset loaders, bibliographic citations, statistical analyses, and scientific conclusions were independently executed and verified by the human author, who takes full responsibility for the integrity of this work.
+All real-data comparisons use $R = 20$ splits ($df = 19$) with unmodified \citet{nadeau2003inference} variance-corrected standard errors $\widehat{\text{SE}}_{\text{NB}} = s_{\Delta}\sqrt{1/R + n_{\text{test}}/n_{\text{train}}}$. Non-inferiority of $15\%$ Neyman pilot discovery relative to $100\%$ full-cohort sequential discovery is tested via \citet{schuirmann1987comparison} one-sided TOST ($90\%$ NB confidence intervals) at both a strict margin ($\Delta_{\text{NI}} = 0.005$ AUPRC) and a practical margin ($\Delta_{\text{NI}} = 0.015$ AUPRC), alongside Net Benefit non-inferiority ($\Delta_{\text{NI,NB}} = 0.50$ true-positive equivalents per $1{,}000$ arrivals) and \citet{dersimonian1986meta} random-effects meta-analysis across cohorts. Multiplicity across the 6 cohorts is adjusted via \citet{holm1979simple} step-down FWER separately within each prespecified hypothesis family (Family 1: TOST non-inferiority vs.\ $100\%$ discovery; Family 2: native superiority vs.\ random channel selection; Family 3: stress-pool superiority vs.\ one-shot CMI; Family 4: stress-pool superiority vs.\ global marginal MI).
 
 \section{Empirical Results}
+\label{sec:results}
 
-\subsection{Fixed-Table Benchmark Suite Across 10 Datasets}
-\label{sec:res_tier1}
+\subsection{Monte Carlo Verification of Two-Phase Variance, Allocation, and Twin Dynamics}
+\label{sec:res_sim}
 
-Table~\ref{tab:tier1} and Figure~\ref{fig:tier1} evaluate stabilized natural-prevalence calibrated LightGBM against SMOTE+GBDT, EasyEnsemble, and RUSBoost (plus ADASYN, Gaussian copulas, and cost-sensitive GBDT in the repository receipts) across 10 OpenML \citep{vanschoren2014openml} and \texttt{imbalanced}-\texttt{learn} \citep{lemaitre2017imbalanced} datasets ($50$ four-way splits). Across all 10 datasets, no resampling or undersampling method achieves a statistically detectable AUPRC gain over stabilized calibrated GBDT ($p_{\text{NB}} \ge 0.068$; Holm-adjusted $p \ge 0.88$, with $95\%$ Nadeau--Bengio intervals spanning zero on all 10 datasets). On the two largest benchmarks (\texttt{Webpage}, $N=34,780$; \texttt{KDD Protein Homology}, $N=145,751$), SMOTE reduces mean AUPRC ($0.817 \to 0.769$ and $0.895 \to 0.885$) and undersampled ensembles degrade sharply. Simultaneously, Table~\ref{tab:tier1} and Figure~\ref{fig:tier1}B highlight finite-sample evaluation uncertainty: on small-minority datasets with $n_+ \in [5, 12]$ test positives per split (\texttt{Abalone 19}, \texttt{Yeast ME2}, \texttt{Ozone Level}, \texttt{PC1}), observed Wilson $95\%$ sensitivity half-widths span $\pm 0.183$ to $\pm 0.221$ (planning half-widths $\pm 0.226$ to $\pm 0.351$), dwarfing point-estimate differences between decoders.
+Before evaluating observational benchmarks, Table~\ref{tab:sim_theory} audits Theorem~\ref{thm:two_phase} and Proposition~\ref{prop:neyman_twins} across three controlled Monte Carlo experiments. In Simulation A ($N=6{,}000$, $\rho=15\%$ Neyman pilot, $1$ true signal channel plus $8$ independent Gaussian pure-noise channels under budget $B=3.0$, $80$ replicates), per-record positive-part truncation $[\psi_i]_+ > 0$ selects at least one pure-noise channel on $100.0\%$ of replicates, and even untruncated $\hat{G}_m > 0$ without LCB stopping selects noise on $98.8\%$ of replicates ($79/80$). Enforcing our two-phase SE and Holm step-down LCB at $\alpha = 0.05$ reduces the family-wise null error rate to $\mathbf{2.5\%}$ ($2/80$; $95\%$ CI $[0.0\%, 5.9\%]$). For the non-null signal channel, incorporating the Phase-2 stratified variance $\widehat{V}_{\text{II}}$ raises empirical $95\%$ CI coverage of the cross-fitted target from $61.3\%$ (naive Phase-1-only SE) to $78.8\%$; the remaining gap between mean plug-in $\widehat{\text{SE}}_{\text{total}}$ ($0.0028$ nats) and empirical Monte Carlo SD ($0.0041$ nats) reflects overlapping $4$-fold CV training covariance in finite nonparametric tree fits \citep{bates2024crossvalidation}.
 
 \begin{table}[t]
 \centering
-\caption{Fixed-table evaluation across 10 public benchmarks ($5$ four-way splits each $= 50$ runs). We report both prespecified planning sensitivity half-widths (at $r=0.80$) and observed Binomial Wilson $95\%$ sensitivity half-widths \citep{wilson1927probable}, mean $\pm$ SD test AUPRC, $95\%$ Nadeau--Bengio CIs for SMOTE minus Calibrated GBDT, and one-sided NB $p$-values (Holm $p \ge 0.88$ across all 10 datasets).}
-\label{tab:tier1}
-\vspace{2pt}
-\resizebox{\textwidth}{!}{%
+\caption{Monte Carlo verification of Theorem~\ref{thm:two_phase} and Proposition~\ref{prop:neyman_twins} (\texttt{theory\_simulations.json}). Simulation A ($80$ reps, $N=6{,}000$, $1$ true + $8$ pure-noise channels, $B=3$); Simulation B ($40$ reps, $N=8{,}000$, multi-channel gain RMSE vs.\ $100\%$ census); Simulation C ($40$ reps, $N=7{,}000$, $M=16$ channels with collinear Stage-2 twin $Z_A' = Z_A + \varepsilon$, orthogonal $Z_B$, $2$ baseline echoes, and $11$ nulls under budget $B=2$).}
+\label{tab:sim_theory}
 \small
-\setlength{\tabcolsep}{3.5pt}
-\begin{tabular}{lrrrcccccc}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{llccc}
 \toprule
-\textbf{Dataset} & $N$ & \textbf{Test} $n_+$ & \textbf{Plan / Obs HW} & \textbf{Cal.\ GBDT} & \textbf{SMOTE} & \textbf{EasyEns} & \textbf{RUSBoost} & \textbf{95\% NB CI (SM$-$GB)} & \textbf{NB $p$ (SM/EE)} \\
+\textbf{Experiment / Diagnostic} & \textbf{Estimator or Design} & \textbf{Primary Metric} & \textbf{Secondary Metric} & \textbf{Null / Twin Waste} \\
 \midrule
-Mammography & 11,183 & 39 & $\pm 0.126$ / $\pm 0.144$ & $\mathbf{0.717 \pm 0.051}$ & $0.705 \pm 0.028$ & $0.637 \pm 0.066$ & $0.635 \pm 0.076$ & $[-0.061, +0.036]$ & $0.738$ / $0.994$ \\
-COIL 2000 & 9,822 & 88 & $\pm 0.084$ / $\pm 0.052$ & $0.149 \pm 0.017$ & $0.145 \pm 0.021$ & $0.164 \pm 0.007$ & $0.134 \pm 0.027$ & $[-0.020, +0.013]$ & $0.708$ / $0.068$ \\
-Satimage & 6,435 & 94 & $\pm 0.081$ / $\pm 0.092$ & $0.766 \pm 0.022$ & $0.778 \pm 0.027$ & $0.632 \pm 0.045$ & $0.588 \pm 0.039$ & $[-0.008, +0.030]$ & $0.088$ / $0.997$ \\
-Thyroid Sick & 3,772 & 35 & $\pm 0.133$ / $\pm 0.143$ & $0.927 \pm 0.024$ & $0.938 \pm 0.021$ & $0.691 \pm 0.102$ & $0.877 \pm 0.045$ & $[-0.018, +0.039]$ & $0.177$ / $0.992$ \\
-Ozone Level & 2,536 & 11 & $\pm 0.236$ / $\pm 0.221$ & $\mathbf{0.356 \pm 0.121}$ & $0.350 \pm 0.138$ & $0.303 \pm 0.118$ & $0.306 \pm 0.120$ & $[-0.124, +0.113]$ & $0.550$ / $0.769$ \\
-PC1 Defects & 1,109 & 12 & $\pm 0.226$ / $\pm 0.183$ & $0.484 \pm 0.084$ & $0.512 \pm 0.094$ & $0.336 \pm 0.120$ & $0.287 \pm 0.130$ & $[-0.073, +0.128]$ & $0.246$ / $0.848$ \\
-Yeast ME2 & 1,484 & 8 & $\pm 0.277$ / $\pm 0.187$ & $0.459 \pm 0.130$ & $0.491 \pm 0.149$ & $0.455 \pm 0.167$ & $0.404 \pm 0.173$ & $[-0.129, +0.193]$ & $0.305$ / $0.528$ \\
-Abalone 19 & 4,177 & 5 & $\pm 0.351$ / $\pm 0.217$ & $0.045 \pm 0.023$ & $0.050 \pm 0.029$ & $0.048 \pm 0.024$ & $0.037 \pm 0.022$ & $[-0.038, +0.049]$ & $0.378$ / $0.445$ \\
-Webpage (35k) & 34,780 & 147 & $\pm 0.065$ / $\pm 0.067$ & $\mathbf{0.817 \pm 0.016}$ & $0.769 \pm 0.033$ & $0.368 \pm 0.038$ & $0.132 \pm 0.047$ & $[-0.098, +0.003]$ & $0.970$ / $1.000$ \\
-Protein Homol. & 145,751 & 194 & $\pm 0.056$ / $\pm 0.046$ & $\mathbf{0.895 \pm 0.024}$ & $0.885 \pm 0.021$ & $0.851 \pm 0.024$ & $0.827 \pm 0.036$ & $[-0.029, +0.009]$ & $0.894$ / $0.995$ \\
+\multirow{3}{*}{Sim A: Null FWER \& CI ($15\%$ Pilot)}
+  & Biased per-record $[\psi_i]_+ > 0$ (no LCB) & --- & --- & $100.0\%$ null FWER \\
+  & Untruncated $\hat{G}_m > 0$ (no LCB) & --- & --- & $98.8\%$ null FWER \\
+  & \textbf{Untruncated $\hat{G}_m$ + Two-Phase SE + Holm LCB} & \textbf{$78.8\%$ CI cov.} & ($61.3\%$ Phase-1 SE) & \textbf{$2.5\%$ null FWER} \\
+\midrule
+\multirow{3}{*}{Sim B: Pilot Gain RMSE vs.\ Census}
+  & Simple Random Sampling (SRS) & $\rho=5\%$: $0.0101$ & $\rho=10\%$: $0.0073$ & $\rho=20\%$: $0.0048$ \\
+  & Balanced Case-Control (BCC) & $\rho=5\%$: $0.0064$ & $\rho=10\%$: $0.0046$ & $\rho=20\%$: $0.0031$ \\
+  & \textbf{Constrained Neyman Two-Phase} & \textbf{$\rho=5\%$: $0.0052$} & \textbf{$\rho=10\%$: $0.0039$} & \textbf{$\rho=20\%$: $0.0025$} \\
+\midrule
+\multirow{6}{*}{Sim C: Twin + Echo + Null ($M=16, B=2$)}
+  & Marginal Mutual Information ($100\%$) & $0.0\%$ both mech. & $67.5\%$ echo rate & $32.5\%$ dup.\ twin \\
+  & One-Shot Non-Sequential CMI ($18\%$) & $0.0\%$ both mech. & $0.0\%$ echo rate & $100.0\%$ dup.\ twin \\
+  & Leave-One-Channel-Out LOCO ($18\%$) & $5.0\%$ both mech. & $0.0\%$ echo rate & $0.0\%$ (cancels $Z_A$) \\
+  & Model-X Knockoff / CRT ($18\%$) & $82.5\%$ both mech. & $0.0\%$ echo rate & $17.5\%$ dup.\ twin \\
+  & Conditional Permutation CPI ($18\%$) & $100.0\%$ both mech. & $0.0\%$ echo rate & $0.0\%$ dup.\ twin \\
+  & \textbf{Sequential Forward $\hat{G}_{m \mid \mathcal{S}}$ + LCB ($18\%$)} & \textbf{$100.0\%$ both mech.} & \textbf{$0.0\%$ echo rate} & \textbf{$0.0\%$ null / twin} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+In Simulation B, constrained Neyman allocation reduces gain estimation RMSE relative to SRS by $49.0\%$ at $\rho=5\%$, $46.6\%$ at $\rho=10\%$, and $47.6\%$ at $\rho=20\%$; notably, a $10\%$ Neyman pilot ($\text{RMSE}=0.0039$) is more accurate than a $20\%$ SRS pilot ($\text{RMSE}=0.0048$). In Simulation C, sequential forward $\hat{G}_{m \mid \mathcal{S}}$ recovers both orthogonal Stage-2 mechanisms on $100.0\%$ of replicates with $0.0\%$ twin, echo, or null waste, whereas one-shot CMI spends its entire budget on $\{Z_A, Z_A'\}$ ($100.0\%$ duplicate twin rate) and LOCO recovers both mechanisms on only $5.0\%$ of replicates due to twin cancellation.
+
+\subsection{Stage A: Fine-Grained Native Channel Discovery and TOST Non-Inferiority}
+\label{sec:res_native}
+
+Table~\ref{tab:native_discovery} and Figure~\ref{fig:discovery}A report native-pool Stage-A discovery across six multi-channel cohorts partitioned into $M = 15\text{--}26$ granular candidate channels ($R=20$ splits per cohort; full schema dictionary in Appendix~\ref{app:schemas}). Across all six cohorts, every downstream model is a single capacity-matched, Platt-calibrated LightGBM classifier, isolating channel discovery quality from model-family complexity.
+
+\begin{table}[t]
+\centering
+\caption{Stage-A native channel discovery across 6 fine-grained multi-channel cohorts ($R=20$ four-way splits per cohort, $df=19$). Values show mean test AUPRC (and mean Net Benefit per $1{,}000$ arrivals net of full-cohort channel cost for key arms). $\Delta_{15-100}$ reports \texttt{Neyman 15\%} minus \texttt{Full 100\%} AUPRC with $90\%$ Nadeau--Bengio CIs for Schuirmann TOST non-inferiority.}
+\label{tab:native_discovery}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Discovery Arm / Metric} & \textbf{UCI Diabetes} & \textbf{Home Credit} & \textbf{IEEE-CIS} & \textbf{Scania APS} & \textbf{NeurIPS BAF} & \textbf{UCI Taiwan} \\
+ & ($N=99\text{k}, M=16$) & ($N=140\text{k}, M=26$) & ($N=591\text{k}, M=25$) & ($N=76\text{k}, M=22$) & ($N=1.0\text{M}, M=18$) & ($N=30\text{k}, M=15$) \\
+ & $\pi=11.4\%, B=4.5$ & $\pi=8.1\%, B=5.0$ & $\pi=3.7\%, B=5.0$ & $\pi=1.8\%, B=4.0$ & $\pi=1.1\%, B=4.5$ & $\pi=22.1\%, B=3.5$ \\
+\midrule
+Baseline $X_{\text{base}}$ only ($0$ ch.) & $0.1782$ ($18.8$) & $0.1606$ ($22.5$) & $0.2059$ ($15.7$) & $0.5233$ ($15.9$) & $0.0715$ ($2.3$) & $0.4084$ ($87.3$) \\
+Random budget selection & $0.2025$ ($18.9$) & $0.1984$ ($23.4$) & $0.4208$ ($19.0$) & $0.8028$ ($14.9$) & $0.0909$ ($1.9$) & $0.4680$ ($90.6$) \\
+Global Marginal MI ($100\%$) & $0.1834$ ($15.1$) & $0.1788$ ($21.2$) & $0.3703$ ($17.7$) & $0.7837$ ($14.8$) & $0.1070$ ($2.2$) & $0.5504$ ($101.6$) \\
+Unweighted DIME-CMI ($15\%$) & $0.1784$ ($17.7$) & $0.1606$ ($22.5$) & $0.5112$ ($21.2$) & $0.8696$ ($15.1$) & $0.0814$ ($2.1$) & $0.5437$ ($102.5$) \\
+LOCO Pilot ($15\%$ Neyman) & $0.2217$ ($26.1$) & $0.2282$ ($29.1$) & $0.4679$ ($19.2$) & $0.7932$ ($15.8$) & $0.0896$ ($2.6$) & $0.5438$ ($102.9$) \\
+CRT / Knockoff ($15\%$ Neyman) & $0.2214$ ($26.2$) & $0.2322$ ($28.8$) & $0.5080$ ($21.0$) & $0.8597$ ($15.0$) & $0.1162$ ($2.6$) & $0.5451$ ($103.2$) \\
+Cond.\ Perm.\ CPI ($15\%$ Neyman) & $0.2230$ ($25.4$) & $0.2376$ ($28.8$) & $0.5092$ ($20.9$) & $0.8638$ ($15.1$) & $0.1092$ ($2.7$) & $0.5479$ ($102.0$) \\
+SRS Pilot Seq-CMI ($15\%$) & $0.2213$ ($26.1$) & $0.2270$ ($29.0$) & $0.4697$ ($20.2$) & $0.7826$ ($15.9$) & $0.0812$ ($2.4$) & $0.5436$ ($103.3$) \\
+Neyman Pilot Seq-CMI ($10\%$) & $0.2214$ ($26.1$) & $0.2312$ ($29.0$) & $0.5052$ ($21.1$) & $0.8452$ ($15.7$) & $0.0954$ ($2.7$) & $0.5453$ ($103.1$) \\
+\textbf{Neyman Pilot Seq-CMI ($15\%$)} & \textbf{$0.2214$ ($26.1$)} & \textbf{$0.2324$ ($29.0$)} & \textbf{$0.5091$ ($21.2$)} & \textbf{$0.8515$ ($15.5$)} & \textbf{$0.1029$ ($2.8$)} & \textbf{$0.5442$ ($102.8$)} \\
+Full-Cohort Seq-CMI ($100\%$) & $0.2249$ ($25.3$) & $0.2383$ ($28.9$) & $0.5089$ ($21.2$) & $0.8636$ ($15.3$) & $0.1150$ ($2.7$) & $0.5542$ ($103.5$) \\
+Unrestricted All-$M$ Native & $0.2296$ ($11.6$) & $0.2585$ ($16.1$) & $0.5356$ ($15.3$) & $0.8888$ ($8.0$) & $0.1505$ ($0.3$) & $0.5582$ ($84.9$) \\
+\midrule
+$\Delta_{15-100}$ AUPRC & $-0.0036$ & $-0.0059$ & $+0.0002$ & $-0.0122$ & $-0.0121$ & $-0.0100$ \\
+$90\%$ NB CI ($\Delta_{15-100}$) & $[-0.0069,-0.0002]$ & $[-0.0109,-0.0008]$ & $[-0.0104,+0.0108]$ & $[-0.0239,-0.0004]$ & $[-0.0223,-0.0019]$ & $[-0.0162,-0.0038]$ \\
+TOST $p_{\text{NI}}$ ($\Delta_{\text{NI}}=0.015$) & $<0.0001$ & $0.0029$ & $0.0112$ & $0.3400$ & $0.3132$ & $0.0889$ \\
+$\Delta_{15-100}$ Net Benefit ($p_{\text{NI,NB}}$) & $+0.84$ ($0.0116$) & $+0.13$ ($0.0084$) & $-0.04$ ($0.1386$) & $+0.19$ ($<0.0001$) & $+0.07$ ($0.0006$) & $-0.67$ ($0.5474$) \\
+Mean Channels Selected ($15\%$ / $100\%$) & $1.10$ / $2.40$ & $3.30$ / $4.40$ & $4.55$ / $4.75$ & $2.70$ / $3.35$ & $3.05$ / $5.00$ & $1.50$ / $3.00$ \\
 \bottomrule
 \end{tabular}%
 }
@@ -224,195 +239,260 @@ Protein Homol. & 145,751 & 194 & $\pm 0.056$ / $\pm 0.046$ & $\mathbf{0.895 \pm 
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.96\textwidth]{fig1_tier1_saturation.pdf}
-\caption{Fixed-table evaluation across 10 OpenML / \texttt{imbalanced-learn} datasets ($50$ splits). (A) Test AUPRC difference between SMOTE+GBDT and stabilized calibrated GBDT ($0/10$ significant gains). (B) Operating-point sensitivity uncertainty: prespecified planning half-widths ($r=0.80$) and observed Binomial Wilson $95\%$ half-widths versus held-out test positives per split ($n_+$).}
-\label{fig:tier1}
+\includegraphics[width=\textwidth]{fig1_discovery_noninferiority_and_stress.pdf}
+\caption{\textbf{Stage-A Pilot Discovery Non-Inferiority and Stress-Pool False Selection ($R=20$ splits per cohort).} \textbf{(A)} $90\%$ Nadeau--Bengio confidence intervals for test AUPRC difference between $15\%$ Neyman sequential discovery ($85\%$ fewer row accesses) and $100\%$ full-cohort sequential discovery against strict ($-0.005$) and practical ($-0.015$) non-inferiority margins. \textbf{(B)} Percentage of selected channel budget wasted on pure-noise nulls, duplicate Stage-2 twins, and baseline echoes in augmented candidate pools ($M=25\text{--}36$); Neyman Seq-CMI + LCB records $0.0\%$ across all $120$ splits.}
+\label{fig:discovery}
 \end{figure}
 
-\subsection{Multi-Channel Discovery: Native Schemas vs.\ Injected-Proxy Stress Tests}
-\label{sec:res_discovery}
-
-To prevent synthetic proxy channels from inflating real-world claims, Table~\ref{tab:ablation} separates \textbf{Panel A (Native-Only Candidate Channels)} across all 9 cohorts ($45$ runs) from \textbf{Panel B (Injected Baseline-Echo Proxy Stress Tests)} across the 8 public cohorts ($40$ runs), while explicitly labeling dataset provenance: \texttt{real\_observational} (\texttt{UCI Diabetes 130-US}, $N=99,343$ eligible; \texttt{UCI Taiwan Credit}, $N=26,921$ eligible; \texttt{ULB Credit Card}, $N=284,807$ PCA blocks; \texttt{Scania APS}, $N=76,000$ anonymized truck counters and 10-bin histogram shape profiles; \texttt{Home Credit}, $N=307,511$ joined across 7 relational tables; \texttt{IEEE-CIS}, $N=590,540$ joined with the $24\%$-populated identity table), \texttt{privacy\_synthetic\_from\_real} (\texttt{NeurIPS BAF}, $N=1,000,000$), \texttt{synthetic\_physics} (\texttt{UCI AI4I}, $N=10,000$), and \texttt{synthetic\_simulator} (\texttt{Gate 0.5}, $N=12,000$).
-
-\begin{table}[t]
-\centering
-\caption{Multi-channel discovery and downstream complexity evaluation ($5$ four-way splits per cohort). \textbf{Panel A (Primary Native-Only Suite, zero synthetic proxies):} Compares baseline $X_{\text{base}}$ GBDT (A0), $100\%$-row Global MI (A4), Unmatched Random-Pilot $\hat{G}_m$ (A4u), Stratified-Pilot $\hat{G}_m$ + Single GBDT (A5, Primary), Full-Cohort $100\%$-row $\hat{G}_m$ (A5f), Calibrated Hybrid Lattice (A7), and Unrestricted All-Native-Channels GBDT (Ref). \textbf{Panel B (Separate Injected-Proxy Stress Test):} Reports false proxy selection rates and resulting single-GBDT test AUPRC when noisy baseline-echo channels are added to the candidate pool.}
-\label{tab:ablation}
-\vspace{2pt}
-\resizebox{\textwidth}{!}{%
-\small
-\setlength{\tabcolsep}{3.4pt}
-\begin{tabular}{llcccccccc}
-\toprule
-\multicolumn{10}{l}{\textbf{Panel A: Primary Native-Only Candidate Channels (45 Splits; Mean Test AUPRC)}}\\
-\midrule
-\textbf{Cohort (Provenance)} & \textbf{Pilot} & \textbf{A0: Base} & \textbf{A4: GlobMI} & \textbf{A4u: Unm$\hat{G}_m$} & \textbf{A5: Strat$\hat{G}_m$} & \textbf{A5f: Full$\hat{G}_m$} & \textbf{A7: Lattice} & \textbf{Ref: All-Nat} & \textbf{Holm $p$} \\
- & \textbf{Used} & ($X_{\text{base}}$) & ($100\%$ rows) & (Pilot) & \textbf{(Primary)} & ($100\%$ rows) & (Selected) & (Unrestr.) & (A5 vs A0) \\
-\midrule
-Gate 0.5 (Sim.) & $20.5\%$ & $0.2104$ & $0.5415$ & $0.7964$ & $\mathbf{0.7964}$ & $0.7964$ & $0.8129$ & $0.7940$ & $\mathbf{0.00002}$ \\
-UCI AI4I (Syn.\ Phys.) & $16.9\%$ & $0.3606$ & $0.7404$ & $0.7428$ & $\mathbf{0.7395}$ & $0.7404$ & $0.7339$ & $0.8702$ & $\mathbf{0.00299}$ \\
-UCI Taiwan (Obs.) & $56.0\%$ & $0.2474$ & $0.4461$ & $0.4461$ & $\mathbf{0.4461}$ & $0.4461$ & $0.4505$ & $0.4506$ & $\mathbf{0.00025}$ \\
-UCI Diabetes Adm.\ (Obs.) & $34.2\%$ & $0.1272$ & $0.2307$ & $0.2307$ & $\mathbf{0.2307}$ & $0.2307$ & $0.2307$ & $0.2338$ & $\mathbf{0.00233}$ \\
-ULB Credit PCA (Obs.) & $1.2\%$ & $0.4821$ & $0.7428$ & $0.7428$ & $\mathbf{0.7541}$ & $0.7428$ & $0.7723$ & $0.7251$ & $\mathbf{0.01775}$ \\
-Scania APS 76k (Obs.) & $9.0\%$ & $0.5260$ & $0.8499$ & $0.8655$ & $\mathbf{0.8662}$ & $0.8662$ & $0.8699$ & $0.8991$ & $\mathbf{0.00233}$ \\
-Home Credit 7T (Obs.) & $40.4\%$ & $0.1678$ & $0.2489$ & $0.2557$ & $\mathbf{0.2557}$ & $0.2557$ & $0.2585$ & $0.2615$ & $\mathbf{0.00006}$ \\
-IEEE-CIS 2T (Obs.) & $15.1\%$ & $0.1974$ & $0.4905$ & $0.4974$ & $\mathbf{0.4974}$ & $0.4974$ & $0.4983$ & $0.5078$ & $\mathbf{0.00123}$ \\
-NeurIPS BAF 1M (Priv.\ Syn.) & $4.1\%$ & $0.0795$ & $0.1613$ & $0.1613$ & $\mathbf{0.1613}$ & $0.1613$ & $0.1688$ & $0.1643$ & $\mathbf{0.00299}$ \\
-\midrule
-\multicolumn{10}{l}{\textbf{Panel B: Separate Injected Baseline-Echo Proxy Stress Test (Large Multi-Table Cohorts Affected; 0\% Proxy Selection Elsewhere)}}\\
-\midrule
-\textbf{Cohort} & \textbf{Budget} & \textbf{GlobMI Proxy\%} & \textbf{UnmCC Proxy\%} & \textbf{PilotMI Proxy\%} & \textbf{A5 Proxy\%} & \textbf{GlobMI AP} & \textbf{A5 Strat$\hat{G}_m$ AP} & \textbf{NB $p$} & \textbf{Holm $p$} \\
-\midrule
-Home Credit 7T + Echoes & 3 of 7 & $33.3\%$ & $33.3\%$ & $33.3\%$ & $\mathbf{0.0\%}$ & $0.2454$ & $\mathbf{0.2557}$ & $\mathbf{0.0021}$ & $\mathbf{0.0168}$ \\
-IEEE-CIS 2T + Echoes & 2 of 6 & $30.0\%$ & $10.0\%$ & $40.0\%$ & $\mathbf{0.0\%}$ & $0.4841$ & $\mathbf{0.4974}$ & $0.0562$ & $0.3370$ \\
-NeurIPS BAF 1M + Echoes & 2 of 5 & $50.0\%$ & $50.0\%$ & $50.0\%$ & $\mathbf{0.0\%}$ & $0.1122$ & $\mathbf{0.1613}$ & $\mathbf{0.0111}$ & $0.0779$ \\
-Other 5 Public Cohorts & 2 of $4$--$8$ & $0.0\%$ & $0.0\%$ & $0.0\%$ & $\mathbf{0.0\%}$ & \multicolumn{2}{c}{Matches Panel A native selection} & $\ge 0.166$ & $\ge 0.828$ \\
-\bottomrule
-\end{tabular}%
-}
-\end{table}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.96\textwidth]{fig2_ablation_ladder.pdf}
-\caption{Native-channel discovery and downstream complexity ablations across all 9 cohorts ($45$ splits). (A) Test AUPRC (mean $\pm$ SD) comparing baseline $X_{\text{base}}$ (A0), $100\%$-row Global MI (A4), Unmatched-Pilot $\hat{G}_m$ (A4u), Primary Stratified-Pilot $\hat{G}_m$ + Single GBDT (A5), Hybrid Lattice (A7), and Unrestricted All-Native GBDT (Ref). (B) Corresponding operating-point sensitivity at Tong et al.\ $(\alpha,\delta=0.05)$-certified false-positive thresholds.}
-\label{fig:ablation}
-\end{figure}
-
-Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} establish five nuanced empirical conclusions:
+Four empirical patterns stand out in Table~\ref{tab:native_discovery}:
 \begin{enumerate}
-  \item \textbf{Significant Gains Over $X_{\text{base}}$ With Certified Operating-Point FPR Control:} Across all $9/9$ native cohorts, primary Arm A5 ($\hat{G}_m$ + Single Calibrated GBDT) significantly improves over $X_{\text{base}}$ (A0) after conservative Nadeau--Bengio and Holm FWER adjustment on \emph{both} Test AUPRC (Holm $p \in [0.00002, 0.01775]$) and Tong et al.\ $(\alpha,\delta=0.05)$-certified Neyman--Pearson sensitivity (Holm $p \in [0.00013, 0.01807]$). Every split ($45/45$) satisfies $(1-\alpha)^m \le 0.05$, and realized test FPR remains strictly below target $\alpha$ on all 9 cohorts (e.g., $4.54\%$ at $\alpha=5\%$ on \texttt{Diabetes}; $0.46\%$ at $\alpha=0.5\%$ on \texttt{IEEE-CIS}; $0.13\%$ at $\alpha=0.2\%$ on \texttt{ULB}).
-  \item \textbf{Pilot Efficiency Relative to Full-Cohort Conditional Discovery and Unrestricted Reference:} Measuring candidate channels only on the score-stratified pilot saves $44.0\%$ to $98.4\%$ of discovery channel accesses ($59.6\%$ to $98.4\%$ when $\pi < 10\%$, e.g., $3,834$ vs.\ $244,365$ channel-row accesses on \texttt{ULB} and $35,655$ vs.\ $858,000$ on \texttt{NeurIPS BAF}) while matching $100\%$-row Full-Cohort $\hat{G}_m$ (A5f) identically on $7/9$ cohorts, within $0.0009$ on \texttt{AI4I}, and $+0.0113$ higher on \texttt{ULB}. Relative to training an unrestricted GBDT on \emph{all} native channels (Ref), selecting $2$--$3$ channels recovers $96.3\%$--$103.9\%$ of all-native AUPRC on $8/9$ cohorts (trailing only on 3-channel synthetic \texttt{AI4I}, where the budget of $2$ omits the third distinct failure mode).
-  \item \textbf{Admission-Time Clinical Case Study (\texttt{UCI Diabetes 130-US}):} Using strictly the 7 true admission-intake variables, A0 achieves $0.1272 \pm 0.0050$ AUPRC and $5.92\% \pm 1.15\%$ sensitivity at $\alpha=5\%$ (realized FPR $4.57\%$). Auditing the 6 candidate Stage-2 channels on a $34.2\%$ pilot ($112,644$ vs.\ $328,422$ discovery channel-row accesses, $65.7\%$ saved) consistently selects prior inpatient/ED/outpatient utilization plus discharge care-transition routing on $5/5$ patient-grouped splits, lifting single-GBDT A5 to $0.2307 \pm 0.0209$ AUPRC (Holm $p=0.00233$) and $17.38\% \pm 1.94\%$ sensitivity (Holm $p=0.00129$; realized FPR $4.54\%$), recovering $98.7\%$ of the all-6-native-channels GBDT ($0.2338$) while reducing downstream training/calibration accesses by $66.7\%$ ($169,060$ vs.\ $507,180$).
-  \item \textbf{Where Conditional Gain Matters vs.\ Where Marginal MI Suffices:} On native schemas lacking strong baseline echoes (\texttt{Diabetes}, \texttt{Taiwan}, \texttt{AI4I}, \texttt{BAF}, \texttt{ULB}), $100\%$-row Global MI (A4) performs competitively with A5, whereas A5 improves over Global MI on confounded or relational native schemas (\texttt{Gate 0.5}: $0.7964$ vs.\ $0.5415$, $p_{\text{NB}}=0.011$; \texttt{Home Credit 7T}: $0.2557$ vs.\ $0.2489$, $p_{\text{NB}}=0.0029$; \texttt{Scania}: $0.8662$ vs.\ $0.8499$; \texttt{IEEE-CIS}: $0.4974$ vs.\ $0.4905$). Once exact HT weights and offset-anchored GBDT conditioning are applied, score-stratified pilot sampling (A5) provides a modest stability edge over unmatched random-pilot $\hat{G}_m$ (A4u) on ultra-rare \texttt{ULB} ($0.7541$ vs.\ $0.7428$) and \texttt{Scania} ($0.8662$ vs.\ $0.8655$) and ties elsewhere. Conversely, in the separate injected-proxy stress test (Panel B), Global MI, Unmatched CC MI, and Pilot MI suffer $30\%$--$50\%$ false proxy selection on the three large multi-table cohorts (\texttt{Home Credit} $0.2454$ vs.\ $0.2557$, Holm $p=0.0168$; \texttt{BAF} $0.1122$ vs.\ $0.1613$, $p_{\text{NB}}=0.0111$; \texttt{IEEE-CIS} $0.4841$ vs.\ $0.4974$), whereas A5 records $0.0\%$ false proxy selection across all $40$ stress runs. Moreover, clean $\hat{G}_m$ (A5) equals or outperforms the older composite heuristic \texttt{credo\_reg} on $9/9$ native cohorts (e.g., \texttt{ULB} $0.7541$ vs.\ $0.7291$, \texttt{BAF} $0.1613$ vs.\ $0.1504$).
-  \item \textbf{Minimal Value of Downstream Ensemble Complexity:} Comparing Single-GBDT A5 against Calibrated Hybrid Lattice A7 shows small two-sided gains on only $2/9$ cohorts (\texttt{Home Credit} $+0.0028$, $p_2=0.025$; \texttt{NeurIPS BAF} $+0.0075$, $p_2=0.013$) and null differences on the remaining $7/9$ ($p_2 \ge 0.402$; exact tie $0.2307$ on \texttt{Diabetes}). Virtually all predictive lift comes from channel acquisition rather than post-selection lattice fusion.
+  \item \textbf{Substantial Pilot Savings With Quantified Finite-Sample Trade-Offs:} Across all 6 cohorts, \texttt{Neyman 15\%} reduces Phase-2 row-channel accesses by $85\%$ while retaining $98.3\%$ of full-cohort Stage-2 mean AUPRC ($0.4103$ vs.\ $0.4175$, or $95.5\%$ of the $+0.1595$ incremental lift over $X_{\text{base}}$; DerSimonian--Laird pooled $\Delta_{15-100} = -0.0059$, $95\%$ CI $[-0.0089, -0.0029]$, $I^2 = 11.6\%$). Under conservative unmodified Nadeau--Bengio SEs, no cohort clears the ultra-strict $\Delta_{\text{NI}}=0.005$ threshold ($p_{\text{NI}} \ge 0.202$), whereas 3 of 6 cohorts (\texttt{UCI Diabetes}, \texttt{Home Credit}, \texttt{IEEE-CIS}) clear the practical $\Delta_{\text{NI}}=0.015$ margin ($p_{\text{NI}} \le 0.011$). Crucially, when evaluated on operational Net Benefit net of channel cost, \texttt{Neyman 15\%} achieves \emph{higher} point-estimate Net Benefit than \texttt{Full 100\%} on 4 of 6 cohorts ($p_{\text{NI,NB}} \le 0.012$), because full-cohort sample sizes ($N_{\text{train}} \approx 54\text{k--}77\text{k}$) pass secondary channels with tiny information gains whose acquisition cost exceeds their decision utility, whereas Holm LCB stopping on the $15\%$ pilot acts as an automatic minimum-effect filter ($1.1\text{--}3.3$ vs.\ $2.4\text{--}5.0$ channels). Conversely, on \texttt{NeurIPS BAF} ($\pi=1.1\%$), extreme rarity plus chronological burn-in limits pilot positive counts, illustrating the exact regime where a $15\%$ pilot trades $-0.0121$ AUPRC for $85\%$ access savings.
+  \item \textbf{Empirical Confirmation of Neyman Stratification Under Rarity:} At the identical $15\%$ pilot budget, \texttt{Neyman 15\%} substantially outperforms simple random pilot sampling (\texttt{SRS 15\%}) on all three low-prevalence cohorts: $+0.0689$ AUPRC on \texttt{Scania APS} ($\pi=1.8\%$), $+0.0394$ on \texttt{IEEE-CIS} ($\pi=3.7\%$), and $+0.0217$ on \texttt{NeurIPS BAF} ($\pi=1.1\%$), while converging with SRS when prevalence is moderate (\texttt{Diabetes} $\pi=11.4\%$, \texttt{Taiwan} $\pi=22.1\%$).
+  \item \textbf{Failure of Unweighted Pilot CMI and Marginal MI:} Removing Horvitz--Thompson weights (\texttt{Unweighted DIME-CMI}) collapses discovery to baseline on \texttt{UCI Diabetes} ($0.1784$) and \texttt{Home Credit} ($0.1606$) because case-enriched unweighted log-loss gradients distort baseline offsets. Similarly, full-cohort \texttt{Global Marginal MI} underperforms conditional discovery by $-0.038$ to $-0.139$ AUPRC on \texttt{Diabetes}, \texttt{Home Credit}, \texttt{IEEE-CIS}, and \texttt{Scania} by selecting baseline-correlated channels rather than conditionally orthogonal signals.
+  \item \textbf{Taiwan Eligibility Sensitivity Audit:} Evaluating unrestricted \texttt{UCI Taiwan Credit} \citep{yeh2009comparisons} ($N=30{,}000$, $\pi=22.1\%$; Table~\ref{tab:native_discovery}) alongside the baseline-current cohort restricted to $\texttt{PAY\_6} \le 0$ ($N=26{,}921$, $\pi=18.7\%$; $3{,}079$ already-delinquent month-6 accounts excluded upfront) confirms consistent behavior: in the restricted cohort, $X_{\text{base}}$ achieves $0.2656$ AUPRC, \texttt{Neyman 15\%} reaches $0.4426$, and \texttt{Full 100\%} reaches $0.4515$ ($\Delta_{15-100} = -0.0089$).
 \end{enumerate}
 
-\subsection{Runtime Selective Acquisition Across Six Equal-Budget Policies}
-\label{sec:res_routing}
+\subsection{Augmented Stress Pools: Pure-Noise Nulls, Stage-2 Twins, and Baseline Echoes}
+\label{sec:res_stress}
 
-Table~\ref{tab:foveation} and Figure~\ref{fig:foveation} evaluate all six equal-budget Stage-2 routing policies on the primary Single-GBDT A5 pipeline across all 9 native cohorts ($45$ splits). Confirming Proposition~\ref{prop:singleton}, Stage-1 Mondrian $\{1\}$ singletons occur on $3.7\%$--$22.1\%$ of test instances across all 9 cohorts yet achieve realized singleton PPV of only $3.8\%$--$38.8\%$ ($3.8\%$ on \texttt{NeurIPS BAF}, $10.1\%$ on \texttt{ULB}, $10.6\%$ on \texttt{IEEE-CIS}, $12.8\%$ on \texttt{Diabetes}). Because literal conformal ambiguity routing ($\{0,1\}$) leaves those $\{1\}$ singletons unverified at Stage 2, CREDO upper-tail acquisition outperforms literal $\{0,1\}$ routing on all $9/9$ cohorts (Holm $p \le 0.005$ on \texttt{Gate 0.5}, \texttt{Scania}, \texttt{Home Credit}, \texttt{IEEE-CIS}, and \texttt{NeurIPS BAF}), saving $24.3\%$--$79.0\%$ of simulated Stage-2 accesses while retaining $83.4\%$--$99.4\%$ of raw Stage-2 AUPRC and $76.3\%$--$98.4\%$ of incremental Stage-2 AUPRC gain over Stage 1 (at the explicit cost of leaving $2.3\%$--$24.3\%$ of true positives unqueried below the Stage-1 pruning gate).
+To test vulnerability to noise and inter-channel collinearity on real covariates, Table~\ref{tab:stress_pool} and Figure~\ref{fig:discovery}B augment each cohort's native candidate pool with 10 controlled stress channels ($M = 25\text{--}36$ total): 4 independent Gaussian pure-noise channels, 3 Stage-2 redundant twins ($Z_m' = Z_m + \varepsilon$, $\sigma_\varepsilon = 0.08\,\text{SD}(Z_m)$) cloned from informative Stage-2 channels, and 3 baseline echoes constructed from $X_{\text{base}}$.
 
 \begin{table}[t]
 \centering
-\caption{Equal-budget runtime Stage-2 selective acquisition across 6 routing policies ($45$ native-channel splits). We report Stage-1 $\{1\}$ singleton PPV, simulated Stage-2 access savings, test AUPRC for Stage-1 Only, Random-$K$, Literal Conformal $\{0,1\}$, Uncertainty-$K$, VOI-$K$, Top-Risk-$K$, CREDO Upper-Tail, and $100\%$ Selected Stage-2, plus Incremental AP Gain Retention ($\text{IncRet}$), Unqueried Missed-Positive Fraction ($\text{UnqMP}$), Holm $p$ vs.\ Literal $\{0,1\}$, and two-sided $p_2$ vs.\ Top-Risk-$K$.}
-\label{tab:foveation}
-\vspace{2pt}
-\resizebox{\textwidth}{!}{%
+\caption{Augmented stress-pool evaluation ($M=25\text{--}36$ channels: native pool + $4$ pure-noise nulls + $3$ Stage-2 twins + $3$ baseline echoes; $R=20$ splits per cohort). Entries report mean test AUPRC and percentage of selected channels wasted on pure-noise nulls / duplicate Stage-2 twins / baseline echoes (\texttt{null\%/twin\%/echo\%}).}
+\label{tab:stress_pool}
 \small
-\setlength{\tabcolsep}{2.8pt}
-\begin{tabular}{lccccccccccccc}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Cohort} & \textbf{$\{1\}$} & \textbf{S2} & \textbf{S1} & \textbf{Rand} & \textbf{Lit} & \textbf{Unc} & \textbf{VOI} & \textbf{TopK} & \textbf{CREDO} & \textbf{100\%} & \textbf{IncRet /} & \textbf{Holm $p$} & $p_2$ \textbf{vs} \\
- & \textbf{PPV} & \textbf{Saved} & \textbf{Only} & $K$ & $\{0,1\}$ & $K$ & $K$ & $K$ & \textbf{UpTail} & \textbf{S2} & \textbf{UnqMP} & (vs $\{0,1\}$) & \textbf{TopK} \\
+\textbf{Method ($15\%$ Pilot unless noted)} & \textbf{UCI Diabetes} & \textbf{Home Credit} & \textbf{IEEE-CIS} & \textbf{Scania APS} & \textbf{NeurIPS BAF} & \textbf{UCI Taiwan} \\
+ & ($M=26$) & ($M=36$) & ($M=35$) & ($M=32$) & ($M=28$) & ($M=25$) \\
 \midrule
-Gate 0.5 & $15.4\%$ & $62.9\%$ & $0.2104$ & $0.4923$ & $0.4620$ & $0.6631$ & $0.6510$ & $0.6631$ & $\mathbf{0.6631}$ & $0.7964$ & $77.2\%$ / $22.5\%$ & $\mathbf{0.00190}$ & $1.000$ \\
-UCI AI4I & $12.4\%$ & $77.1\%$ & $0.3606$ & $0.4343$ & $0.4424$ & $0.6534$ & $0.6323$ & $0.6534$ & $0.6517$ & $0.7395$ & $76.3\%$ / $24.3\%$ & $0.05323$ & $0.671$ \\
-UCI Taiwan & $26.4\%$ & $34.6\%$ & $0.2474$ & $0.3937$ & $0.3917$ & $0.4179$ & $0.4073$ & $0.4179$ & $\mathbf{0.4179}$ & $0.4461$ & $85.8\%$ / $22.5\%$ & $0.13952$ & $1.000$ \\
-UCI Diabetes & $12.8\%$ & $24.3\%$ & $0.1272$ & $0.2095$ & $0.2071$ & $0.2146$ & $\mathbf{0.2169}$ & $0.2146$ & $0.2146$ & $0.2307$ & $84.5\%$ / $19.7\%$ & $0.13952$ & $1.000$ \\
-ULB Credit & $10.1\%$ & $79.0\%$ & $0.4821$ & $0.5347$ & $0.5415$ & $\mathbf{0.7510}$ & $0.7184$ & $\mathbf{0.7510}$ & $0.7357$ & $0.7541$ & $93.3\%$ / $6.3\%$ & $0.13952$ & $0.215$ \\
-Scania APS & $38.8\%$ & $78.6\%$ & $0.5260$ & $0.6229$ & $0.6285$ & $\mathbf{0.8610}$ & $0.8262$ & $\mathbf{0.8610}$ & $0.8609$ & $0.8662$ & $98.4\%$ / $2.3\%$ & $\mathbf{0.00214}$ & $0.551$ \\
-Home Credit & $16.3\%$ & $41.4\%$ & $0.1678$ & $0.2247$ & $0.2028$ & $0.2472$ & $0.2432$ & $0.2472$ & $\mathbf{0.2472}$ & $0.2557$ & $90.3\%$ / $20.2\%$ & $\mathbf{0.00214}$ & $1.000$ \\
-IEEE-CIS & $10.6\%$ & $62.0\%$ & $0.1974$ & $0.3317$ & $0.2297$ & $0.4738$ & $0.4331$ & $0.4738$ & $\mathbf{0.4739}$ & $0.4974$ & $92.3\%$ / $22.7\%$ & $\mathbf{0.00059}$ & $0.358$ \\
-NeurIPS BAF & $3.8\%$ & $61.9\%$ & $0.0795$ & $0.1108$ & $0.0844$ & $0.1568$ & $0.1425$ & $0.1568$ & $\mathbf{0.1568}$ & $0.1613$ & $94.6\%$ / $18.3\%$ & $\mathbf{0.00500}$ & $1.000$ \\
+\textbf{Neyman Seq-CMI + Holm LCB} & \textbf{$0.2213$} & \textbf{$0.2320$} & \textbf{$0.5071$} & \textbf{$0.8512$} & \textbf{$0.1022$} & \textbf{$0.5440$} \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $\mathbf{0/0/0\%}$ & $\mathbf{0/0/0\%}$ & $\mathbf{0/0/0\%}$ & $\mathbf{0/0/0\%}$ & $\mathbf{0/0/0\%}$ & $\mathbf{0/0/0\%}$ \\
+\midrule
+One-Shot Neyman CMI (non-seq.) & $0.2227$ & $0.2293$ & $0.5042$ & $0.8598$ & $0.1119$ & $0.5448$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/\mathbf{26.7}/0\%$ & $0/\mathbf{40.0}/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/\mathbf{6.2}/0\%$ & $0/\mathbf{33.3}/0\%$ \\
+\midrule
+Conditional Perm.\ CPI & $0.2193$ & $0.2362$ & $0.5065$ & $0.8638$ & $0.1058$ & $0.5473$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/\mathbf{27.5}/0\%$ & $0/\mathbf{8.8}/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/\mathbf{12.5}/0\%$ \\
+\midrule
+CRT / Model-X Knockoffs & $0.2068$ & $0.2306$ & $0.5087$ & $0.8600$ & $0.1153$ & $0.5438$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/0/0\%$ & $0/\mathbf{35.1}/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/\mathbf{35.0}/0\%$ \\
+\midrule
+Leave-One-Channel-Out (LOCO) & $\mathbf{0.1782}$ & $\mathbf{0.1662}$ & $0.4650$ & $0.7693$ & $0.0836$ & $\mathbf{0.4373}$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ \\
+\midrule
+Unweighted DIME-CMI (no LCB) & $0.1784$ & $0.1606$ & $0.5118$ & $0.8696$ & $0.0799$ & $0.5436$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/0/0\%$ & $0/0/0\%$ & $0/0/1.0\%$ & $0/0/0\%$ & $\mathbf{15.8}/0/\mathbf{30.4\%}$ & $0/2.5/1.7\%$ \\
+\midrule
+Global Marginal MI ($100\%$ rows) & $0.1829^*$ & $0.1788^*$ & $0.3631^*$ & $0.7924^*$ & $0.1088$ & $0.5439$ \\
+\quad Spurious (\texttt{null/twin/echo\%}) & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/0/0\%$ & $0/\mathbf{33.3}/0\%$ \\
 \bottomrule
+\multicolumn{7}{l}{$^*$Holm-adjusted Family-4 superiority $p \le 9.4 \times 10^{-5}$ for \texttt{Neyman Seq-CMI} over \texttt{Global Marginal MI}.}
 \end{tabular}%
 }
 \end{table}
+
+Across all $120/120$ stress-pool splits, \texttt{Neyman Seq-CMI + Holm LCB} selects $\mathbf{0.0\%}$ pure-noise nulls, $\mathbf{0.0\%}$ duplicate Stage-2 twins, and $\mathbf{0.0\%}$ baseline echoes, preserving native-pool AUPRC to within $0.0020$ on every cohort. By contrast, real-data collinearity exposes the exact structural vulnerabilities predicted by Proposition~\ref{prop:neyman_twins}(2): (i) \texttt{One-Shot CMI}, \texttt{CPI}, and \texttt{CRT-Knockoffs} buy both a parent channel and its collinear twin on $26.7\%\text{--}40.0\%$, $8.8\%\text{--}27.5\%$, and $35.0\%\text{--}35.1\%$ of selected channels across \texttt{Diabetes}, \texttt{Home Credit}, and \texttt{Taiwan}; and (ii) \texttt{LOCO} suffers severe twin cancellation when key channels have near-duplicates in the pool, dropping AUPRC from $0.2217 \to 0.1782$ on \texttt{Diabetes}, $0.2282 \to 0.1662$ on \texttt{Home Credit}, and $0.5438 \to 0.4373$ on \texttt{Taiwan}. Meanwhile, \texttt{Unweighted DIME-CMI} without LCB stopping wastes $46.2\%$ of selected channels on pure-noise nulls ($15.8\%$) and echoes ($30.4\%$) on \texttt{NeurIPS BAF}.
+
+\subsection{Stage B: Streaming Budget--Utility Frontiers and Conformal FDR Selection}
+\label{sec:res_streaming}
+
+Figures~\ref{fig:streaming} and~\ref{fig:cfbh} and Table~\ref{tab:streaming_cfbh} evaluate Stage-B deployment routing across streaming query rates $q \in [0\%, 100\%]$ calibrated strictly on $\mathcal{D}_{\text{cal}}$. On cohorts where top-decile Stage-1 probabilities already exceed the Bayes action threshold $\tau^*$ (\texttt{UCI Diabetes}, $\tau^*=0.111$; \texttt{Home Credit}, $\tau^*=0.077$), \texttt{Streaming Risk} ($R(x)=\hat{p}_1(x)$) \emph{reduces} Net Benefit at $q=20\%$ below $0\%$-query Stage-1 screening ($18.75 \to 17.93$ on \texttt{Diabetes}; flat $22.47 \to 22.53$ on \texttt{Home Credit}), because paying to verify patients who remain above $\tau^*$ either way yields zero decision flips. By contrast, \texttt{Streaming VOI}, \texttt{Boundary Uncertainty}, and \texttt{Mondrian Ambiguity} concentrate Stage-2 queries near $\tau^*$, lifting $q=20\%$ Net Benefit to $20.86\text{--}20.88$ on \texttt{Diabetes} and $25.37\text{--}25.46$ on \texttt{Home Credit}. On \texttt{Scania APS} ($50:1$ failure-to-inspection cost ratio, $\tau^*=0.0196$), the parameter-free rule $\widehat{\operatorname{VOI}}_{\mathcal{K}}(x) > c_{\text{query}}$ queries only $\mathbf{7.2\%}$ of arriving trucks and achieves $\mathbf{16.25}$ Net Benefit---exceeding $100\%$ full-fleet querying ($14.98$) while saving $92.8\%$ of sensor downloads. Similarly, on \texttt{NeurIPS BAF}, autonomous VOI queries $12.8\%$ of applications and reaches $3.08$ Net Benefit versus $2.44$ under $100\%$ querying.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.96\textwidth]{fig3_kappa0_and_foveation.pdf}
-\caption{Runtime selective acquisition and simulated access savings across 9 cohorts ($45$ splits). (A) Equal-budget test AUPRC across all 6 Stage-2 routing policies. (B) Simulated percentage of candidate channel-row accesses saved during training-time pilot discovery and deployment-time Stage-2 routing.}
-\label{fig:foveation}
+\includegraphics[width=\textwidth]{fig2_streaming_budget_curves.pdf}
+\caption{\textbf{Stage-B Streaming Query-Rate Frontiers ($R=20$ splits).} Vickers--Elkin Net Benefit per $1{,}000$ arrivals (net of per-instance query cost $c_{\text{query}}$) across calibration-tuned streaming query rates $q \in [0\%, 100\%]$ on four representative clinical, credit, fraud, and industrial cohorts (all six cohorts reported in Table~\ref{tab:streaming_cfbh}). Red stars denote the autonomous Bayes stopping rule $\widehat{\operatorname{VOI}}_{\mathcal{K}}(x) > c_{\text{query}}$ with zero tuned query-fraction hyperparameter.}
+\label{fig:streaming}
 \end{figure}
 
-\textbf{Critical Finding on Top-Risk-$K$ Equivalence:} Table~\ref{tab:foveation} reveals an essential operational insight that only emerges when \textbf{Top-Risk-$K$} and \textbf{Uncertainty-$K$} are included at equal budget $K$: across all 9 rare-event cohorts, \textbf{CREDO Upper-Tail} is statistically indistinguishable from \textbf{Top-Risk-$K$} ($p_2 \ge 0.215$; exact tie on $5/9$ cohorts, while Top-Risk-$K$ slightly leads on ultra-rare \texttt{ULB} at $0.7510$ vs.\ $0.7357$ and VOI-$K$ slightly leads on \texttt{Diabetes} at $0.2169$ vs.\ $0.2146$). Because Stage-1 baseline probabilities on these imbalanced cohorts almost never exceed $\max(q_{\text{target}}, 0.85) = 0.85$, the upper deficit cutoff rarely binds; consequently, Mondrian calibration here provides \textbf{principled query-budget sizing} ($K$ calibrated to $(\alpha_0, \alpha_1)$) rather than a superior instance ranking over Top-Risk-$K$ once $K$ is fixed.
-
-\subsection{Controlled Adversarial and Failure-Mode Simulation Suite}
-\label{sec:res_sims}
-
-To establish exact boundary conditions where each discovery and routing rule succeeds or fails, Table~\ref{tab:sims} summarizes 7 synthetic adversarial regimes ($5$ seeds each $= 35$ runs):
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig3_conformal_fdr_selection.pdf}
+\caption{\textbf{Certified Positive Selection: Mondrian $\{1\}$ Singletons vs.\ Jin--Cand\`es Conformal BH (\texttt{CfBH}, $R=20$ splits).} \textbf{(A)} Realized False Discovery Proportion ($1-\text{PPV}$): unverified Mondrian $\{1\}$ singletons ($\alpha=0.20$) suffer $60.7\%\text{--}96.5\%$ false discoveries, whereas \texttt{CfBH} tracks target $\text{FDR} = 1 - q_{\text{target}}$. \textbf{(B)} Certified recall at target FDR for Stage-1 alone ($0\%$ queries), Streaming VOI at $20\%$ queries, and Full Stage-2 ($100\%$ queries).}
+\label{fig:cfbh}
+\end{figure}
 
 \begin{table}[t]
 \centering
-\caption{Controlled 7-regime adversarial simulation suite ($5$ seeds per regime) probing conditional discovery, baseline misspecification, $m$-ratio sensitivity, VOI routing, unequal channel costs, and non-exchangeable temporal drift.}
-\label{tab:sims}
-\vspace{2pt}
-\resizebox{\textwidth}{!}{%
+\caption{Stage-B streaming Net Benefit (per $1{,}000$ arrivals net of query cost) and Jin--Cand\`es Conformal BH (\texttt{CfBH}) positive selection across all 6 cohorts ($R=20$ splits). Target $\text{FDR} = 1 - q_{\text{target}}$ is set by each cohort's decision contract.}
+\label{tab:streaming_cfbh}
 \small
-\setlength{\tabcolsep}{4.0pt}
-\begin{tabular}{lllc}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Regime} & \textbf{Structural Mechanism Tested} & \textbf{Key Quantitative Outcome (Mean Across 5 Seeds)} & \textbf{Verdict} \\
+\textbf{Deployment Policy / Metric} & \textbf{UCI Diabetes} & \textbf{Home Credit} & \textbf{IEEE-CIS} & \textbf{Scania APS} & \textbf{NeurIPS BAF} & \textbf{UCI Taiwan} \\
+ & ($\tau^*=0.111$) & ($\tau^*=0.077$) & ($\tau^*=0.038$) & ($\tau^*=0.020$) & ($\tau^*=0.032$) & ($\tau^*=0.167$) \\
 \midrule
-Sim 1: Pure Baseline Echo & $Z_{\text{echo}} = g(X_{\text{base}}) + \varepsilon$ vs.\ weaker $Z_{\text{orth}}$ & Global MI \& Pilot MI precision $0.0\%$; Full-$[X_{\text{base}},Z]$ $\hat{G}_m$ precision $\mathbf{100.0\%}$ & Rejects echo \\
-Sim 2: Correlated Residual & $\operatorname{Corr}(Z, X_{\text{base}}) = 0.91$ with true residual signal & $\hat{G}_m$ selects informative correlated channel on $\mathbf{5/5}$ seeds ($100\%$) & Preserves signal \\
-Sim 3: Pure Parity XOR & $Y$ depends on $\operatorname{sign}(X_1)\operatorname{sign}(Z_{\text{xor}})$; $I(Y;Z_{\text{xor}})=0$ & Global MI $0\%$; scalar-score $S(X_{\text{base}})$ CMI $0\%$; full-$[X_{\text{base}},Z]$ $\hat{G}_m$ $\mathbf{100\%}$ & Requires full $X_{\text{base}}$ \\
-Sim 4: Underfit Stage-1 & Linear Stage-1 fit to quadratic $X_{\text{base}}^2$ + shadow $Z$ & Misspecified linear baseline fooled by $Z = X_1^2 + \varepsilon$ on $\mathbf{100\%}$ of seeds ($0\%$ under GBDT) & Failure boundary \\
-Sim 5: Sparse Trigger $m$ & $\pi = 0.70\%$, sparse binary trigger ($n_{+,\text{train}} \approx 62$) & Top-1 hit \& test AUPRC rise from $80\%$ ($0.0366$) at $m \le 4$ to $\mathbf{100\%}$ ($\mathbf{0.0485}$) at $m \in \{8,16\}$ & Supports $m=8$ \\
-Sim 6: Irreducible Top Pocket & Top $10\%$ irreducible ($p_1=0.86$); mid $10\%$ resolves $0/1$ & Top-Risk-$K$ ($0.8017$) \& CREDO ($0.8052$) fail; \textbf{VOI-$K$ ($\mathbf{0.8674}$)} \& \textbf{Lit $\{0,1\}$ ($\mathbf{0.8671}$)} win & Routing boundary \\
-Sim 7: Unequal Cost \& Drift & Pair ($c=1+1$) vs.\ single ($c=2$); test covariate shift & $\hat{G}_m/c_m$ picks pair $100\%$ ($0.2256$ vs.\ $0.1315$); class-0 coverage drops $80.0\% \to \mathbf{62.4\%}$ ($-17.6\%$) & Drift vulnerability \\
+\multicolumn{7}{l}{\emph{Net Benefit per $1{,}000$ Arrivals (Net of Query Cost)}} \\
+Stage-1 Baseline ($q=0\%$) & $18.75$ & $22.47$ & $15.70$ & $15.92$ & $2.28$ & $87.26$ \\
+Streaming Top-Risk ($q=20\%$) & $17.93$ & $22.53$ & $17.89$ & $16.23$ & $3.13$ & $86.10$ \\
+Streaming Random ($q=20\%$) & $19.53$ & $23.51$ & $16.73$ & $15.77$ & $2.22$ & $89.38$ \\
+Mondrian Ambiguity $\{0,1\}$ ($q=20\%$) & $20.88$ & $25.46$ & $18.31$ & $16.23$ & $2.18$ & $90.47$ \\
+Streaming VOI ($q=20\%$) & $20.86$ & $25.37$ & $18.70$ & $14.98^\dagger$ & $2.44$ & $93.30$ \\
+\textbf{Autonomous} $\widehat{\operatorname{VOI}}_{\mathcal{K}} > c_{\text{query}}$ (realized $q$) & \textbf{$22.35$} ($55.5\%$) & \textbf{$27.70$} ($61.6\%$) & \textbf{$19.83$} ($33.7\%$) & \textbf{$16.25$} ($7.2\%$) & \textbf{$3.08$} ($12.8\%$) & \textbf{$97.93$} ($72.8\%$) \\
+Full Stage-2 Querying ($q=100\%$) & $22.34$ & $27.85$ & $21.01$ & $14.98$ & $2.44$ & $99.42$ \\
+\midrule
+\multicolumn{7}{l}{\emph{Conformal FDR Positive Selection (\texttt{CfBH}) vs.\ Unverified Mondrian $\{1\}$ ($\alpha=0.20$)}} \\
+Contract Target $\text{FDR} = 1 - q_{\text{target}}$ & $70.0\%$ & $68.0\%$ & $40.0\%$ & $50.0\%$ & $75.0\%$ & $50.0\%$ \\
+Mondrian $\{1\}$ Realized FDP (Recall) & $82.7\%$ ($32.7\%$) & $84.1\%$ ($43.3\%$) & $89.1\%$ ($63.9\%$) & $60.7\%$ ($77.5\%$) & $96.5\%$ ($65.0\%$) & $61.3\%$ ($44.2\%$) \\
+\texttt{CfBH} Stage-1 FDP (Recall, $q=0\%$) & $71.4\%$ ($9.5\%$) & $67.7\%$ ($3.6\%$) & $38.5\%$ ($5.0\%$) & $50.3\%$ ($58.7\%$) & $78.5\%$ ($11.2\%$) & $48.7\%$ ($25.9\%$) \\
+\textbf{\texttt{CfBH} + VOI-20\% FDP (Recall)} & \textbf{$71.0\%$ ($11.8\%$)} & \textbf{$71.4\%$ ($5.6\%$)} & \textbf{$42.6\%$ ($26.7\%$)} & \textbf{$51.1\%$ ($91.3\%$)} & \textbf{$77.5\%$ ($16.4\%$)} & \textbf{$48.5\%$ ($30.6\%$)} \\
+\texttt{CfBH} Full Stage-2 FDP (Recall, $q=100\%$) & $67.4\%$ ($19.6\%$) & $67.9\%$ ($21.2\%$) & $42.1\%$ ($44.7\%$) & $51.1\%$ ($91.3\%$) & $77.5\%$ ($16.4\%$) & $49.3\%$ ($54.2\%$) \\
+\bottomrule
+\multicolumn{7}{l}{$^\dagger$On \texttt{Scania APS}, $92.8\%$ of trucks have $\widehat{\operatorname{VOI}}_{\mathcal{K}}(x) \le c_{\text{query}}$; forcing $q=20\%$ queries zero-VOI trucks, whereas autonomous VOI stops at $7.2\%$.}
+\end{tabular}%
+}
+\end{table}
+
+Figure~\ref{fig:cfbh} and the lower half of Table~\ref{tab:streaming_cfbh} resolve the precision failure of standard class-conditional conformal sets under rarity. Accepting unverified Mondrian $\{1\}$ singletons at $\alpha = 0.20$ yields realized false discovery proportions of $60.7\%\text{--}96.5\%$ across all six cohorts ($89.1\%$ on \texttt{IEEE-CIS} vs.\ $40.0\%$ target FDR; $96.5\%$ on \texttt{NeurIPS BAF} vs.\ $75.0\%$ target FDR). Applying \texttt{CfBH} (Eq.~\eqref{eq:cfbh}) brings realized FDP directly into alignment with $1 - q_{\text{target}}$ across every cohort while demonstrating the power value of selective Stage-2 acquisition: querying just $20\%$ of streaming arrivals via VOI increases certified \texttt{CfBH} recall more than fivefold on \texttt{IEEE-CIS} ($5.0\% \to 26.7\%$), from $58.7\% \to 91.3\%$ on \texttt{Scania APS} (matching $100\%$ Stage-2 recall at one-fifth the query volume), and from $11.2\% \to 16.4\%$ on \texttt{NeurIPS BAF}.
+
+\section{Clinical Case Study: Hospital Discharge Readmission Screening}
+\label{sec:clinical_case}
+
+To examine clinical validity, missingness, cost structure, and demographic fairness in detail, we analyze unplanned $<30$-day hospital readmission screening at the \textbf{hospital discharge landmark} on \texttt{UCI Diabetes 130-US Hospitals} \citep{strack2014impact}. Out of $101{,}766$ raw inpatient encounters, $2{,}423$ encounters ending in inpatient death or hospice discharge (\texttt{discharge\_disposition\_id} $\in \{11, 13, 14, 19, 20, 21\}$, including $43$ carrying a recorded \texttt{<30} code) cannot enter post-discharge transitional-care follow-up and are excluded upfront without inspecting $Y$, leaving $99{,}343$ eligible encounters across $69{,}990$ unique patients ($\pi = 11.39\%$; patient-grouped disjoint four-way splits).
+
+\textbf{Discharge Landmark, Missingness, and Interface Cost Accounting:} Unlike admission-time models that artificially withhold inpatient length of stay, at the moment a discharge summary is signed all $13$ local inpatient ADT and stay-summary fields reside in $X_{\text{base}}$ at zero marginal query cost: \texttt{age}, \texttt{gender}, \texttt{race} ($2.25\%$ missing), \texttt{admission\_type\_id}, \texttt{admission\_source\_id}, \texttt{discharge\_disposition\_id}, \texttt{payer\_code} ($39.66\%$ missing, paired with an explicit missingness indicator), \texttt{weight} documentation indicator ($96.85\%$ missing in raw EHR extract), \texttt{time\_in\_hospital}, \texttt{num\_lab\_procedures}, \texttt{num\_procedures}, \texttt{num\_medications}, and \texttt{number\_diagnoses}. The $M = 16$ candidate Stage-2 channels represent external regional Health Information Exchange (HIE) prior-year utilization queries (\texttt{hie\_prior\_inpatient}, \texttt{hie\_prior\_emergency}, \texttt{hie\_prior\_outpatient}; high fixed HL7/FHIR interface build cost plus per-query network lookup latency), ICD-9 organ-system groupers (\texttt{diag\_1..3}; $0.02\%\text{--}1.43\%$ missing), specialty service (\texttt{medical\_specialty}; $48.94\%$ missing), laboratory interfaces (\texttt{HbA1c}, \texttt{max\_glu\_serum}), and seven class-specific discharge medication-reconciliation feeds. Across $20$ patient-disjoint splits, $15\%$ Neyman discovery consistently isolates \texttt{hie\_prior\_inpatient} (and \texttt{hie\_prior\_emergency} on $2/20$ splits; mean $1.10$ channels vs.\ $16$), avoiding integration of $14+$ low-yield specialty and medication feeds while lifting test AUPRC from $0.1782$ to $0.2214$ and maintaining overall ECE $= 0.0080$ and calibration slope $= 0.968$.
+
+\begin{table}[t]
+\centering
+\caption{Demographic subgroup calibration, discrimination, operating-point sensitivity/false-positive rates (at $\tau^* = 0.111$), and 20-split race-blind sensitivity audit at the hospital discharge landmark on \texttt{UCI Diabetes 130-US} ($99{,}343$ encounters, $69{,}990$ patients, $R=20$ patient-grouped splits).}
+\label{tab:diabetes_fairness}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Subgroup} & \textbf{Prevalence} & \textbf{Base} & \textbf{Stage-2} & \textbf{Stage-2} & \textbf{Calib.} & \textbf{TPR at $\tau^*$} & \textbf{Race-Blind} \\
+ & ($\pi$, $\%$) & \textbf{AUPRC} & \textbf{AUPRC} & \textbf{ECE} & \textbf{Slope} & (\textbf{FPR}, $\%$) & \textbf{Stage-2 AUPRC} \\
+\midrule
+\multicolumn{8}{l}{\emph{Race / Ethnicity Strata}} \\
+Caucasian ($\approx 74.4\%$) & $11.5\%$ & $0.1833$ & $0.2261$ & $0.0074$ & $0.979$ & $61.0\%$ ($38.1\%$) & $0.2267$ \\
+African American ($\approx 19.6\%$) & $11.3\%$ & $0.1639$ & $0.2076$ & $0.0173$ & $0.871$ & $58.5\%$ ($36.5\%$) & $0.2070$ \\
+Hispanic ($\approx 2.0\%$) & $10.5\%$ & $0.2349$ & $0.3050$ & $0.0472$ & $1.333$ & $63.4\%$ ($29.7\%$) & $0.3068$ \\
+Asian ($\approx 0.7\%$) & $12.2\%$ & $0.2841$ & $0.3413$ & $0.0788$ & $1.437$ & $59.0\%$ ($26.5\%$) & $0.3416$ \\
+Other ($\approx 1.5\%$) & $9.4\%$ & $0.1864$ & $0.2042$ & $0.0527$ & $0.976$ & $49.3\%$ ($28.8\%$) & $0.2137$ \\
+Missing Race ($2.25\%$) & $8.5\%$ & $0.1663$ & $0.1846$ & $0.0398$ & $1.093$ & $42.7\%$ ($21.9\%$) & $0.1797$ \\
+\midrule
+\multicolumn{8}{l}{\emph{Sex Strata}} \\
+Female & $11.5\%$ & $0.1830$ & $0.2278$ & $0.0093$ & $0.975$ & $61.2\%$ ($38.2\%$) & $0.2283$ \\
+Male & $11.2\%$ & $0.1745$ & $0.2146$ & $0.0102$ & $0.961$ & $59.0\%$ ($35.6\%$) & $0.2151$ \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-Simulations~3, 4, 6, and 7 make the paper's methodological boundaries explicit: (i) conditioning solely on a compressed scalar baseline score $S(X_{\text{base}})$ fails completely ($0\%$) on pure parity/XOR interactions that full-$[X_{\text{base}}, Z_m]$ offset-anchored GBDTs recover ($100\%$, Sim~3); (ii) conditional discovery is only as strong as the Stage-1 nuisance learner---underfitting $X_{\text{base}}$ causes nonlinear baseline shadows to masquerade as novel signal ($100\%$ false selection, Sim~4); (iii) when the highest-risk Stage-1 pocket already lies safely above the decision threshold with irreducible Stage-2 noise while an intermediate-risk pocket contains resolvable ambiguity, upper-tail and top-risk routing waste queries ($0.8052$ and $0.8017$ AUPRC; net utility $389.4$), whereas \textbf{VOI-$K$} ($0.8674$; net utility $422.3$) and \textbf{Literal $\{0,1\}$} ($0.8671$) recover full Stage-2 performance (Sim~6); and (iv) unweighted Mondrian conformal thresholds lose $17.6$ percentage points of nominal class-0 coverage under post-calibration covariate shift, motivating importance-weighted conformal extensions \citep{barber2023conformal} in non-stationary streams (Sim~7).
+\textbf{Subgroup Fairness, Calibration, and Race-Blind Sensitivity (Table~\ref{tab:diabetes_fairness}):} Across the two largest racial groups (Caucasian and African American, comprising $94\%$ of encounters) and across Female and Male encounters, Stage-2 HIE acquisition delivers parallel AUPRC gains ($+0.0428$ and $+0.0437$), low ECE ($0.0074\text{--}0.0173$), and closely aligned sensitivity at $\tau^*$ ($61.0\%$ vs.\ $58.5\%$; $61.2\%$ vs.\ $59.0\%$). Smaller demographic strata (\texttt{Asian}, \texttt{Hispanic}) exhibit higher calibration-slope variability due to small per-split test denominators, while encounters with unrecorded \texttt{race} ($2.25\%$) have lower recorded readmission prevalence ($8.5\%$) and lower sensitivity ($42.7\%$), reflecting incomplete administrative registration in short-stay transfers and underscoring why missingness indicators require subgroup auditing prior to clinical use. Removing \texttt{race} entirely from $X_{\text{base}}$ (\texttt{UCI\_Diabetes\_RaceBlind}, $20$ splits) leaves overall Stage-1 ($0.1777$ vs.\ $0.1782$) and $15\%$-Neyman Stage-2 ($0.2219$ vs.\ $0.2214$) AUPRC virtually unchanged and preserves African American ($0.2070$) and Caucasian ($0.2267$) discrimination without using race as an input feature.
 
-\section{Discussion, Limitations, and Conclusions}
+\section{Discussion and Limitations}
+\label{sec:discussion}
 
-Our reconstructed theoretical and empirical analysis reframes imbalanced tabular prediction around budgeted information acquisition while stripping away unsupported universal claims:
+Our theoretical and empirical results clarify how budgeted two-phase discovery and streaming selective acquisition interact under class imbalance:
 \begin{enumerate}
-  \item \textbf{Stabilized Baselines Before Resampling:} Across 10 fixed-table benchmarks, once leaf Newton steps are bounded (\texttt{max\_delta\_step}$=1.0$) and probabilities are Platt-calibrated on natural prevalence, standard resampling and undersampled ensembles yield zero statistically detectable AUPRC improvements and widen calibration error unless recalibrated. On small cohorts ($n_+ \le 12$), reporting exact Wilson $95\%$ sensitivity intervals prevents mistaking Binomial sampling noise for algorithmic progress.
-  \item \textbf{Stratified-Pilot Conditional Discovery + Simple Downstream Models:} Evaluating candidate channels on a known-probability baseline-stratified case-cohort pilot via Horvitz--Thompson offset-anchored conditional log-likelihood gain $\hat{G}_m$ cuts pilot channel accesses by $44\%$--$98\%$, matches full-cohort conditional selection within $0.0009$ AUPRC on $8/9$ cohorts, immunizes multi-table discovery against baseline echoes ($0\%$ vs.\ $30\%$--$50\%$ false proxy selection), and achieves nearly all downstream predictive gains with a single calibrated GBDT.
-  \item \textbf{When Conformal Routing Helps---and When Simple Risk or VOI Routing Is Better:} Under low prevalence, positive conformal singletons $\{1\}$ routinely suffer low PPV ($3.8\%$--$38.8\%$), explaining why querying upper-tail candidates achieves higher mean AUPRC than literal $\{0,1\}$ ambiguity routing across $9/9$ cohorts (Holm $p \le 0.005$ on $5/9$). When Stage-1 risk rarely exceeds $q_{\text{target}}$, however, upper-tail conformal routing reduces to Top-Risk-$K$ ordering with conformal budget sizing; and when top-risk pockets carry low expected loss reduction relative to mid-risk pockets, decision-focused VOI-$K$ routing is strictly preferable.
+  \item \textbf{When Two-Phase Pilot Discovery Suffices---and When Sample Size Binds:} Across $M=15\text{--}26$ candidate channels, constrained Neyman stratification concentrates Phase-2 measurements in high-dispersion $(Y, \text{score\_bin})$ cells, outperforming simple random pilots by up to $+0.0689$ AUPRC under rarity and eliminating pure-noise, echo, and Stage-2 twin waste via sequential forward conditioning and Holm LCB stopping ($0.0\%$ across $120$ stress splits). At the same time, under extreme rarity ($\pi \approx 1\%$, \texttt{NeurIPS BAF}), Holm stopping on a $15\%$ pilot conservatively halts before weak tertiary channels pass significance, trading $-0.0121$ AUPRC against $85\%$ access savings while preserving full Net Benefit.
+  \item \textbf{Finite-Sample CV Variance and Pure Interaction Boundaries:} As demonstrated in Simulation A, plug-in two-phase SEs underestimate full Monte Carlo variability on non-null GBDT gains due to $K$-fold training overlap \citep{bates2024crossvalidation}; nested cross-validation or split-sample pilots offer a principled, albeit more compute-intensive, extension when exact non-null interval coverage is required. Moreover, greedy forward stepwise discovery cannot detect pure higher-order XOR interactions among Stage-2 channels whose individual conditional gains given $X_{\text{base}}$ are identically zero ($I(Y; Z_1 \mid X_{\text{base}}) = I(Y; Z_2 \mid X_{\text{base}}) = 0$ while $I(Y; Z_1, Z_2 \mid X_{\text{base}}) > 0$), motivating grouped domain blocks when synergistic pairs are anticipated.
+  \item \textbf{Retrospective Feature-Masking Simulation vs.\ Prospective Deployment:} Following standard active feature acquisition methodology \citep{saartsechansky2009active,shim2018joint,vonkleist2025evaluation}, our multi-channel benchmarks simulate selective channel retrieval on retrospective observational cohorts (and one privacy-preserving CTGAN bank benchmark, \texttt{NeurIPS BAF}; \citealp{jesus2022turning}). Prospective clinical or operational deployment requires live interface latency measurement, drift recalibration \citep{barber2023conformal}, and institutional governance review.
 \end{enumerate}
 
-\textbf{Limitations:} Four limitations bound our conclusions. First, all Stage-2 acquisitions on public cohorts are retrospective masked-column simulations on pre-collected datasets \citep{vonkleist2025evaluation}; in live clinical workflows, diagnostic ordering patterns can induce missing-not-at-random ascertainment shifts requiring prospective validation. Second, as Simulation~4 demonstrates, $\hat{G}_m$ relies on expressive Stage-1 conditioning and can select nonlinear baseline functions if Stage 1 is misspecified. Third, greedy per-channel ranking $\hat{G}_m/c_m$ can over-select redundant pairs among Stage-2 channels themselves unless sequential conditional updates $\hat{G}_{m \mid \mathcal{S}}$ are computed. Fourth, standard Mondrian conformal thresholds require exchangeability and suffer coverage drift under non-stationarity (Simulation~7), where weighted conformal methods \citep{barber2023conformal} should be adopted.
+\section*{Ethics, Data Availability, and Reproducibility}
 
-\appendix
-\section{Mathematical Proofs}
-\label{app:proofs}
+\textbf{Ethics Statement:} All empirical evaluations analyze publicly available synthetic generators or fully de-identified public benchmark datasets (\texttt{OpenML}, \texttt{UCI Machine Learning Repository}, \texttt{Scania}, \texttt{Home Credit}, \texttt{IEEE-CIS}, and \texttt{NeurIPS BAF}). Under U.S.\ federal regulations ($45\text{ CFR }46.102\text{(e)}$), secondary analysis of publicly available de-identified datasets does not constitute human subjects research and requires no Institutional Review Board approval. All clinical readmission analyses are retrospective methodological evaluations and are not validated for direct patient-care decisions without prospective clinical governance.
 
-\begin{proof}[Proof of Lemma~\ref{lem:prior_shift}]
-Under class-conditional invariance $\tilde{\mathbb{P}}(X_{\text{base}} \in A \mid Y=y) = \mathbb{P}(X_{\text{base}} \in A \mid Y=y)$ for $y \in \{0,1\}$, Bayes' rule gives posterior odds $\tilde{\eta}(x)/[1-\tilde{\eta}(x)] = [\tilde{\pi}/(1-\tilde{\pi})] L(x) = \gamma\, \eta_{\text{base}}(x)/[1-\eta_{\text{base}}(x)]$ with $\gamma = \tilde{\pi}(1-\pi)/[\pi(1-\tilde{\pi})] > 0$, yielding $\tilde{\eta}(x) = \gamma \eta_{\text{base}}(x)/[\gamma \eta_{\text{base}}(x) + 1 - \eta_{\text{base}}(x)]$. Since $d\tilde{\eta}/d\eta_{\text{base}} = \gamma / [\gamma \eta_{\text{base}} + 1 - \eta_{\text{base}}]^2 > 0$ on $(0,1)$, superlevel sets $\{x : \tilde{\eta}(x) > \tilde{\tau}\}$ coincide with $\{x : \eta_{\text{base}}(x) > \tau\}$ for $\tau = g_\gamma^{-1}(\tilde{\tau})$, preserving population ROC and PR curves \citep{elkan2001foundations}. Under natural prevalence $\pi$, $\mathbb{P}(Y=1 \mid \tilde{\eta}(X_{\text{base}})=s) = g_\gamma^{-1}(s) \ne s$ for $\gamma \ne 1$ whenever $s \in (0,1)$. Finally, achieving posterior probability $\ge q_{\text{target}}$ requires posterior log-odds $\ge \operatorname{logit}(q_{\text{target}})$, leaving non-negative log-odds gap $D_q(x) = \max\{0, \operatorname{logit}(q_{\text{target}}) - \operatorname{logit}(\eta_{\text{base}}(x))\}$.
-\end{proof}
+\textbf{Code and Reproducibility Availability:} The complete \texttt{imboreceipt} Python package, two-phase Neyman allocator, sequential conditional discovery engine, streaming VOI / \texttt{CfBH} router, $160$ per-split JSON checkpoints, simulation outputs, and unit tests are openly available under the MIT License at \url{https://github.com/deesatzed/imboreceipt}.
 
-\begin{proof}[Proof of Lemma~\ref{lem:ht_cmi}]
-For part (1), conditioning on $X_{\text{base}}=x$ and using $\mathbb{P}(Y=1 \mid X_{\text{base}}=x) = \eta_{\text{base}}(x)$ yields $\mathbb{E}[\ell(Y, \eta_{\text{base}}(X_{\text{base}})) \mid X_{\text{base}}=x] = -\eta_{\text{base}}(x)\log \eta_{\text{base}}(x) - [1-\eta_{\text{base}}(x)]\log[1-\eta_{\text{base}}(x)] = H(Y \mid X_{\text{base}}=x)$. Conditioning on $(X_{\text{base}}=x, Z_m=z)$ similarly yields $\mathbb{E}[\ell(Y, \eta_m(X_{\text{base}}, Z_m)) \mid X_{\text{base}}=x, Z_m=z] = H(Y \mid X_{\text{base}}=x, Z_m=z)$. Taking expectations over $(X_{\text{base}}, Z_m)$ by the law of iterated expectations gives $\mathbb{E}[g_m(X_{\text{base}}, Z_m, Y)] = H(Y \mid X_{\text{base}}) - H(Y \mid X_{\text{base}}, Z_m) = I(Y; Z_m \mid X_{\text{base}}) \ge 0$, which vanishes if and only if $Y \perp Z_m \mid X_{\text{base}}$ \citep{covert2023learning,gadgil2024estimating}. For part (2), let $I_i \in \{0,1\}$ indicate pilot inclusion given $\mathcal{D}_{\text{train}}$. By construction, $\mathbb{E}[I_i \mid \mathcal{D}_{\text{train}}] = 1$ for $Y_i = 1$ ($w_i = 1$) and $\mathbb{E}[I_i \mid \mathcal{D}_{\text{train}}] = n_{0,b}/N_{0,b} > 0$ for $Y_i = 0$ in stratum $b$ ($w_i = N_{0,b}/n_{0,b}$). Linearity of expectation gives $\mathbb{E}_{\mathcal{P}}[\frac{1}{N}\sum_{i=1}^N I_i w_i \psi_i \mid \mathcal{D}_{\text{train}}] = \frac{1}{N}\sum_{i=1}^N \mathbb{E}[I_i \mid \mathcal{D}_{\text{train}}] w_i \psi_i = \frac{1}{N}\sum_{i=1}^N \psi_i$.
-\end{proof}
-
-\begin{proof}[Proof of Proposition~\ref{prop:singleton}]
-By Bayes' rule on $\mathcal{S}_{\{1\}}$, $\operatorname{PPV}(\mathcal{S}_{\{1\}}) = \pi \gamma_1 / [\pi \gamma_1 + (1-\pi)\gamma_0]$. Since $0 \notin \mathcal{C}_1(x)$ iff $\hat{p}_1(x) > \hat{q}_{1-\alpha_0}^{(0)}$, Mondrian validity on calibration negatives implies $\gamma_0 \le \alpha_0$ in expectation while imposing no lower bound on $\alpha_0 - \gamma_0$; rearranging $\operatorname{PPV}(\mathcal{S}_{\{1\}}) < q_{\text{target}}$ gives $\pi < q_{\text{target}}\gamma_0 / \allowbreak [q_{\text{target}}\gamma_0 + (1-q_{\text{target}})\gamma_1]$. For the $(\alpha,\delta)$ Neyman--Pearson threshold \citep{tong2018neyman}, let $S_1,\dots,S_m \stackrel{\text{i.i.d.}}{\sim} F_0$ be negative calibration scores and let $R(s) = \mathbb{P}_{X \sim F_0}(S(X) > s)$ denote the strict-inequality population false-positive rate. Define $s_\alpha = \inf\{s \in \mathbb{R} : R(s) \le \alpha\}$; by right-continuity of $1 - R(s)$, $R(s_\alpha) \le \alpha$. Under the strict rule $S(X) > S_{(r)}$, the event $\{R(S_{(r)}) > \alpha\}$ implies $S_{(r)} < s_\alpha$, which holds only if at least $r$ of the $m$ negative calibration scores satisfy $S_i < s_\alpha$. Since $\mathbb{P}_{F_0}(S_i < s_\alpha) \le 1 - \alpha$ even under arbitrary point masses (e.g., if $S \equiv 0.20$, then $s_\alpha = 0.20$, $S_{(r)} = 0.20$, and $R(S_{(r)}) = \mathbb{P}(0.20 > 0.20) = 0 \le \alpha$), Binomial tail dominance yields
-\[
-  \mathbb{P}\!\left(R(S_{(r)}) > \alpha\right) \le \sum_{j=r}^{m} \binom{m}{j}(1-\alpha)^j \alpha^{m-j} \le \delta. \qedhere
-\]
-\end{proof}
-
-\section*{Author Contributions}
-
-Conceptualization, methodology, software, validation, formal statistical analysis, investigation, writing---original draft, and writing---review and editing: W.A.S. The author has read and agreed to the published version of the manuscript.
-
-\section*{Funding}
-
-This research received no external grant funding. Computational and agentic research platform access was supported by the Google Antigravity for Science program.
-
-\section*{Institutional Review Board and Informed Consent Statement}
-
-Ethical review and approval and patient informed consent were not required for this study under 45 CFR 46.104(d)(4) because all analyses were conducted exclusively on publicly available, fully de-identified, and anonymized benchmark datasets with zero human subject recruitment, intervention, or private health information access.
-
-\section*{Data and Code Availability}
-
-{\raggedright All source code (\texttt{imboreceipt} Python package), deterministic benchmark runners, unit and counterexample regression test suites (\texttt{31/31} passing tests), SHA-256 split and eligibility manifests, and reconstructed campaign JSON receipts (\texttt{results/reconstructed/}) supporting the findings of this study are publicly available under the MIT License at \url{https://github.com/deesatzed/imboreceipt} and in the accompanying reproducibility archive (\texttt{credo\_reproducibility\_code.zip}). The 19 evaluated benchmark cohorts comprise 18 external public datasets accessible through the UCI Machine Learning Repository (\url{https://archive.ics.uci.edu/dataset/296}, \url{https://archive.ics.uci.edu/dataset/350}, \url{https://archive.ics.uci.edu/dataset/601}), OpenML (\url{https://www.openml.org/d/310}, \url{https://www.openml.org/d/1068}, \url{https://www.openml.org/d/1597}), Kaggle public competition archives (\texttt{Home Credit Default Risk} and \texttt{IEEE-CIS Fraud Detection}), and the NeurIPS Bank Account Fraud archive (\url{https://doi.org/10.48550/arXiv.2211.13358}), plus 1 deterministic synthetic multi-mechanism simulator (\texttt{Gate 0.5}) included in the open-source package.\par}
-
-\section*{Acknowledgments}
-
-Computational and agentic research platform access was supported by the Google Antigravity for Science program.
+\textbf{AI-Assisted Workflows and Author Responsibility:} Portions of the computational workflow---specifically literature cross-checking, Python statistical pipeline implementation, and manuscript drafting---were conducted using \emph{Google Antigravity} powered by \emph{Gemini}. All study design decisions, mathematical proofs, empirical code executions, bibliographic citations, dataset eligibility specifications, and final text were independently reviewed, verified, and approved by the human author, who takes full responsibility for the integrity and accuracy of this work.
 
 \section*{Competing Interests}
 
-The author declares no competing financial or commercial interests.
+The author declares no competing financial or non-financial interests.
+
+\section*{Acknowledgments}
+
+Computational and agentic research platform access was supported in part by the \emph{Google Antigravity for Science} program. We gratefully acknowledge the creators and maintainers of \texttt{scikit-learn} \citep{pedregosa2011scikit}, the \texttt{OpenML} platform \citep{vanschoren2014openml}, \texttt{imbalanced-learn} \citep{lemaitre2017imbalanced}, \texttt{LightGBM} \citep{ke2017lightgbm}, and the public clinical, industrial, and financial benchmark repositories analyzed herein.
+
+\appendix
+
+\section{Mathematical Proofs}
+\label{app:proofs}
+
+\begin{proof}[Proof of Theorem~\ref{thm:two_phase}]
+\emph{Part 1.} Conditional on the Phase-1 $\sigma$-field $\mathcal{F}_{\text{I}}$, strata $\mathcal{U}_1,\dots,\mathcal{U}_H$ and population scores $\{\psi_i\}_{i=1}^N$ are fixed. Within stratum $h$, $\mathcal{P}_h$ is a simple random sample without replacement of size $n_h \ge 2$ from $N_h$ units, so the Phase-2 inclusion indicator $R_i = \mathbb{I}\{i \in \mathcal{P}_h\}$ satisfies $\mathbb{E}_{\text{II}}[R_i \mid \mathcal{F}_{\text{I}}] = n_h/N_h = \pi_i$, $\operatorname{Var}_{\text{II}}(R_i \mid \mathcal{F}_{\text{I}}) = \frac{n_h}{N_h}(1 - \frac{n_h}{N_h})$, and for $i \ne j \in \mathcal{U}_h$, $\operatorname{Cov}_{\text{II}}(R_i, R_j \mid \mathcal{F}_{\text{I}}) = -\frac{n_h(N_h - n_h)}{N_h^2(N_h - 1)}$ \citep{horvitz1952generalization}. Hence $\mathbb{E}_{\text{II}}[\hat{G} \mid \mathcal{F}_{\text{I}}] = N^{-1}\sum_{h=1}^H \sum_{i \in \mathcal{U}_h} (N_h/n_h)\psi_i \mathbb{E}_{\text{II}}[R_i \mid \mathcal{F}_{\text{I}}] = N^{-1}\sum_{i=1}^N \psi_i = \bar{\psi}_N$. By independence of Phase-2 sampling across distinct strata, standard finite-population algebra yields $\operatorname{Var}_{\text{II}}(\hat{G} \mid \mathcal{F}_{\text{I}}) = N^{-2}\sum_{h=1}^H N_h^2 (1 - n_h/N_h) S_{h,\text{I}}^2 / n_h$ \citep{lumley2010complex}, and the law of total variance $\operatorname{Var}(\hat{G}) = \operatorname{Var}_{\text{I}}(\mathbb{E}_{\text{II}}[\hat{G} \mid \mathcal{F}_{\text{I}}]) + \mathbb{E}_{\text{I}}[\operatorname{Var}_{\text{II}}(\hat{G} \mid \mathcal{F}_{\text{I}})]$ gives Eq.~\eqref{eq:var_decomp}. Moreover, within each stratum $\mathbb{E}_{\text{II}}[s_h^2 \mid \mathcal{F}_{\text{I}}] = S_{h,\text{I}}^2$, so $\mathbb{E}_{\text{II}}[\widehat{V}_{\text{II}} \mid \mathcal{F}_{\text{I}}] = \operatorname{Var}_{\text{II}}(\hat{G} \mid \mathcal{F}_{\text{I}})$ exactly. For $\widehat{V}_{\text{I}}$ under cluster partition $\{g\}_{g=1}^C$, $\operatorname{Var}_{\text{I}}(\bar{\psi}_N) = N^{-2}\sum_{g=1}^C \mathbb{E}_{\text{I}}[(\sum_{i \in g}(\psi_i - \mu))^2]$; expanding $(\sum_{i \in \mathcal{P}\cap g} w_i r_i)^2 - \sum_{i \in \mathcal{P}\cap g} w_i(w_i - 1)r_i^2 = \sum_{i \in \mathcal{P}\cap g} w_i r_i^2 + \sum_{i \ne j \in \mathcal{P}\cap g} w_i w_j r_i r_j$ matches diagonal inclusion probabilities $\pi_i = w_i^{-1}$ (reducing identically to $\sum_{i \in \mathcal{P}} w_i r_i^2$ when $|g|=1$). Under unclustered SRS ($H=1, n_1=n_{\text{pilot}}, w_i = N/n_{\text{pilot}}$), $\widehat{V}_{\text{I}} = \frac{n_{\text{pilot}}}{n_{\text{pilot}}-1}\frac{(N/n_{\text{pilot}})(n_{\text{pilot}}-1)s^2}{N^2} = \frac{s^2}{N}$ and $\widehat{V}_{\text{II}} = (1 - \frac{n_{\text{pilot}}}{N})\frac{s^2}{n_{\text{pilot}}}$, summing to $\frac{s^2}{n_{\text{pilot}}}$ identically.
+
+\emph{Part 2.} Suppose at step $t$ all remaining affordable channels $m \in \mathcal{A}_t$ belong to $\mathcal{H}_0(\mathcal{S}_{t-1})$, so $Y \perp Z_m \mid W_{t-1}$ and $I(Y; Z_m \mid W_{t-1}) = 0$. By Gibbs' inequality on conditional cross-entropy, for any out-of-fold predictor $\hat{\eta}_{\mathcal{S}_{t-1}\cup\{m\}}^{(-k)}$, $\mathbb{E}[\ell(Y, \hat{\eta}_{\mathcal{S}_{t-1}\cup\{m\}}^{(-k)}(W_{t,m}))] \le \mathbb{E}[\ell(Y, \eta_{\mathcal{S}_{t-1}}^*(W_{t-1}))]$. Under capacity-matched estimation satisfying $\mathbb{E}[\psi_{i,m\mid\mathcal{S}_{t-1}}] = \mu_{m,N} \le 0$ and asymptotic normality $(\hat{G}_{m\mid\mathcal{S}_{t-1}} - \mu_{m,N})/\widehat{\text{SE}}_{m\mid\mathcal{S}_{t-1}} \leadsto \mathcal{N}(0,1)$ with $\widehat{\text{SE}}_{m\mid\mathcal{S}_{t-1}}^2 \ge \varepsilon_{n_{\text{pilot}}} > 0$ \citep{williamson2021nonparametric}, each $Z$-statistic satisfies $\hat{G}_{m\mid\mathcal{S}_{t-1}}/\widehat{\text{SE}}_{m\mid\mathcal{S}_{t-1}} \le (\hat{G}_{m\mid\mathcal{S}_{t-1}} - \mu_{m,N})/\widehat{\text{SE}}_{m\mid\mathcal{S}_{t-1}}$, so $p_m^{(t)}$ is asymptotically super-uniform on $[0,1]$. Let $m^* = \arg\min_{m \in \mathcal{A}_t} p_m^{(t)}$. Holm's step-down procedure rejects at least one $m \in \mathcal{A}_t$ if and only if $|\mathcal{A}_t|\, p_{m^*}^{(t)} < \alpha$. By Boole's inequality, $\limsup_{N\to\infty}\mathbb{P}(\min_{m \in \mathcal{A}_t} p_m^{(t)} < \alpha / |\mathcal{A}_t|) \le \sum_{m \in \mathcal{A}_t} \limsup_{N\to\infty}\mathbb{P}(p_m^{(t)} < \alpha / |\mathcal{A}_t|) \le |\mathcal{A}_t|(\alpha / |\mathcal{A}_t|) = \alpha$, whereupon selection halts immediately.
+\end{proof}
+
+\begin{proof}[Proof of Proposition~\ref{prop:neyman_twins}]
+\emph{Part 1.} Rewriting $\sum_{h=1}^H N_h^2(1 - n_h/N_h)\sigma_h^2 / n_h = \sum_{h=1}^H \frac{N_h^2 \sigma_h^2}{n_h} - \sum_{h=1}^H N_h \sigma_h^2$, the second sum is constant with respect to $n_h$. Since $f_h(n_h) = N_h^2 \sigma_h^2 / n_h$ is strictly convex on $[\ell_h, N_h]$ whenever $N_h \sigma_h > 0$, the Karush--Kuhn--Tucker conditions with simplex multiplier $\lambda^{-2} > 0$ and box multipliers yield $n_h^* = \min(N_h, \max(\ell_h, \lambda N_h \sigma_h))$. Because $g(\lambda) = \sum_{h=1}^H \min(N_h, \max(\ell_h, \lambda N_h \sigma_h))$ is continuous, piecewise linear, and strictly increasing on $\{\lambda : \sum_h \ell_h < g(\lambda) < N\}$, clamping violated box constraints in at most $H$ iterations finds the unique global optimum. Under SRS, expected stratum sample sizes are $\bar{n}_h = n_{\text{pilot}} N_h / N$ and between-stratum score variance enters $(1 - f)S_{\text{total}}^2 / n_{\text{pilot}}$, both strictly dominated when $\sigma_h$ or stratum means vary.
+
+\emph{Part 2.} Let $Z_2 = Z_1 + \varepsilon$ with $\varepsilon \perp (X_{\text{base}}, Z_1, Z_3, Y)$ and $\operatorname{Var}(\varepsilon) = \delta^2$, and assume smooth bounded conditional log-likelihood derivatives. By the data-processing inequality and Gaussian noise continuity, $G_2^* = I(Y; Z_1 + \varepsilon \mid X_{\text{base}}) = G_1^* - O(\delta^2) > G_3^*$ for sufficiently small $\delta > 0$, so ranking $\{G_m^*\}_{m=1}^3$ selects $\{Z_1, Z_2\}$ under $B=2$. For LOCO, $\Delta\ell_{\text{LOCO}}(Z_1) = I(Y; Z_1 \mid X_{\text{base}}, Z_2, Z_3)$. Conditional on $Z_2 = Z_1 + \varepsilon$ with $\operatorname{Var}(Z_1) = \sigma_1^2$, $\operatorname{Var}(Z_1 \mid Z_2) = \frac{\sigma_1^2 \delta^2}{\sigma_1^2 + \delta^2} = O(\delta^2)$, so second-order Taylor expansion of conditional entropy around $Z_1 = \mathbb{E}[Z_1 \mid Z_2]$ gives $I(Y; Z_1 \mid X_{\text{base}}, Z_2, Z_3) = O(\delta^2) \to 0$, and symmetrically $\Delta\ell_{\text{LOCO}}(Z_2) = O(\delta^2) \to 0 < \Delta\ell_{\text{LOCO}}(Z_3) = G_3^*$. Under Sequential Forward CMI, Step 1 selects $m_1 = 1$ ($G_1^* > G_2^* > G_3^*$). At Step 2, $G_{2 \mid \{1\}}^* = I(Y; Z_1 + \varepsilon \mid X_{\text{base}}, Z_1) = I(Y; \varepsilon \mid X_{\text{base}}, Z_1) = 0$, whereas $G_{3 \mid \{1\}}^* = I(Y; Z_3 \mid X_{\text{base}}, Z_1) \ge G_3^* > 0$ whenever $Z_3 \perp Z_1 \mid X_{\text{base}}$, selecting $\{Z_1, Z_3\}$.
+\end{proof}
+
+\section{Fine-Grained Multi-Channel Cohort Schema Dictionary}
+\label{app:schemas}
+
+Table~\ref{tab:schema_dict} documents the exact baseline tables $X_{\text{base}}$, candidate Stage-2 channel pools ($M=15\text{--}26$ native channels; $+10$ stress channels in augmented pools), splitting protocols, and operational decision contracts across all six cohorts implemented in \path{src/imboreceipt/bench/fine_grained_cohorts.py}.
+
+\begin{table}[h!]
+\centering
+\caption{Summary of baseline feature schemas $X_{\text{base}}$, fine-grained Stage-2 candidate channel pools ($M=15\text{--}26$), leak-free split constraints, and operational contracts.}
+\label{tab:schema_dict}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l>{\raggedright\arraybackslash}p{4.5cm}>{\raggedright\arraybackslash}p{6.6cm}ll}
+\toprule
+\textbf{Cohort} & \textbf{Baseline Table} $X_{\text{base}}$ & \textbf{Stage-2 Candidate Pool ($M$ Native Channels)} & \textbf{Split Type} & \textbf{Contract} \\
+\midrule
+\texttt{UCI Diabetes} ($N=99{,}343$) & $13$ discharge-landmark local stay fields: age, sex, race, adm.\ type/source, disposition, payer (+miss.\ flag), weight flag, LOS, lab, proc, med, and dx counts. & $M=16$: 3 external HIE utilization feeds (prior inpatient, ED, outpatient; $c=1.1\text{--}1.2$), 3 ICD-9 organ-system groupers, specialty, HbA1c, glucose, 7 drug-class feeds ($c=0.8\text{--}1.0$). & Patient-grouped disjoint & $C_{\text{FN}}/C_{\text{FP}}=8$, $q_{\text{target}}=0.30$, $c_q=0.05$, $B=4.5$ \\
+\addlinespace[2pt]
+\texttt{Home Credit} ($N=140\text{k}$) & $18$ borrower-submitted application fields: income, loan/annuity/goods amt, age, employment/reg/ID tenure, contract, gender, car, realty, housing, education, family. & $M=26$: 3 external score APIs (\texttt{EXT\_SOURCE\_1..3}), 4 \texttt{bureau} \& \texttt{bureau\_balance} feeds, 3 \texttt{previous\_application}, 3 \texttt{POS\_CASH}, 3 \texttt{installments}, 3 \texttt{credit\_card}, 7 property/geo/KYC blocks ($20.8\text{M}$ child rows). & Stratified 4-way & $C_{\text{FN}}/C_{\text{FP}}=12$, $q_{\text{target}}=0.32$, $c_q=0.04$, $B=5.0$ \\
+\addlinespace[2pt]
+\texttt{IEEE-CIS} ($590{,}540$ txns) & $11$ payment header fields: \texttt{TransactionAmt}, \texttt{ProductCD}, \texttt{card1..6}, \texttt{addr1..2}, \texttt{P\_emaildomain}. & $M=25$: 4 entity link-count blocks (\texttt{C1..14}), 3 velocity delta blocks (\texttt{D1..15}), AVS rules, geo/recipient routing, 10 Vesta risk blocks (\texttt{V1..339}), 6 Identity device/IP/OS tables. & Forward chrono.\ + expanding OOF & $C_{\text{FN}}/C_{\text{FP}}=25$, $q_{\text{target}}=0.60$, $c_q=0.04$, $B=5.0$ \\
+\addlinespace[2pt]
+\texttt{Scania APS} ($N=76{,}000$) & $5$ primary counters: odometer/load (\texttt{aa\_000..ad\_000}) + missing-sensor count. & $M=22$: 7 10-bin operating-range histogram subsystems (\texttt{ag}, \texttt{ay}, \texttt{az}, \texttt{ba}, \texttt{cn}, \texttt{cs}, \texttt{ee}) + 15 diagnostic telemetry counter modules ($170$ total sensors). & Stratified 4-way & $C_{\text{FN}}/C_{\text{FP}}=50$, $q_{\text{target}}=0.50$, $c_q=0.08$, $B=4.0$ \\
+\addlinespace[2pt]
+\texttt{NeurIPS BAF} ($1{,}000{,}000$) & $9$ onboarding form fields: income, age, credit limit, intended balance, days since req., employment, housing, payment type, source. & $M=18$: credit bureau score, other cards, bank/prev/curr address tenure, 3 consortium velocity streams (6h/24h/4w), zip/branch density, DOB-email graph, lexical/free email, home/mobile phone, session, 2 device APIs. & Forward chrono.\ + expanding OOF & $C_{\text{FN}}/C_{\text{FP}}=30$, $q_{\text{target}}=0.25$, $c_q=0.03$, $B=4.5$ \\
+\addlinespace[2pt]
+\texttt{UCI Taiwan} ($N=30{,}000$) & $8$ baseline fields: credit limit, sex, education, marriage, age, plus oldest month-6 repayment/bill/payment snapshot. & $M=15$: 5 subsequent monthly repayment-status ledgers ($m_5..m_1$), 5 monthly statement-bill ledgers, and 5 monthly cash-payment ledgers. & Stratified 4-way & $C_{\text{FN}}/C_{\text{FP}}=5$, $q_{\text{target}}=0.50$, $c_q=0.03$, $B=3.5$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\section{Fixed-Table Resampling, Step Stabilization, Calibration, and TOST Equivalence Supplement}
+\label{app:fixed_table}
+
+To verify empirically that modifying class proportions on a fixed baseline table $X_{\text{base}}$ neither substitutes for Stage-2 channel discovery nor outperforms stabilized, calibrated gradient boosting, Table~\ref{tab:fixed_table_supp} evaluates 10 canonical OpenML/\texttt{imbalanced-learn} datasets across $R = 20$ four-way splits ($200$ total runs). To ensure hyperparameter parity, \texttt{SMOTE} is tuned on $\mathcal{D}_{\text{val}}$ over $k \in \{3, 5\}$ and minority-to-majority sampling ratios $\{0.25, 0.50, 1.0\}$ and Platt-calibrated on natural-prevalence $\mathcal{D}_{\text{cal}}$ alongside \texttt{ADASYN}, Gaussian copula synthesis, \texttt{EasyEnsemble}, and \texttt{RUSBoost}, plus an explicit ablation turning Newton leaf clipping (\texttt{max\_delta\_step}$=1.0$) off (\texttt{Unclipped Cal.\ GBDT}).
+
+\begin{table}[h!]
+\centering
+\caption{Fixed-table resampling, \texttt{max\_delta\_step} ablation, calibration, and Schuirmann TOST equivalence across 10 public imbalanced benchmarks ($R=20$ four-way splits per dataset, $df=19$). $\Delta_{\text{SMOTE}}$ reports \texttt{HPO-Tuned Cal.\ SMOTE} minus \texttt{Stabilized Cal.\ GBDT} AUPRC with $90\%$ Nadeau--Bengio CIs.}
+\label{tab:fixed_table_supp}
+\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Dataset} ($N$, $\pi$) & \textbf{Stabilized} & \textbf{Unclipped} & \textbf{Stab.\ ECE} & \textbf{Uncal.\ SMOTE} & \textbf{HPO-Tuned} & $\mathbf{\Delta}_{\text{SMOTE}}$ \textbf{AUPRC} & \textbf{TOST} $p_{\text{eq}}$ \\
+ & \textbf{Cal.\ GBDT} & \textbf{Cal.\ GBDT} & (\textbf{Slope}) & \textbf{ECE} & \textbf{Cal.\ SMOTE} & ($90\%$ NB CI) & ($\pm 0.025$) \\
+\midrule
+Mammography ($11{,}183$, $2.32\%$) & $0.7355$ & $0.7250$ & $0.0045$ ($1.05$) & $0.0248$ & $0.7329$ & $-0.0026$ ($[-0.030, +0.025]$) & $0.0876$ \\
+COIL 2000 ($9{,}822$, $5.97\%$) & $0.1576$ & $0.1581$ & $0.0179$ ($1.00$) & $0.0313$ & $0.1645$ & $+0.0070$ ($[-0.008, +0.022]$) & $\mathbf{0.0237}$ \\
+Satimage ($6{,}435$, $9.73\%$) & $0.7684$ & $0.7683$ & $0.0162$ ($1.04$) & $0.0234$ & $0.7691$ & $+0.0007$ ($[-0.012, +0.013]$) & $\mathbf{0.0017}$ \\
+Thyroid Sick ($3{,}772$, $6.12\%$) & $0.9462$ & $0.9481$ & $0.0091$ ($1.10$) & $0.0117$ & $0.9461$ & $-0.0001$ ($[-0.018, +0.017]$) & $\mathbf{0.0118}$ \\
+Ozone Level ($2{,}536$, $2.88\%$) & $0.3469$ & $0.3581$ & $0.0164$ ($0.97$) & $0.0327$ & $0.3448$ & $-0.0022$ ($[-0.073, +0.069]$) & $0.2924$ \\
+PC1 Defects ($1{,}109$, $6.94\%$) & $0.4436$ & $0.4403$ & $0.0492$ ($1.11$) & $0.0642$ & $0.4534$ & $+0.0098$ ($[-0.050, +0.069]$) & $0.3319$ \\
+Yeast ME2 ($1{,}484$, $3.44\%$) & $0.4315$ & $0.4242$ & $0.0214$ ($1.01$) & $0.0439$ & $0.4447$ & $+0.0132$ ($[-0.052, +0.079]$) & $0.3799$ \\
+Abalone 19 ($4{,}177$, $0.77\%$) & $0.0902$ & $0.0887$ & $0.0078$ ($0.66$) & $0.0306$ & $0.0600$ & $-0.0302$ ($[-0.091, +0.030]$) & $0.5581$ \\
+Webpage ($34{,}780$, $2.82\%$) & $0.7757$ & $0.7824$ & $0.0030$ ($1.03$) & $0.0070$ & $0.7587$ & $-0.0170$ ($[-0.035, +0.001]$) & $0.2310$ \\
+KDD Protein ($145{,}751$, $0.89\%$) & $0.8970$ & $0.9007$ & $0.0005$ ($1.02$) & $0.0088$ & $0.8902$ & $-0.0068$ ($[-0.014, +0.000]$) & $\mathbf{0.0001}$ \\
+\midrule
+\multicolumn{6}{l}{\textbf{DerSimonian--Laird Random-Effects Meta-Analysis Across All 10 Benchmarks} ($I^2 = 0.0\%$, $\tau^2 = 0.0$)} & $\mathbf{-0.0040}$ ($95\%$ CI $[-0.0097, +0.0017]$) & $p_2 = 0.165$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Across all 10 benchmarks, no resampling family (\texttt{SMOTE}, \texttt{ADASYN}, \texttt{Copula}, \texttt{EasyEnsemble}, or \texttt{RUSBoost}) achieves a statistically significant AUPRC gain over stabilized calibrated LightGBM (separate per-family Holm-adjusted $p = 1.00$ across all five families). Where minority test denominators are large enough to resolve small differences (\texttt{COIL 2000}, \texttt{Satimage}, \texttt{Thyroid Sick}, \texttt{KDD Protein}), Schuirmann TOST formally establishes equivalence within $\pm 0.025$ AUPRC ($p_{\text{eq}} \le 0.0237$), whereas small-sample benchmarks (\texttt{Ozone}, \texttt{PC1}, \texttt{Yeast ME2}, \texttt{Abalone 19}; $n_{+,\text{test}} = 5\text{--}15$) exhibit wide $\pm 0.05\text{--}0.09$ confidence intervals due to test-set binomial variance rather than algorithmic gains. Pooling all 10 datasets via DerSimonian--Laird random-effects meta-analysis bounds the mean effect of HPO-tuned calibrated SMOTE to $-0.0040$ AUPRC ($95\%$ CI $[-0.0097, +0.0017]$), while uncalibrated SMOTE inflates ECE twofold to seventeenfold (e.g., $0.0005 \to 0.0088$ on \texttt{KDD Protein}; $0.0045 \to 0.0248$ on \texttt{Mammography}) until natural-prevalence Platt calibration is applied \citep{vancalster2019calibration,vandengoorbergh2022harm}.
 
 \bibliographystyle{plainnat}
 \bibliography{references}
