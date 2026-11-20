@@ -31,9 +31,10 @@
 \title{\textbf{Two-Phase Stratified Pilot Discovery and Streaming Selective Feature Acquisition for Cost-Constrained Prediction}}
 
 \author{
-  Wayne A. Satz, MD\\
+  Wayne A. Satz, MD$^*$\\
   \small Department of Emergency Medicine, Lewis Katz School of Medicine at Temple University,\\
-  \small Philadelphia, PA, USA \quad (\texttt{satzwa@temple.edu})
+  \small Philadelphia, PA 19140, USA\\
+  \small $^*$Correspondence: \texttt{satzwa@temple.edu}
 }
 
 \date{November 2026}
@@ -255,7 +256,7 @@ Four empirical patterns stand out in Table~\ref{tab:native_discovery}:
 \subsection{Augmented Stress Pools: Pure-Noise Nulls, Stage-2 Twins, and Baseline Echoes}
 \label{sec:res_stress}
 
-To test vulnerability to noise and inter-channel collinearity on real covariates, Table~\ref{tab:stress_pool} and Figure~\ref{fig:discovery}B augment each cohort's native candidate pool with 10 controlled stress channels ($M = 25\text{--}36$ total): 4 independent Gaussian pure-noise channels, 3 Stage-2 redundant twins ($Z_m' = Z_m + \varepsilon$, $\sigma_\varepsilon = 0.08\,\text{SD}(Z_m)$) cloned from informative Stage-2 channels, and 3 baseline echoes constructed from $X_{\text{base}}$.
+To test vulnerability to noise and inter-channel collinearity on real covariates, Table~\ref{tab:stress_pool} and Figure~\ref{fig:discovery}B augment each cohort's native candidate pool with 10 controlled stress channels ($M = 25\text{--}36$ total): 4 independent Gaussian pure-noise channels, 3 Stage-2 redundant twins ($Z_m' = Z_m + \varepsilon$, $\sigma_\varepsilon = 0.35\,\text{SD}(Z_m)$, correlation $\approx 0.94$) cloned from informative Stage-2 channels, and 3 baseline echoes constructed from $X_{\text{base}}$.
 
 \begin{table}[t]
 \centering
@@ -395,21 +396,33 @@ Our theoretical and empirical results clarify how budgeted two-phase discovery a
   \item \textbf{Retrospective Feature-Masking Simulation vs.\ Prospective Deployment:} Following standard active feature acquisition methodology \citep{saartsechansky2009active,shim2018joint,vonkleist2025evaluation}, our multi-channel benchmarks simulate selective channel retrieval on retrospective observational cohorts (and one privacy-preserving CTGAN bank benchmark, \texttt{NeurIPS BAF}; \citealp{jesus2022turning}). Prospective clinical or operational deployment requires live interface latency measurement, drift recalibration \citep{barber2023conformal}, and institutional governance review.
 \end{enumerate}
 
-\section*{Ethics, Data Availability, and Reproducibility}
+\section*{Author Contributions}
 
-\textbf{Ethics Statement:} All empirical evaluations analyze publicly available synthetic generators or fully de-identified public benchmark datasets (\texttt{OpenML}, \texttt{UCI Machine Learning Repository}, \texttt{Scania}, \texttt{Home Credit}, \texttt{IEEE-CIS}, and \texttt{NeurIPS BAF}). Under U.S.\ federal regulations ($45\text{ CFR }46.102\text{(e)}$), secondary analysis of publicly available de-identified datasets does not constitute human subjects research and requires no Institutional Review Board approval. All clinical readmission analyses are retrospective methodological evaluations and are not validated for direct patient-care decisions without prospective clinical governance.
+Conceptualization, methodology, software, validation, formal statistical analysis, investigation, data curation, writing---original draft, and writing---review and editing: W.A.S. The author has read and agreed to the published version of the manuscript.
 
-\textbf{Code and Reproducibility Availability:} The complete \texttt{imboreceipt} Python package, two-phase Neyman allocator, sequential conditional discovery engine, streaming VOI / \texttt{CfBH} router, $160$ per-split JSON checkpoints, simulation outputs, and unit tests are openly available under the MIT License at \url{https://github.com/deesatzed/imboreceipt}.
+\section*{Funding}
 
-\textbf{AI-Assisted Workflows and Author Responsibility:} Portions of the computational workflow---specifically literature cross-checking, Python statistical pipeline implementation, and manuscript drafting---were conducted using \emph{Google Antigravity} powered by \emph{Gemini}. All study design decisions, mathematical proofs, empirical code executions, bibliographic citations, dataset eligibility specifications, and final text were independently reviewed, verified, and approved by the human author, who takes full responsibility for the integrity and accuracy of this work.
+This research received no external grant funding. Computational and agentic research platform access was supported in part by the \emph{Google Antigravity for Science} program.
 
-\section*{Competing Interests}
+\section*{Institutional Review Board and Informed Consent Statement}
 
-The author declares no competing financial or non-financial interests.
+Ethical review and approval and patient informed consent were not applicable because all empirical evaluations analyze synthetic generators or publicly available, fully de-identified benchmark datasets (\texttt{OpenML}, \texttt{UCI Machine Learning Repository}, \texttt{Scania}, \texttt{Home Credit}, \texttt{IEEE-CIS}, and \texttt{NeurIPS BAF}). Under U.S.\ federal regulations ($45\text{ CFR }46.102\text{(e)}$), secondary analysis of publicly available de-identified datasets does not constitute human subjects research and requires no Institutional Review Board approval. All clinical readmission analyses are retrospective methodological evaluations and are not validated for direct patient-care decisions without prospective clinical governance.
+
+\section*{Data and Code Availability Statement}
+
+{\raggedright The complete \texttt{imboreceipt} Python package (\texttt{pyproject.toml} and \texttt{requirements.txt}), two-phase Neyman allocator, sequential conditional discovery engine, streaming VOI / \texttt{CfBH} router, $160$ per-split JSON checkpoints, simulation outputs, and unit tests ($37/37$ passing) are openly available under the MIT License at \url{https://github.com/deesatzed/imboreceipt} and in the accompanying supplementary archive (\texttt{credo\_reproducibility\_code.zip}). Public benchmark datasets are accessible via the UCI Machine Learning Repository (\url{https://archive.ics.uci.edu/dataset/296}, \url{https://archive.ics.uci.edu/dataset/350}, \url{https://archive.ics.uci.edu/dataset/421}), OpenML (\url{https://www.openml.org}), and the NeurIPS Bank Account Fraud repository (\url{https://doi.org/10.48550/arXiv.2211.13358}).\par}
+
+\section*{AI-Assisted Workflows Disclosure}
+
+Portions of the computational workflow---specifically literature cross-checking, Python statistical pipeline implementation, and manuscript drafting---were conducted using \emph{Google Antigravity} powered by \emph{Gemini}. All study design decisions, mathematical proofs, empirical code executions, bibliographic citations, dataset eligibility specifications, and final text were independently reviewed, verified, and approved by the human author, who takes full responsibility for the integrity and accuracy of this work.
 
 \section*{Acknowledgments}
 
 Computational and agentic research platform access was supported in part by the \emph{Google Antigravity for Science} program. We gratefully acknowledge the creators and maintainers of \texttt{scikit-learn} \citep{pedregosa2011scikit}, the \texttt{OpenML} platform \citep{vanschoren2014openml}, \texttt{imbalanced-learn} \citep{lemaitre2017imbalanced}, \texttt{LightGBM} \citep{ke2017lightgbm}, and the public clinical, industrial, and financial benchmark repositories analyzed herein.
+
+\section*{Conflicts of Interest}
+
+The author declares no conflicts of interest and no competing financial or non-financial interests.
 
 \appendix
 
@@ -443,7 +456,7 @@ Table~\ref{tab:schema_dict} documents the exact baseline tables $X_{\text{base}}
 \toprule
 \textbf{Cohort} & \textbf{Baseline Table} $X_{\text{base}}$ & \textbf{Stage-2 Candidate Pool ($M$ Native Channels)} & \textbf{Split Type} & \textbf{Contract} \\
 \midrule
-\texttt{UCI Diabetes} ($N=99{,}343$) & $13$ discharge-landmark local stay fields: age, sex, race, adm.\ type/source, disposition, payer (+miss.\ flag), weight flag, LOS, lab, proc, med, and dx counts. & $M=16$: 3 external HIE utilization feeds (prior inpatient, ED, outpatient; $c=1.1\text{--}1.2$), 3 ICD-9 organ-system groupers, specialty, HbA1c, glucose, 7 drug-class feeds ($c=0.8\text{--}1.0$). & Patient-grouped disjoint & $C_{\text{FN}}/C_{\text{FP}}=8$, $q_{\text{target}}=0.30$, $c_q=0.05$, $B=4.5$ \\
+\texttt{UCI Diabetes} ($N=99{,}343$) & $13$ discharge-landmark local stay fields: age, sex, race, adm.\ type/source, disposition, payer (+miss.\ flag), weight flag, LOS, lab, proc, med, and dx counts. & $M=16$: 3 external HIE utilization feeds (prior inpatient, ED, outpatient; $c=1.1\text{--}1.2$), 3 ICD-9 organ-system groupers, specialty, HbA1c, glucose, 7 drug-class feeds ($c=0.8\text{--}1.0$). & Patient-grouped disjoint & $C_{\text{FN}}/C_{\text{FP}}=8$, $q_{\text{target}}=0.30$, $c_q=0.04$, $B=4.5$ \\
 \addlinespace[2pt]
 \texttt{Home Credit} ($N=140\text{k}$) & $18$ borrower-submitted application fields: income, loan/annuity/goods amt, age, employment/reg/ID tenure, contract, gender, car, realty, housing, education, family. & $M=26$: 3 external score APIs (\texttt{EXT\_SOURCE\_1..3}), 4 \texttt{bureau} \& \texttt{bureau\_balance} feeds, 3 \texttt{previous\_application}, 3 \texttt{POS\_CASH}, 3 \texttt{installments}, 3 \texttt{credit\_card}, 7 property/geo/KYC blocks ($20.8\text{M}$ child rows). & Stratified 4-way & $C_{\text{FN}}/C_{\text{FP}}=12$, $q_{\text{target}}=0.32$, $c_q=0.04$, $B=5.0$ \\
 \addlinespace[2pt]

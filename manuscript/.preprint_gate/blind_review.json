@@ -2,26 +2,26 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "Independent cold screening of the 20-page manuscript (main.tex, references.bib, main.pdf, and Figures 1-3) for arXiv passes all hard compliance gates with zero blockers. Only a human author is listed, Google Antigravity/Gemini workflow roles with explicit human verification and Google Antigravity for Science support are transparently disclosed, bibliographic spot-checks confirm zero hallucinated citations, mathematical proofs match stated assumptions with explicit finite-sample CV caveats, and clinical readmission analyses on de-identified public data are properly framed as retrospective methodological benchmarks.",
+  "summary": "The manuscript passes cold screening for both arXiv and Preprints.org submission with zero blocking defects. Authorship, Google Antigravity / Gemini workflow disclosure with explicit human verification, Google Antigravity for Science acknowledgment, 45 CFR 46.102(e) de-identified secondary-data ethics statement, open-source code/data availability, and retrospective clinical claim framing are all complete, accurate, and internally consistent with the compiled PDF, figures, and bibliographic records.",
   "blockers": [],
   "warnings": [
     {
       "id": "W1",
-      "category": "DATABASE_TOOL_ATTRIBUTION",
-      "location": "main.tex:L80,L213,L400,L448-L452",
-      "detail": "Three public benchmark cohorts (Scania APS, Home Credit Default Risk, and IEEE-CIS Fraud Detection) are named in the text, Ethics/Data statement, and Table 6 without dedicated dataset bibliography entries or persistent repository URLs/DOIs in references.bib (unlike UCI Diabetes, UCI Taiwan, NeurIPS BAF, and OpenML)."
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L214-L216, L250, L461-L467",
+      "detail": "Clarify per-split window/subsample sizes in Table 2 and Appendix B: IEEE-CIS (590,540 total rows) and NeurIPS BAF (1,000,000 total rows) evaluate 130k- and 140k-row staggered chronological windows across the full streams, Home Credit (N=140k) is a 140k-row subsample of 307,511 borrowers, and UCI Taiwan has N_train=16.5k alongside the larger cohorts (N_train approx. 54k-77k noted at L250)."
     },
     {
       "id": "W2",
-      "category": "INTERNAL_COHERENCE",
-      "location": "main.tex:L99,L108",
-      "detail": "In Theorem 1 Eq. (3), the cluster count C and cluster partition index g appear in the Phase-1 variance estimator V_I before being explicitly defined in Appendix A (L420); defining C via the Phase-1 cluster identifier G_i inside Theorem 1 would improve self-containedness."
+      "category": "DATABASE_ATTRIBUTION",
+      "location": "main.tex:L411-L413; references.bib",
+      "detail": "Data and Code Availability provides direct URLs/DOIs for UCI datasets (296, 350, 421), OpenML, and NeurIPS BAF, but omits direct Kaggle archive URLs or formal .bib entries for Home Credit Default Risk and IEEE-CIS Fraud Detection, as well as optional citations for the Scania APS dataset paper and foundational Python libraries (NumPy, SciPy, pandas)."
     },
     {
       "id": "W3",
-      "category": "INTERNAL_COHERENCE",
-      "location": "main.tex:L334,L345",
-      "detail": "In Table 4 (Scania APS, Streaming VOI at q=20%, 14.98) and Figure 2 (panel 4), non-strict thresholding R(x) >= gamma_0.20 = 0 across point-mass ties at VOI=0 results in a 100% realized query rate (matching Full Stage-2 = 14.98); noting this tie-induced jump to 100% realized queries in Footnote dagger would clarify the alignment between Table 4 and Figure 2."
+      "category": "AI_ATTRIBUTION",
+      "location": "main.tex:L415-L417",
+      "detail": "AI-Assisted Workflows Disclosure clearly states the role of Google Antigravity powered by Gemini and explicit human verification, but could optionally specify the exact Gemini model version string for finer-grained provenance."
     }
   ],
   "checked_files": [
@@ -33,7 +33,7 @@
     "fig3_conformal_fdr_selection.pdf"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "b49b764affa806337c5acfb1dfe08ce90f7b381a8edc9b3e20b1a6bd89defa07",
+  "manuscript_sha256": "c24cd97a6e64ae0952d59f4dca4527b7b126ff1ddb2928d442c11fe821c82d59",
   "file_count": 7,
-  "recorded_at": "2026-11-19T21:23:13.287269+00:00"
+  "recorded_at": "2026-11-20T01:30:48.138550+00:00"
 }
