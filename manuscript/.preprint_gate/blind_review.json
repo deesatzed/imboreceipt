@@ -2,26 +2,26 @@
   "auditor": "preprint-blind-auditor",
   "target_server": "arxiv",
   "verdict": "PASS",
-  "summary": "The manuscript passes cold screening for both arXiv and Preprints.org submission with zero blocking defects. Authorship, Google Antigravity / Gemini workflow disclosure with explicit human verification, Google Antigravity for Science acknowledgment, 45 CFR 46.102(e) de-identified secondary-data ethics statement, open-source code/data availability, and retrospective clinical claim framing are all complete, accurate, and internally consistent with the compiled PDF, figures, and bibliographic records.",
+  "summary": "Cold blind screening audit of the Version 2 manuscript (/Users/o2satz/antigravity/imboreceipt/manuscript) confirms full compliance for arXiv and Preprints.org submission with zero blockers. Sole human authorship (Wayne A. Satz, MD), explicit Google Antigravity / Gemini workflow disclosure with human verification, Google Antigravity for Science program acknowledgment, 45 CFR 46.102(e) IRB non-applicability framing, absence of unhedged prospective clinical claims, and mathematical/empirical alignment across Theorem 1, Propositions 1-2, Tables 1-7, Figures 1-4, and source/checkpoint artifacts are all verified.",
   "blockers": [],
   "warnings": [
     {
       "id": "W1",
-      "category": "INTERNAL_COHERENCE",
-      "location": "main.tex:L214-L216, L250, L461-L467",
-      "detail": "Clarify per-split window/subsample sizes in Table 2 and Appendix B: IEEE-CIS (590,540 total rows) and NeurIPS BAF (1,000,000 total rows) evaluate 130k- and 140k-row staggered chronological windows across the full streams, Home Credit (N=140k) is a 140k-row subsample of 307,511 borrowers, and UCI Taiwan has N_train=16.5k alongside the larger cohorts (N_train approx. 54k-77k noted at L250)."
+      "category": "DATABASE_TOOL_ATTRIBUTION",
+      "location": "main.tex:L446",
+      "detail": "Scania APS, Home Credit Default Risk, and IEEE-CIS Fraud Detection are attributed via direct UCI/Kaggle URLs in the Data and Code Availability Statement rather than formal BibTeX entries in references.bib (unlike UCI Diabetes, UCI Taiwan, NeurIPS BAF, and OpenML)."
     },
     {
       "id": "W2",
-      "category": "DATABASE_ATTRIBUTION",
-      "location": "main.tex:L411-L413; references.bib",
-      "detail": "Data and Code Availability provides direct URLs/DOIs for UCI datasets (296, 350, 421), OpenML, and NeurIPS BAF, but omits direct Kaggle archive URLs or formal .bib entries for Home Credit Default Risk and IEEE-CIS Fraud Detection, as well as optional citations for the Scania APS dataset paper and foundational Python libraries (NumPy, SciPy, pandas)."
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L271",
+      "detail": "The parenthetical full-cohort training size range 'N_train approx 54k-77k' reflects the four larger cohorts, whereas across all six cohorts under the 55% training split N_train spans 16.5k-77k (including Scania APS at 41.8k and UCI Taiwan at 16.5k)."
     },
     {
       "id": "W3",
-      "category": "AI_ATTRIBUTION",
-      "location": "main.tex:L415-L417",
-      "detail": "AI-Assisted Workflows Disclosure clearly states the role of Google Antigravity powered by Gemini and explicit human verification, but could optionally specify the exact Gemini model version string for finer-grained provenance."
+      "category": "INTERNAL_COHERENCE",
+      "location": "main.tex:L500",
+      "detail": "In Appendix Table 6 (Home Credit), total native channel count M=26 matches the code, but the prose breakdown lists '4 bureau, 3 POS_CASH, 3 installments' whereas fine_grained_cohorts.py defines 5 bureau/inquiry channels, 1 POS_CASH channel, and 4 installments channels (also summing to 26) on a 140k-row subsample of the 307,511-borrower table."
     }
   ],
   "checked_files": [
@@ -30,10 +30,11 @@
     "main.pdf",
     "fig1_discovery_noninferiority_and_stress.pdf",
     "fig2_streaming_budget_curves.pdf",
-    "fig3_conformal_fdr_selection.pdf"
+    "fig3_conformal_fdr_selection.pdf",
+    "fig4_pilot_curve_and_flip_decomposition.pdf"
   ],
   "manuscript_file": null,
-  "manuscript_sha256": "c24cd97a6e64ae0952d59f4dca4527b7b126ff1ddb2928d442c11fe821c82d59",
-  "file_count": 7,
-  "recorded_at": "2026-11-20T01:30:48.138550+00:00"
+  "manuscript_sha256": "30c8331d01526159d2687e69e3fdc222db04c85b2d574b15e4868bafa8851b04",
+  "file_count": 8,
+  "recorded_at": "2026-11-20T17:33:53.242718+00:00"
 }

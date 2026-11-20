@@ -121,7 +121,7 @@
       <div class="btn-row">
         <a class="btn btn-primary" href="https://github.com/deesatzed/imboreceipt/blob/main/manuscript/main.pdf">Read Full Preprint (PDF)</a>
         <a class="btn btn-secondary" href="CHAIRMAN_EXECUTIVE_BRIEF_1PAGE.pdf">1-Page Executive Brief</a>
-        <a class="btn btn-secondary" href="https://github.com/deesatzed/imboreceipt">GitHub Repository (37/37 Tests)</a>
+        <a class="btn btn-secondary" href="https://github.com/deesatzed/imboreceipt">GitHub Repository (41/41 Tests)</a>
       </div>
 
       <div class="kpi-grid">
@@ -157,15 +157,15 @@
           </p>
         </div>
         <div class="card">
-          <h3>2. Sequential &Gcirc;<sub><em>m</em>|<em>S</em></sub> &amp; Two-Phase Variance</h3>
+          <h3>2. Sequential &Gcirc;<sub><em>m</em>|<em>S</em></sub> &amp; Split-Pilot Inference</h3>
           <p>
-            Capacity-matched forward conditional log-likelihood gain with exact two-phase variance <em>V</em><sub>I</sub> + <em>V</em><sub>II</sub> and Holm LCB stopping controls pure-noise null FWER at 2.5% (&le; 5%, <strong>Theorem 1</strong>) while preventing both One-Shot CMI twin duplication and LOCO twin cancellation.
+            Capacity-matched forward conditional log-likelihood gain with exact two-phase variance <em>V</em><sub>I</sub> + <em>V</em><sub>II</sub> and Holm LCB stopping controls pure-noise null FWER at 1.0%&ndash;2.0% (&le; 5%, <strong>Theorem 1</strong>; 98.0% adaptive CI coverage via 50/50 split-pilot) while preventing twin duplication and LOCO cancellation.
           </p>
         </div>
         <div class="card">
-          <h3>3. Streaming VOI &amp; Conformal FDR (CfBH)</h3>
+          <h3>3. Martingale-Centered VOI &amp; CfBH</h3>
           <p>
-            Calibration-only streaming thresholds and autonomous Bayes stopping <span style="white-space: nowrap;">VOI<sub><em>K</em></sub>(<em>x</em>) &gt; <em>c</em><sub>query</sub></span> maximize Vickers&ndash;Elkin Net Benefit (querying just 7.2% of trucks on Scania), while <code>CfBH</code> delivers certified positive selection at target FDR.
+            Mean-preserving logit offsets enforce posterior martingale coherence (<strong>Proposition 2</strong>), beating uncentered VOI on all 6/6 cohorts and beating 100% querying on 4/6 cohorts (e.g. 7.7% queried on Scania), while <code>CfBH</code> delivers certified positive selection at target FDR.
           </p>
         </div>
       </div>
@@ -218,7 +218,13 @@
       <div class="fig-card">
         <img src="assets/fig3_conformal_fdr_selection.png" alt="Conformal FDR Selection vs Mondrian Singletons" />
         <div class="fig-cap">
-          <strong>Figure 3:</strong> (A) Realized False Discovery Proportion (1 &minus; PPV) for unverified Mondrian {1} singletons (&alpha;=0.20) vs. Jin&ndash;Cand&egrave;s <code>CfBH</code>. (B) Certified recall at target FDR across 0%, 20% VOI, and 100% Stage-2 querying.
+          <strong>Figure 3:</strong> (A) Realized False Discovery Proportion (1 &minus; PPV) for unverified Mondrian {1} singletons (&alpha;=0.20) vs. Jin&ndash;Cand&egrave;s <code>CfBH</code>. (B) Certified recall at target FDR across 0%, 20% Tie-Broken Mean-Centered VOI, Autonomous VOI, and 100% Stage-2 querying.
+        </div>
+      </div>
+      <div class="fig-card">
+        <img src="assets/fig4_pilot_curve_and_flip_decomposition.png" alt="Pilot-Fraction Frontiers, Flip Decomposition, and Query-Fee Adaptation" />
+        <div class="fig-cap">
+          <strong>Figure 4:</strong> (A) 5%&ndash;100% Neyman vs. SRS pilot-fraction frontiers (5&times; sample efficiency under rarity). (B) Exact decision-flip Net Benefit decomposition at <em>q</em> = 20%. (C) Autonomous VOI query-rate adaptation across 0.25&times;&ndash;4&times; <em>c</em><sub>query</sub>.
         </div>
       </div>
     </section>
@@ -229,8 +235,9 @@
 cd imboreceipt
 python3 -m venv .venv &amp;&amp; source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q   # 37 passed
-imboreceipt bench-two-phase --out results/two_phase --n-splits 20</pre>
+pytest -q   # 41 passed
+imboreceipt bench-two-phase --out results/two_phase --n-splits 20
+python scripts/run_v2_strengthening_suite.py</pre>
     </section>
 
     <footer>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from scipy.special import expit, logit
 
 from imboreceipt.contract.decision import DecisionContract
 from imboreceipt.core.bootstrap import (
@@ -14,13 +15,17 @@ from imboreceipt.discover.selector import CandidateChannelSpec
 from imboreceipt.discover.two_phase import (
     discover_competitor_method,
     discover_sequential_conditional_gain,
+    evaluate_split_pilot_step1_inference,
     sample_two_phase_pilot,
     two_phase_variance_decomposition,
 )
 from imboreceipt.lattice.streaming_routing import (
     StreamingSelectiveRouter,
+    calibrated_randomized_threshold_masks,
     compute_calibration_summary,
     conformal_fdr_selection,
+    decompose_routing_flips,
+    solve_mean_preserving_logit_offset,
 )
 
 
@@ -205,3 +210,99 @@ def test_competitor_methods_handle_nominal_and_missingness_channels() -> None:
             m_name, X_b, Z_df, y, cands, p0, pilot, max_budget=1.5, seed=66
         )
         assert out.initial_scores["ch_cat"] > out.initial_scores["ch_miss"]
+
+
+def test_proposition2_mean_centered_voi_coherence_and_nonnegativity() -> None:
+    """Verify Proposition 2: mu*(p1, sigma) preserves E[p2|p1]=p1 to 1e-13 and VOI >= 0 pre-clip."""
+    from imboreceipt.lattice.streaming_routing import _GH_NODES, _GH_WEIGHTS
+
+    p1 = np.array([1e-4, 0.005, 0.010, 0.0196, 0.05, 0.20, 0.50, 0.85, 0.995])
+    sig = np.array([0.1, 0.5, 1.0, 1.4, 0.8, 1.2, 2.0, 0.9, 1.5])
+    mu = solve_mean_preserving_logit_offset(p1, sig)
+    probs_grid = expit(logit(p1)[:, None] + mu[:, None] + sig[:, None] * _GH_NODES[None, :])
+    mean_p2 = np.sum(_GH_WEIGHTS[None, :] * probs_grid, axis=1)
+    assert float(np.max(np.abs(mean_p2 - p1))) < 1e-13
+
+    contract = DecisionContract(
+        task_name="ScaniaTest", cost_fp=1.0, cost_fn=50.0, target_precision=0.50
+    )
+    router = StreamingSelectiveRouter(contract, per_instance_query_cost=0.08, mean_centered=True)
+    router.bin_edges_ = np.array([0.0, 1.0])
+    router.bin_logit_sd_ = np.array([1.0])
+    raw_centered = router._compute_raw_voi(p1, 1.0, 50.0, mean_centered=True)
+    raw_uncentered = router._compute_raw_voi(p1, 1.0, 50.0, mean_centered=False)
+    assert float(np.min(raw_centered)) >= -1e-12
+    # At p1=0.010 under Scania 50:1 costs, uncentered VOI is negative (-0.036) while centered > 0
+    assert raw_uncentered[2] < -0.03
+    assert raw_centered[2] > 0.08
+
+
+def test_randomized_tie_breaking_prevents_point_mass_query_explosion() -> None:
+    """Verify randomized tie-breaking hits target q=20% even when 92% of scores are tied at 0.0."""
+    rng = np.random.default_rng(77)
+    n_cal, n_tst = 5000, 5000
+    # 92% exact zeros, 8% positive scores -> non-strict >= quantile(0.80)=0 would query 100%!
+    sc = np.zeros(n_cal)
+    sc[:400] = rng.uniform(0.05, 0.50, 400)
+    rng.shuffle(sc)
+    st = np.zeros(n_tst)
+    st[:400] = rng.uniform(0.05, 0.50, 400)
+    rng.shuffle(st)
+
+    u_c = rng.uniform(0.0, 1.0, n_cal)
+    u_t = rng.uniform(0.0, 1.0, n_tst)
+    m_cal, m_tst, gamma, rho = calibrated_randomized_threshold_masks(sc, st, 0.20, u_c, u_t)
+    assert gamma == 0.0
+    assert 0.12 < rho < 0.14
+    assert abs(float(np.mean(m_cal)) - 0.20) < 0.015
+    assert abs(float(np.mean(m_tst)) - 0.20) < 0.015
+
+
+def test_flip_decomposition_exact_net_benefit_identity() -> None:
+    """Verify NB_net(route) - NB_net(Stage 1) == beneficial - harmful - fee_drag identically."""
+    rng = np.random.default_rng(88)
+    n = 2000
+    p1 = np.clip(rng.beta(1.2, 8.0, n), 1e-4, 0.999)
+    p2 = np.clip(expit(logit(p1) + rng.normal(0.0, 0.9, n)), 1e-4, 0.999)
+    y = rng.binomial(1, p2)
+    q_mask = rng.uniform(0.0, 1.0, n) < 0.25
+    contract = DecisionContract(
+        task_name="Decomp", cost_fp=1.0, cost_fn=12.0, target_precision=0.35
+    )
+    c_q = 0.04
+    decomp = decompose_routing_flips(y, p1, p2, q_mask, contract, c_q)
+
+    tau = 1.0 / 13.0
+    nb_s1 = (1000.0 / n) * (
+        np.sum((y == 1) & (p1 >= tau)) - (1.0 / 12.0) * np.sum((y == 0) & (p1 >= tau))
+    )
+    pr = np.where(q_mask, p2, p1)
+    nb_rt = (1000.0 / n) * (
+        np.sum((y == 1) & (pr >= tau))
+        - (1.0 / 12.0) * np.sum((y == 0) & (pr >= tau))
+        - (c_q / 12.0) * np.sum(q_mask)
+    )
+    assert abs((nb_rt - nb_s1) - decomp.net_nb_delta_vs_stage1_per_1k) < 1e-11
+
+
+def test_split_pilot_step1_inference_runs_and_controls_nulls() -> None:
+    """Verify disjoint split-pilot Step-1 inference produces valid SEs and selects signal."""
+    rng = np.random.default_rng(99)
+    n = 4500
+    x0 = rng.normal(0.0, 1.0, n)
+    z_sig = rng.normal(0.0, 1.0, n)
+    z_nul = rng.normal(0.0, 1.0, n)
+    p0 = 1.0 / (1.0 + np.exp(-(-2.8 + 0.9 * x0)))
+    y = rng.binomial(1, 1.0 / (1.0 + np.exp(-(-2.8 + 0.9 * x0 + 1.2 * z_sig))))
+    Xb = pd.DataFrame({"x0": x0})
+    Zdf = pd.DataFrame({"z_sig": z_sig, "z_nul": z_nul})
+    cands = [
+        CandidateChannelSpec("sig", ("z_sig",), 1.0, "sig"),
+        CandidateChannelSpec("nul", ("z_nul",), 1.0, "null"),
+    ]
+    pil = sample_two_phase_pilot(y, p0, pilot_fraction=0.25, design="neyman", seed=99)
+    out = evaluate_split_pilot_step1_inference(Xb, Zdf, y, cands, p0, pil, seed=99)
+    assert "sig" in out["selected_ids"]
+    assert "nul" not in out["selected_ids"]
+    assert out["ses_total"]["sig"] > 0.0
+

@@ -15,10 +15,15 @@ from imboreceipt.lattice.or_of_ands import (
 from imboreceipt.lattice.streaming_routing import (
     CalibrationSummary,
     ConformalFDRResult,
+    FlipDecomposition,
+    StreamingBudgetPoint,
     StreamingSelectiveRouter,
+    calibrated_randomized_threshold_masks,
     compute_calibration_summary,
     conformal_fdr_selection,
+    decompose_routing_flips,
     precision_at_target_recall,
+    solve_mean_preserving_logit_offset,
 )
 
 __all__ = [
@@ -27,11 +32,16 @@ __all__ = [
     "ConfirmRescueLattice",
     "ConformalFDRResult",
     "ConformalFoveationReport",
+    "FlipDecomposition",
     "MechanismBranch",
+    "StreamingBudgetPoint",
     "StreamingSelectiveRouter",
     "TailCoincidenceReport",
+    "calibrated_randomized_threshold_masks",
     "compute_calibration_summary",
     "conformal_fdr_selection",
+    "decompose_routing_flips",
     "estimate_tail_coincidence_surrogate",
     "precision_at_target_recall",
+    "solve_mean_preserving_logit_offset",
 ]

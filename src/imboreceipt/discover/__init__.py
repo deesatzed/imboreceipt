@@ -30,6 +30,7 @@ from imboreceipt.discover.two_phase import (
     TwoPhasePilot,
     discover_competitor_method,
     discover_sequential_conditional_gain,
+    evaluate_split_pilot_step1_inference,
     sample_two_phase_pilot,
     two_phase_variance_decomposition,
 )
@@ -52,6 +53,7 @@ __all__ = [
     "build_consensus_residual_strata",
     "discover_competitor_method",
     "discover_sequential_conditional_gain",
+    "evaluate_split_pilot_step1_inference",
     "make_leak_free_cv_splits",
     "sample_case_cohort_pilot",
     "sample_two_phase_pilot",

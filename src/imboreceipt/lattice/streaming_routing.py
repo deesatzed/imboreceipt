@@ -2,12 +2,15 @@
 
 Implements:
 1. Real-time streaming threshold routing across full query-rate frontiers q in [0, 1]
-   calibrated strictly on D_cal (no batch test-set argsort and no hard-zero PR truncation).
-2. Decision-contract Bayes Value-of-Information (VOI) loss-reduction routing with an
-   autonomous cost-optimal stopping rule VOI_K(x) > c_query (Saar-Tsechansky et al., 2009;
-   Shim et al., 2018; Li & Oliva, 2021).
-3. Conformal Selection with False Discovery Rate (FDR = 1 - PPV) control via conformal
-   p-values and Benjamini-Hochberg (CfBH; Jin & Candes, 2023).
+   calibrated strictly on D_cal with prespecified calibration-exact randomized tie-breaking
+   (no batch test-set argsort and no hard-zero PR truncation).
+2. Coherent Martingale Mean-Centered Logit-Normal Value-of-Information (VOI) routing
+   (Proposition 2: unique offset mu*(p_1, sigma) solving E[p_2 | p_1] = p_1 on the 9-node
+   Gauss-Hermite measure so pre-clip VOI >= 0 identically), alongside uncentered heuristic
+   VOI diagnostics (E0/E1), flip-level Net Benefit decompositions (E2), and autonomous
+   Bayes stopping VOI_K(x) > c_query.
+3. Conformal Selection with False Discovery Rate (FDR = 1 - PPV) control via smoothed
+   conformal p-values and Benjamini-Hochberg (CfBH; Jin & Candes, 2023).
 4. Clinical & statistical calibration metrics: ECE, calibration slope, calibration-in-the-large,
    Precision at 50% Recall, and Vickers-Elkin Net Benefit net of query cost.
 """
@@ -55,6 +58,20 @@ class ConformalFDRResult:
 
 
 @dataclass(frozen=True, slots=True)
+class FlipDecomposition:
+    """Exact decomposition of Net Benefit change (per 1,000 arrivals) relative to Stage 1 (E2)."""
+
+    beneficial_flip_nb_gain_per_1k: float
+    harmful_flip_nb_loss_per_1k: float
+    query_fee_nb_drag_per_1k: float
+    net_nb_delta_vs_stage1_per_1k: float
+    queried_rate: float
+    decision_flip_rate: float
+    unchanged_queried_rate: float
+    above_tau_unchanged_queried_rate: float
+
+
+@dataclass(frozen=True, slots=True)
 class StreamingBudgetPoint:
     """Evaluation of a streaming routing policy at a single calibration-tuned threshold."""
 
@@ -69,6 +86,129 @@ class StreamingBudgetPoint:
     cal_slope: float
     cfbh_recall: float
     cfbh_realized_fdp: float
+    beneficial_flip_nb_gain_per_1k: float = 0.0
+    harmful_flip_nb_loss_per_1k: float = 0.0
+    query_fee_nb_drag_per_1k: float = 0.0
+    unchanged_queried_rate: float = 0.0
+    above_tau_unchanged_queried_rate: float = 0.0
+
+
+def solve_mean_preserving_logit_offset(p1: np.ndarray, sigma: np.ndarray) -> np.ndarray:
+    """Solve sum_r omega_r expit(logit(p_1) + mu* + sigma * xi_r) = p_1 (Proposition 2).
+
+    Because f(mu) is strictly increasing from 0 to 1 with derivative
+    f'(mu) = sum_r omega_r p_{2,r}(1 - p_{2,r}) > 0, vectorized Newton-Raphson converges
+    quadratically to machine precision (< 1e-14) in 8 iterations across all rows simultaneously.
+    """
+    p = np.clip(np.asarray(p1, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
+    sig = np.maximum(0.0, np.asarray(sigma, dtype=float).ravel())
+    lp = logit(p)
+
+    # Analytic second-order initialization: -0.5 * sig^2 * (1 - 2p) / (1 + 0.35 * sig^2)
+    mu = -0.5 * (sig**2) * (1.0 - 2.0 * p) / (1.0 + 0.35 * (sig**2))
+    zero_sig = sig <= 1e-12
+    if np.all(zero_sig):
+        return np.zeros_like(p)
+
+    nodes = _GH_NODES[None, :]  # (1, 9)
+    weights = _GH_WEIGHTS[None, :]  # (1, 9)
+    base_arg = lp[:, None] + sig[:, None] * nodes  # (N, 9)
+
+    for _ in range(10):
+        probs = expit(base_arg + mu[:, None])
+        f_val = np.sum(weights * probs, axis=1) - p
+        if float(np.max(np.abs(f_val))) < 1e-14:
+            break
+        f_der = np.sum(weights * probs * (1.0 - probs), axis=1)
+        step = np.clip(f_val / np.maximum(1e-14, f_der), -4.0, 4.0)
+        mu = mu - step
+
+    mu[zero_sig] = 0.0
+    return mu
+
+
+def calibrated_randomized_threshold_masks(
+    scores_cal: np.ndarray,
+    scores_test: np.ndarray,
+    target_q: float,
+    u_cal: np.ndarray,
+    u_test: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, float, float]:
+    """Compute prespecified calibration-exact randomized tie-broken query masks.
+
+    Guarantees E_U[mean(mask_cal)] == target_q on D_cal even when scores have point-mass ties
+    (e.g., clipped zeros or discrete GBDT leaf values). Returns (mask_cal, mask_test, gamma_q,
+    tie_prob_at_cutoff).
+    """
+    sc = np.asarray(scores_cal, dtype=float).ravel()
+    st = np.asarray(scores_test, dtype=float).ravel()
+    q = float(np.clip(target_q, 0.0, 1.0))
+    if q <= 0.0:
+        return np.zeros(sc.size, dtype=bool), np.zeros(st.size, dtype=bool), float("inf"), 0.0
+    if q >= 1.0:
+        return np.ones(sc.size, dtype=bool), np.ones(st.size, dtype=bool), float("-inf"), 1.0
+
+    gamma = float(np.quantile(sc, 1.0 - q))
+    frac_gt = float(np.mean(sc > gamma))
+    frac_eq = float(np.mean(sc == gamma))
+    if frac_eq > 0.0:
+        rho_tie = float(np.clip((q - frac_gt) / frac_eq, 0.0, 1.0))
+    else:
+        rho_tie = 0.0
+
+    m_cal = (sc > gamma) | ((sc == gamma) & (u_cal < rho_tie))
+    m_tst = (st > gamma) | ((st == gamma) & (u_test < rho_tie))
+    return m_cal, m_tst, gamma, rho_tie
+
+
+def decompose_routing_flips(
+    y_true: np.ndarray,
+    p1: np.ndarray,
+    p2: np.ndarray,
+    query_mask: np.ndarray,
+    contract: DecisionContract,
+    per_instance_query_cost: float,
+) -> FlipDecomposition:
+    """Decompose Net Benefit delta (route minus Stage 1) into flips and query fees (E2)."""
+    yt = np.asarray(y_true, dtype=int).ravel()
+    q_m = np.asarray(query_mask, dtype=bool).ravel()
+    n_t = max(1.0, float(yt.size))
+    c_fp = float(contract.cost_fp)
+    c_fn = max(1e-9, float(contract.cost_fn))
+    tau_star = c_fp / (c_fp + c_fn)
+
+    p_route = np.where(q_m, p2, p1)
+    a1 = p1 >= tau_star
+    ar = p_route >= tau_star
+
+    # Beneficial flips: (0->1 on Y=1) saves C_FN; (1->0 on Y=0) saves C_FP
+    tp_gained = float(np.sum((~a1) & ar & (yt == 1)))
+    fp_avoided = float(np.sum(a1 & (~ar) & (yt == 0)))
+    ben_nb_1k = (1000.0 / n_t) * (tp_gained + (c_fp / c_fn) * fp_avoided)
+
+    # Harmful flips: (1->0 on Y=1) loses C_FN; (0->1 on Y=0) adds C_FP
+    tp_lost = float(np.sum(a1 & (~ar) & (yt == 1)))
+    fp_added = float(np.sum((~a1) & ar & (yt == 0)))
+    harm_nb_1k = (1000.0 / n_t) * (tp_lost + (c_fp / c_fn) * fp_added)
+
+    n_q = float(np.sum(q_m))
+    fee_drag_1k = (1000.0 / n_t) * (float(per_instance_query_cost) / c_fn) * n_q
+    net_delta_1k = ben_nb_1k - harm_nb_1k - fee_drag_1k
+
+    flips = a1 != ar
+    unchanged_q = q_m & (~flips)
+    above_tau_unchanged_q = q_m & a1 & ar
+
+    return FlipDecomposition(
+        beneficial_flip_nb_gain_per_1k=float(ben_nb_1k),
+        harmful_flip_nb_loss_per_1k=float(harm_nb_1k),
+        query_fee_nb_drag_per_1k=float(fee_drag_1k),
+        net_nb_delta_vs_stage1_per_1k=float(net_delta_1k),
+        queried_rate=float(n_q / n_t),
+        decision_flip_rate=float(np.sum(flips)) / n_t,
+        unchanged_queried_rate=float(np.sum(unchanged_q)) / n_t,
+        above_tau_unchanged_queried_rate=float(np.sum(above_tau_unchanged_q)) / n_t,
+    )
 
 
 def compute_calibration_summary(
@@ -96,7 +236,6 @@ def compute_calibration_summary(
     if np.unique(y).size < 2 or float(np.std(lp)) < 1e-8:
         return CalibrationSummary(ece=float(ece), brier=brier, cal_intercept=0.0, cal_slope=1.0)
 
-    # Calibration-in-the-large: intercept alpha with fixed slope = 1 (offset = lp)
     def _nll_int(a_arr: np.ndarray) -> float:
         eta = a_arr[0] + lp
         return float(np.mean(np.logaddexp(0.0, eta) - y * eta))
@@ -104,7 +243,6 @@ def compute_calibration_summary(
     res_int = minimize(_nll_int, x0=np.array([0.0]), method="BFGS")
     cal_int = float(res_int.x[0]) if res_int.success else 0.0
 
-    # Calibration slope: logistic regression of y on logit(p) without regularization
     def _nll_slope(ab: np.ndarray) -> float:
         eta = ab[0] + ab[1] * lp
         return float(np.mean(np.logaddexp(0.0, eta) - y * eta) + 1e-6 * (ab[1] - 1.0) ** 2)
@@ -142,15 +280,7 @@ def conformal_fdr_selection(
     target_fdr: float = 0.35,
     seed: int = 42,
 ) -> ConformalFDRResult:
-    """Conformal Selection with False Discovery Rate control (CfBH; Jin & Candes, 2023, JMLR).
-
-    Implements Jin & Candes (2023, Eq. 6 & Theorem 2.2) smoothed conformal p-values for
-    binary positive selection (V(x, 0) = S(x), V(x, 1) = -inf) with deterministic uniform
-    tie-breaking so discrete tree-leaf score ties do not collapse discovery power:
-      p_j = [#{i in D_cal : Y_i=0, S_i > S_test,j}
-             + U_j * (1 + #{i in D_cal : Y_i=0, S_i == S_test,j})] / (1 + |D_cal|),
-    followed by Benjamini-Hochberg step-up selection at level ``target_fdr = 1 - target_ppv``.
-    """
+    """Conformal Selection with False Discovery Rate control (CfBH; Jin & Candes, 2023, JMLR)."""
     yc = np.asarray(y_cal, dtype=int).ravel()
     yt = np.asarray(y_test, dtype=int).ravel()
     sc = np.asarray(cal_scores, dtype=float).ravel()
@@ -172,7 +302,6 @@ def conformal_fdr_selection(
             realized_recall=0.0,
         )
 
-    # Exact counts of calibration negatives strictly greater than and equal to S_test,j
     idx_left = np.searchsorted(neg_cal, st, side="left")
     idx_right = np.searchsorted(neg_cal, st, side="right")
     n_gt = (m0 - idx_right).astype(float)
@@ -180,7 +309,6 @@ def conformal_fdr_selection(
     u_tie = np.random.default_rng(seed).uniform(0.0, 1.0, size=n_test)
     p_conf = (1.0 + n_gt + u_tie * n_eq) / float(1 + n_cal)
 
-    # Benjamini-Hochberg step-up procedure at level target_fdr
     order = np.argsort(p_conf)
     p_sorted = p_conf[order]
     thresh = float(target_fdr) * (np.arange(1, n_test + 1, dtype=float) / float(n_test))
@@ -231,16 +359,20 @@ class StreamingSelectiveRouter:
         contract: DecisionContract,
         per_instance_query_cost: float = 0.05,
         n_voi_bins: int = 12,
+        mean_centered: bool = True,
     ) -> None:
         self.contract = contract
         self.query_cost = float(per_instance_query_cost)
         self.n_voi_bins = int(n_voi_bins)
+        self.mean_centered = bool(mean_centered)
         self.bin_edges_: np.ndarray = np.array([0.0, 1.0])
         self.bin_logit_sd_: np.ndarray = np.array([0.5])
+        self.bin_diagnostics_: list[dict[str, float]] = []
         self.p1_cal_: np.ndarray = np.empty(0)
         self.p2_cal_: np.ndarray = np.empty(0)
         self.y_cal_: np.ndarray = np.empty(0, dtype=int)
         self.voi_cal_: np.ndarray = np.empty(0)
+        self.voi_raw_cal_: np.ndarray = np.empty(0)
 
     def fit(
         self, y_cal: np.ndarray, p1_cal: np.ndarray, p2_cal: np.ndarray
@@ -252,45 +384,116 @@ class StreamingSelectiveRouter:
 
         delta_logit = logit(self.p2_cal_) - logit(self.p1_cal_)
         edges = np.unique(np.quantile(self.p1_cal_, np.linspace(0.0, 1.0, self.n_voi_bins + 1)))
+        self.bin_diagnostics_ = []
         if edges.size <= 2:
             self.bin_edges_ = np.array([0.0, 1.0])
-            self.bin_logit_sd_ = np.array([max(0.05, float(np.std(delta_logit)))])
+            sd_g = (
+                float(np.std(delta_logit, ddof=1))
+                if self.mean_centered and delta_logit.size > 1
+                else float(np.sqrt(np.mean(delta_logit**2)))
+            )
+            self.bin_logit_sd_ = np.array([max(0.02, sd_g)])
+            self.bin_diagnostics_.append(
+                {
+                    "bin_idx": 0.0,
+                    "p1_low": 0.0,
+                    "p1_high": 1.0,
+                    "n_cal": float(delta_logit.size),
+                    "mean_p1": float(np.mean(self.p1_cal_)),
+                    "mean_p2": float(np.mean(self.p2_cal_)),
+                    "mean_delta_logit": float(np.mean(delta_logit)),
+                    "sd_delta_logit": float(self.bin_logit_sd_[0]),
+                }
+            )
         else:
             self.bin_edges_ = edges
             bins = np.clip(np.digitize(self.p1_cal_, edges[1:-1], right=False), 0, edges.size - 2)
-            global_sd = max(0.05, float(np.std(delta_logit)))
+            global_sd = max(
+                0.05,
+                float(np.std(delta_logit, ddof=1))
+                if self.mean_centered and delta_logit.size > 1
+                else float(np.std(delta_logit)),
+            )
             sds = np.empty(edges.size - 1, dtype=float)
             for b in range(edges.size - 1):
                 m = bins == b
-                if int(np.sum(m)) >= 12:
-                    sds[b] = max(0.02, float(np.sqrt(np.mean(delta_logit[m] ** 2))))
+                cnt = int(np.sum(m))
+                if cnt >= 12:
+                    if self.mean_centered:
+                        sds[b] = max(0.02, float(np.std(delta_logit[m], ddof=1)))
+                    else:
+                        sds[b] = max(0.02, float(np.sqrt(np.mean(delta_logit[m] ** 2))))
                 else:
                     sds[b] = global_sd
+                if cnt > 0:
+                    self.bin_diagnostics_.append(
+                        {
+                            "bin_idx": float(b),
+                            "p1_low": float(edges[b]),
+                            "p1_high": float(edges[b + 1]),
+                            "n_cal": float(cnt),
+                            "mean_p1": float(np.mean(self.p1_cal_[m])),
+                            "mean_p2": float(np.mean(self.p2_cal_[m])),
+                            "mean_delta_logit": float(np.mean(delta_logit[m])),
+                            "sd_delta_logit": float(sds[b]),
+                        }
+                    )
             self.bin_logit_sd_ = sds
 
-        self.voi_cal_ = self.estimate_voi(self.p1_cal_)
+        self.voi_raw_cal_ = self._compute_raw_voi(
+            self.p1_cal_, self.contract.cost_fp, self.contract.cost_fn, self.mean_centered
+        )
+        self.voi_cal_ = np.maximum(0.0, self.voi_raw_cal_)
         return self
 
-    def estimate_voi(self, p1: np.ndarray) -> np.ndarray:
-        """Compute expected Bayes loss reduction VOI_K(x) via 9-node Gauss-Hermite quadrature."""
+    def _lookup_sigma(self, p: np.ndarray) -> np.ndarray:
+        if self.bin_edges_.size <= 2:
+            return np.full(p.size, self.bin_logit_sd_[0], dtype=float)
+        bins = np.clip(
+            np.digitize(p, self.bin_edges_[1:-1], right=False), 0, self.bin_edges_.size - 2
+        )
+        return self.bin_logit_sd_[bins]
+
+    def _compute_raw_voi(
+        self,
+        p1: np.ndarray,
+        cost_fp: float,
+        cost_fn: float,
+        mean_centered: bool,
+    ) -> np.ndarray:
         p = np.clip(np.asarray(p1, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
         lp = logit(p)
-        if self.bin_edges_.size <= 2:
-            sig = np.full(p.size, self.bin_logit_sd_[0], dtype=float)
-        else:
-            bins = np.clip(
-                np.digitize(p, self.bin_edges_[1:-1], right=False), 0, self.bin_edges_.size - 2
-            )
-            sig = self.bin_logit_sd_[bins]
+        sig = self._lookup_sigma(p)
+        mu = (
+            solve_mean_preserving_logit_offset(p, sig)
+            if mean_centered
+            else np.zeros_like(p)
+        )
 
-        prior_loss = _bayes_action_loss(p, self.contract.cost_fp, self.contract.cost_fn)
+        prior_loss = _bayes_action_loss(p, cost_fp, cost_fn)
         post_loss = np.zeros(p.size, dtype=float)
         for node, wt in zip(_GH_NODES, _GH_WEIGHTS, strict=True):
-            p_post = expit(lp + sig * float(node))
-            post_loss += float(wt) * _bayes_action_loss(
-                p_post, self.contract.cost_fp, self.contract.cost_fn
+            p_post = expit(lp + mu + sig * float(node))
+            post_loss += float(wt) * _bayes_action_loss(p_post, cost_fp, cost_fn)
+        return prior_loss - post_loss
+
+    def estimate_voi(
+        self,
+        p1: np.ndarray,
+        cost_fp: float | None = None,
+        cost_fn: float | None = None,
+        mean_centered: bool | None = None,
+    ) -> np.ndarray:
+        """Compute expected Bayes loss reduction VOI_K(x) via 9-node Gauss-Hermite quadrature."""
+        cfp = self.contract.cost_fp if cost_fp is None else float(cost_fp)
+        cfn = self.contract.cost_fn if cost_fn is None else float(cost_fn)
+        mc = self.mean_centered if mean_centered is None else bool(mean_centered)
+        raw = self._compute_raw_voi(p1, cfp, cfn, mean_centered=mc)
+        if mc and raw.size > 0 and float(np.min(raw)) < -1e-9:
+            raise AssertionError(
+                f"Proposition 2 violation: mean-centered VOI had negative value {np.min(raw)}"
             )
-        return np.maximum(0.0, prior_loss - post_loss)
+        return np.maximum(0.0, raw)
 
     def _eval_point(
         self,
@@ -324,8 +527,11 @@ class StreamingSelectiveRouter:
             self.contract.cost_fp * fp + self.contract.cost_fn * fn + self.query_cost * n_q
         )
         treat_none_cost_1k = (1000.0 / n_t) * self.contract.cost_fn * float(np.sum(yt == 1))
-        # Vickers-Elkin Net Benefit per 1,000 arrivals net of query cost
         net_benefit_1k = (treat_none_cost_1k - total_cost_1k) / max(1e-9, self.contract.cost_fn)
+
+        decomp = decompose_routing_flips(
+            yt, p1_test, p2_test, q_tst, self.contract, self.query_cost
+        )
 
         target_fdr = max(0.05, min(0.80, 1.0 - self.contract.target_precision))
         cfbh = conformal_fdr_selection(
@@ -344,7 +550,121 @@ class StreamingSelectiveRouter:
             cal_slope=cal_sum.cal_slope,
             cfbh_recall=cfbh.realized_recall,
             cfbh_realized_fdp=cfbh.realized_fdp,
+            beneficial_flip_nb_gain_per_1k=decomp.beneficial_flip_nb_gain_per_1k,
+            harmful_flip_nb_loss_per_1k=decomp.harmful_flip_nb_loss_per_1k,
+            query_fee_nb_drag_per_1k=decomp.query_fee_nb_drag_per_1k,
+            unchanged_queried_rate=decomp.unchanged_queried_rate,
+            above_tau_unchanged_queried_rate=decomp.above_tau_unchanged_queried_rate,
         )
+
+    def evaluate_contract_sensitivity(
+        self,
+        y_test: np.ndarray,
+        p1_test: np.ndarray,
+        p2_test: np.ndarray,
+        cost_fn_multipliers: tuple[float, ...] = (0.5, 1.0, 2.0),
+        query_cost_multipliers: tuple[float, ...] = (0.25, 0.5, 1.0, 2.0, 4.0),
+        seed: int = 42,
+    ) -> dict[str, object]:
+        """Evaluate Stage-B robustness across Bayes cost ratios tau* and query fees c_query."""
+        yt = np.asarray(y_test, dtype=int).ravel()
+        p1_t = np.clip(np.asarray(p1_test, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
+        p2_t = np.clip(np.asarray(p2_test, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
+        n_t = max(1.0, float(yt.size))
+        rng = np.random.default_rng(seed + 77)
+        u_cal = rng.uniform(0.0, 1.0, self.p1_cal_.size)
+        u_tst = rng.uniform(0.0, 1.0, p1_t.size)
+
+        def _nb(
+            p_arr: np.ndarray, q_mask: np.ndarray, c_fp: float, c_fn: float, c_q: float
+        ) -> float:
+            tau = c_fp / (c_fp + c_fn)
+            act = p_arr >= tau
+            tp = float(np.sum((yt == 1) & act))
+            fp = float(np.sum((yt == 0) & act))
+            nq = float(np.sum(q_mask))
+            return (1000.0 / n_t) * (tp - (c_fp / c_fn) * fp - (c_q / c_fn) * nq)
+
+        # 1. Cost-ratio (tau*) sweep at baseline c_query
+        tau_sweep: list[dict[str, float]] = []
+        z_mask = np.zeros(yt.size, dtype=bool)
+        o_mask = np.ones(yt.size, dtype=bool)
+        _, rsk20_tst, _, _ = calibrated_randomized_threshold_masks(
+            self.p1_cal_, p1_t, 0.20, u_cal, u_tst
+        )
+        for mult in cost_fn_multipliers:
+            cfn_m = self.contract.cost_fn * float(mult)
+            cfp_m = self.contract.cost_fp
+            tau_m = cfp_m / (cfp_m + cfn_m)
+            voi_c_m = self.estimate_voi(
+                self.p1_cal_, cost_fp=cfp_m, cost_fn=cfn_m, mean_centered=True
+            )
+            voi_t_m = self.estimate_voi(p1_t, cost_fp=cfp_m, cost_fn=cfn_m, mean_centered=True)
+            _, voi20_tst, _, _ = calibrated_randomized_threshold_masks(
+                voi_c_m, voi_t_m, 0.20, u_cal, u_tst
+            )
+            auto_tst_m = voi_t_m > self.query_cost
+            tau_sweep.append(
+                {
+                    "cost_fn_multiplier": float(mult),
+                    "tau_star": float(tau_m),
+                    "nb_stage1_0pct": _nb(p1_t, z_mask, cfp_m, cfn_m, self.query_cost),
+                    "nb_top_risk_20pct": _nb(
+                        np.where(rsk20_tst, p2_t, p1_t), rsk20_tst, cfp_m, cfn_m, self.query_cost
+                    ),
+                    "nb_voi_20pct": _nb(
+                        np.where(voi20_tst, p2_t, p1_t), voi20_tst, cfp_m, cfn_m, self.query_cost
+                    ),
+                    "nb_voi_autonomous": _nb(
+                        np.where(auto_tst_m, p2_t, p1_t), auto_tst_m, cfp_m, cfn_m, self.query_cost
+                    ),
+                    "auto_realized_q": float(np.mean(auto_tst_m)),
+                    "nb_full_100pct": _nb(p2_t, o_mask, cfp_m, cfn_m, self.query_cost),
+                }
+            )
+
+        # 2. Query-cost (c_query) sweep at baseline contract (C_FP, C_FN)
+        voi_c_base = self.estimate_voi(self.p1_cal_, mean_centered=True)
+        voi_t_base = self.estimate_voi(p1_t, mean_centered=True)
+        _, voi20_base, _, _ = calibrated_randomized_threshold_masks(
+            voi_c_base, voi_t_base, 0.20, u_cal, u_tst
+        )
+        fee_sweep: list[dict[str, float]] = []
+        for q_mult in query_cost_multipliers:
+            cq = self.query_cost * float(q_mult)
+            auto_q_m = voi_t_base > cq
+            fee_sweep.append(
+                {
+                    "query_cost_multiplier": float(q_mult),
+                    "c_query": float(cq),
+                    "nb_stage1_0pct": _nb(
+                        p1_t, z_mask, self.contract.cost_fp, self.contract.cost_fn, cq
+                    ),
+                    "nb_voi_20pct": _nb(
+                        np.where(voi20_base, p2_t, p1_t),
+                        voi20_base,
+                        self.contract.cost_fp,
+                        self.contract.cost_fn,
+                        cq,
+                    ),
+                    "nb_voi_autonomous": _nb(
+                        np.where(auto_q_m, p2_t, p1_t),
+                        auto_q_m,
+                        self.contract.cost_fp,
+                        self.contract.cost_fn,
+                        cq,
+                    ),
+                    "auto_realized_q": float(np.mean(auto_q_m)),
+                    "nb_full_100pct": _nb(
+                        p2_t, o_mask, self.contract.cost_fp, self.contract.cost_fn, cq
+                    ),
+                }
+            )
+
+        return {
+            "tau_star_sweep": tau_sweep,
+            "query_cost_sweep": fee_sweep,
+        }
 
     def evaluate_budget_frontier(
         self,
@@ -354,13 +674,24 @@ class StreamingSelectiveRouter:
         query_rates: tuple[float, ...] = (0.0, 0.05, 0.10, 0.20, 0.30, 0.50, 1.0),
         seed: int = 42,
     ) -> dict[str, object]:
-        """Evaluate streaming routing policies across ``query_rates`` + autonomous VOI & CfBH."""
+        """Evaluate streaming routing policies across ``query_rates`` + E0/E1/E2 diagnostics."""
         yt = np.asarray(y_test, dtype=int).ravel()
         p1_t = np.clip(np.asarray(p1_test, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
         p2_t = np.clip(np.asarray(p2_test, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
 
         tau_star = self.contract.cost_fp / (self.contract.cost_fp + self.contract.cost_fn)
-        voi_t = self.estimate_voi(p1_t)
+        voi_t = self.estimate_voi(p1_t, mean_centered=self.mean_centered)
+
+        # Also compute uncentered heuristic VOI on identical splits for Track-0 E0/E1 audit
+        voi_uncentered_cal = self.estimate_voi(self.p1_cal_, mean_centered=False)
+        voi_uncentered_tst = self.estimate_voi(p1_t, mean_centered=False)
+        raw_uncentered_cal = self._compute_raw_voi(
+            self.p1_cal_, self.contract.cost_fp, self.contract.cost_fn, mean_centered=False
+        )
+        raw_centered_cal = self._compute_raw_voi(
+            self.p1_cal_, self.contract.cost_fp, self.contract.cost_fn, mean_centered=True
+        )
+
         unc_cal = -np.abs(self.p1_cal_ - tau_star)
         unc_t = -np.abs(p1_t - tau_star)
 
@@ -368,12 +699,12 @@ class StreamingSelectiveRouter:
         u_cal = rng.uniform(0.0, 1.0, self.p1_cal_.size)
         u_tst = rng.uniform(0.0, 1.0, p1_t.size)
 
-        # Mondrian conformal calibration nonconformity quantiles on D_cal
         neg_p1 = self.p1_cal_[self.y_cal_ == 0]
         pos_s1 = 1.0 - self.p1_cal_[self.y_cal_ == 1]
 
         curves: dict[str, list[dict[str, float | str]]] = {
             "streaming_voi": [],
+            "streaming_voi_uncentered": [],
             "streaming_top_risk": [],
             "streaming_uncertainty": [],
             "mondrian_ambiguity": [],
@@ -396,47 +727,37 @@ class StreamingSelectiveRouter:
                     curves[k].append({**asdict(pt1), "policy": k})
                 continue
 
-            # 1. Streaming VOI threshold calibrated on D_cal
-            th_voi = float(np.quantile(self.voi_cal_, 1.0 - q))
-            pt_voi = self._eval_point(
-                "streaming_voi",
-                q,
-                self.voi_cal_ >= th_voi,
-                voi_t >= th_voi,
-                yt,
-                p1_t,
-                p2_t,
+            # 1. Mean-Centered Coherent Streaming VOI (Proposition 2 + calibration-exact tie-break)
+            m_voi_c, m_voi_t, _, _ = calibrated_randomized_threshold_masks(
+                self.voi_cal_, voi_t, q, u_cal, u_tst
             )
+            pt_voi = self._eval_point("streaming_voi", q, m_voi_c, m_voi_t, yt, p1_t, p2_t)
             curves["streaming_voi"].append(asdict(pt_voi))
 
-            # 2. Streaming Top-Risk threshold calibrated on D_cal
-            th_rsk = float(np.quantile(self.p1_cal_, 1.0 - q))
-            pt_rsk = self._eval_point(
-                "streaming_top_risk",
-                q,
-                self.p1_cal_ >= th_rsk,
-                p1_t >= th_rsk,
-                yt,
-                p1_t,
-                p2_t,
+            # 1b. Uncentered Heuristic VOI with randomized tie-break (E1 head-to-head)
+            m_uncv_c, m_uncv_t, _, _ = calibrated_randomized_threshold_masks(
+                voi_uncentered_cal, voi_uncentered_tst, q, u_cal, u_tst
             )
+            pt_uncv = self._eval_point(
+                "streaming_voi_uncentered", q, m_uncv_c, m_uncv_t, yt, p1_t, p2_t
+            )
+            curves["streaming_voi_uncentered"].append(asdict(pt_uncv))
+
+            # 2. Streaming Top-Risk threshold calibrated on D_cal
+            m_rsk_c, m_rsk_t, _, _ = calibrated_randomized_threshold_masks(
+                self.p1_cal_, p1_t, q, u_cal, u_tst
+            )
+            pt_rsk = self._eval_point("streaming_top_risk", q, m_rsk_c, m_rsk_t, yt, p1_t, p2_t)
             curves["streaming_top_risk"].append(asdict(pt_rsk))
 
             # 3. Streaming Decision-Boundary Uncertainty threshold calibrated on D_cal
-            th_unc = float(np.quantile(unc_cal, 1.0 - q))
-            pt_unc = self._eval_point(
-                "streaming_uncertainty",
-                q,
-                unc_cal >= th_unc,
-                unc_t >= th_unc,
-                yt,
-                p1_t,
-                p2_t,
+            m_unc_c, m_unc_t, _, _ = calibrated_randomized_threshold_masks(
+                unc_cal, unc_t, q, u_cal, u_tst
             )
+            pt_unc = self._eval_point("streaming_uncertainty", q, m_unc_c, m_unc_t, yt, p1_t, p2_t)
             curves["streaming_uncertainty"].append(asdict(pt_unc))
 
             # 4. Mondrian Conformal Ambiguity {0,1} matched to streaming calibration query rate q
-            # Find symmetric alpha on D_cal whose {0,1} size is closest to q
             best_alpha = 0.10
             best_gap = 10.0
             for a_cand in np.linspace(0.01, 0.45, 45):
@@ -451,16 +772,19 @@ class StreamingSelectiveRouter:
             qp_b = float(np.quantile(pos_s1, 1.0 - best_alpha)) if pos_s1.size > 0 else 1.0
             amb_cal = (self.p1_cal_ <= qn_b) & ((1.0 - self.p1_cal_) <= qp_b)
             amb_tst = (p1_t <= qn_b) & ((1.0 - p1_t) <= qp_b)
-            # If {0,1} is smaller than q on D_cal, pad streamingly from {0} closest to qn_b
             if float(np.mean(amb_cal)) < q - 0.01:
                 rem_q = q - float(np.mean(amb_cal))
                 only0_cal = (self.p1_cal_ <= qn_b) & (~amb_cal)
                 if np.any(only0_cal):
                     pad_frac = min(0.99, rem_q / max(1e-6, float(np.mean(only0_cal))))
-                    pad_cut = float(np.quantile(self.p1_cal_[only0_cal], 1.0 - pad_frac))
-                    amb_cal = amb_cal | (only0_cal & (self.p1_cal_ >= pad_cut))
+                    pad_c_m, pad_t_m, _, _ = calibrated_randomized_threshold_masks(
+                        self.p1_cal_[only0_cal], p1_t, pad_frac, u_cal[only0_cal], u_tst
+                    )
+                    amb_cal_full = amb_cal.copy()
+                    amb_cal_full[only0_cal] = pad_c_m
+                    amb_cal = amb_cal | amb_cal_full
                     only0_tst = (p1_t <= qn_b) & (~amb_tst)
-                    amb_tst = amb_tst | (only0_tst & (p1_t >= pad_cut))
+                    amb_tst = amb_tst | (only0_tst & pad_t_m)
             pt_amb = self._eval_point("mondrian_ambiguity", q, amb_cal, amb_tst, yt, p1_t, p2_t)
             curves["mondrian_ambiguity"].append(asdict(pt_amb))
 
@@ -481,23 +805,66 @@ class StreamingSelectiveRouter:
             p2_t,
         )
 
+        # Uncentered autonomous rule for E1 comparison
+        auto_unc_cal = voi_uncentered_cal > self.query_cost
+        auto_unc_tst = voi_uncentered_tst > self.query_cost
+        pt_auto_unc = self._eval_point(
+            "voi_uncentered_autonomous",
+            float(np.mean(auto_unc_cal)),
+            auto_unc_cal,
+            auto_unc_tst,
+            yt,
+            p1_t,
+            p2_t,
+        )
+
+        # E0/E1 Router Agreement & Tie Diagnostic at q = 0.20
+        m_v20_c, m_v20_t, gamma_v20_centered, rho_v20_centered = (
+            calibrated_randomized_threshold_masks(self.voi_cal_, voi_t, 0.20, u_cal, u_tst)
+        )
+        _, m_uv20_t, gamma_v20_uncentered, _ = calibrated_randomized_threshold_masks(
+            voi_uncentered_cal, voi_uncentered_tst, 0.20, u_cal, u_tst
+        )
+        legacy_nontiebroken_v20_t = voi_uncentered_tst >= gamma_v20_uncentered
+        jaccard_20 = float(np.sum(m_v20_t & m_uv20_t)) / max(
+            1.0, float(np.sum(m_v20_t | m_uv20_t))
+        )
+        disagree_20 = float(np.mean(m_v20_t != m_uv20_t))
+
+        e0_e1_diagnostics = {
+            "uncentered_raw_voi_neg_frac_cal": float(np.mean(raw_uncentered_cal < 0.0)),
+            "centered_raw_voi_neg_frac_cal": float(np.mean(raw_centered_cal < -1e-12)),
+            "uncentered_clipped_zero_frac_cal": float(np.mean(voi_uncentered_cal <= 0.0)),
+            "centered_clipped_zero_frac_cal": float(np.mean(self.voi_cal_ <= 0.0)),
+            "legacy_nontiebroken_q20_realized_test": float(np.mean(legacy_nontiebroken_v20_t)),
+            "centered_tiebroken_q20_realized_test": float(np.mean(m_v20_t)),
+            "uncentered_tiebroken_q20_realized_test": float(np.mean(m_uv20_t)),
+            "centered_vs_uncentered_q20_disagreement": disagree_20,
+            "centered_vs_uncentered_q20_jaccard": jaccard_20,
+            "gamma_q20_centered": gamma_v20_centered,
+            "rho_tie_q20_centered": rho_v20_centered,
+            "gamma_q20_uncentered": gamma_v20_uncentered,
+        }
+
         # Conformal FDR Selection (Jin & Candes, 2023) vs unverified Mondrian {1} singleton
         target_fdr = max(0.05, min(0.80, 1.0 - self.contract.target_precision))
         cfbh_s1 = conformal_fdr_selection(
             self.p1_cal_, self.y_cal_, p1_t, yt, target_fdr=target_fdr
         )
-        # Routed VOI at q = 0.20 for clean fixed-rate CfBH comparison
-        th_voi20 = float(np.quantile(self.voi_cal_, 0.80))
-        p_cal_v20 = np.where(self.voi_cal_ >= th_voi20, self.p2_cal_, self.p1_cal_)
-        p_tst_v20 = np.where(voi_t >= th_voi20, p2_t, p1_t)
+        p_cal_v20 = np.where(m_v20_c, self.p2_cal_, self.p1_cal_)
+        p_tst_v20 = np.where(m_v20_t, p2_t, p1_t)
         cfbh_voi20 = conformal_fdr_selection(
             p_cal_v20, self.y_cal_, p_tst_v20, yt, target_fdr=target_fdr
+        )
+        p_cal_auto = np.where(auto_cal, self.p2_cal_, self.p1_cal_)
+        p_tst_auto = np.where(auto_tst, p2_t, p1_t)
+        cfbh_auto = conformal_fdr_selection(
+            p_cal_auto, self.y_cal_, p_tst_auto, yt, target_fdr=target_fdr
         )
         cfbh_s2 = conformal_fdr_selection(
             self.p2_cal_, self.y_cal_, p2_t, yt, target_fdr=target_fdr
         )
 
-        # Unverified Mondrian {1} singleton at alpha_0 = 0.20, alpha_1 = 0.20 for direct contrast
         qn20 = float(np.quantile(neg_p1, 0.80)) if neg_p1.size > 0 else 1.0
         qp20 = float(np.quantile(pos_s1, 0.80)) if pos_s1.size > 0 else 1.0
         sing1_tst = (p1_t > qn20) & ((1.0 - p1_t) <= qp20)
@@ -510,6 +877,12 @@ class StreamingSelectiveRouter:
             "query_rates": list(query_rates),
             "curves": curves,
             "voi_autonomous": asdict(pt_auto),
+            "voi_uncentered_autonomous": asdict(pt_auto_unc),
+            "e0_e1_diagnostics": e0_e1_diagnostics,
+            "bin_diagnostics": self.bin_diagnostics_,
+            "contract_sensitivity": self.evaluate_contract_sensitivity(
+                yt, p1_t, p2_t, seed=seed
+            ),
             "conformal_fdr_comparison": {
                 "target_fdr": target_fdr,
                 "target_ppv": 1.0 - target_fdr,
@@ -517,6 +890,7 @@ class StreamingSelectiveRouter:
                 "mondrian_singleton1_alpha20_recall": mondrian_sing1_rec,
                 "cfbh_stage1": asdict(cfbh_s1),
                 "cfbh_streaming_voi_20pct": asdict(cfbh_voi20),
+                "cfbh_voi_autonomous": asdict(cfbh_auto),
                 "cfbh_full_stage2": asdict(cfbh_s2),
             },
             "stage1_calibration": asdict(compute_calibration_summary(yt, p1_t)),
@@ -527,9 +901,13 @@ class StreamingSelectiveRouter:
 __all__ = [
     "CalibrationSummary",
     "ConformalFDRResult",
+    "FlipDecomposition",
     "StreamingBudgetPoint",
     "StreamingSelectiveRouter",
+    "calibrated_randomized_threshold_masks",
     "compute_calibration_summary",
     "conformal_fdr_selection",
+    "decompose_routing_flips",
     "precision_at_target_recall",
+    "solve_mean_preserving_logit_offset",
 ]

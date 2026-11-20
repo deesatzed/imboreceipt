@@ -1,22 +1,23 @@
 {
   "status": "SEALED_FOR_SUBMISSION",
   "reverified": true,
-  "seal_id": "53998978c673c68e6deb6775",
+  "seal_id": "bc15e63d9e097395cc31cde4",
   "target_server": "arxiv",
   "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
   "manuscript_file": null,
-  "manuscript_sha256": "c24cd97a6e64ae0952d59f4dca4527b7b126ff1ddb2928d442c11fe821c82d59",
+  "manuscript_sha256": "30c8331d01526159d2687e69e3fdc222db04c85b2d574b15e4868bafa8851b04",
   "files": {
     "fig1_discovery_noninferiority_and_stress.pdf": "54399a0d2cad0db3728cf584ea123d9d690587b298015afa8275897f46284ec3",
-    "fig2_streaming_budget_curves.pdf": "2f6a318bdc2b8cbfcdaac62c3b28b681edbe42a9613e8ce4a7ce887ea394651c",
-    "fig3_conformal_fdr_selection.pdf": "16bbf9b594f181fe0afc8c38008ea65868570e566b8e606d9819c38102c37e30",
+    "fig2_streaming_budget_curves.pdf": "b48f0dcc2db2393017ae41c26c6e3f962836881503d297c317a79b91f7c76a74",
+    "fig3_conformal_fdr_selection.pdf": "56619fce34a7e4b7c922d6c57f4483b3e637f94cbf5f09ed80a3b336fed51e2c",
+    "fig4_pilot_curve_and_flip_decomposition.pdf": "bf46c570e64d0cc04aee74955e96f4be59777e4106f4811c0ba01f5695ad1d72",
     "main.bbl": "e0bb139231d75217fb21c7929d8ea5ac791abc042bd4a58d98bc5a5f6b8c6a2d",
-    "main.pdf": "f4ef7d4ce13a4295da9e8558a8b4f880a4341fd0b46d288291337dac967dd727",
-    "main.tex": "90cfd2312d2c97b23dbd98da5887c0a2856cac96e38cac5a7dbede430dc50418",
+    "main.pdf": "b0187a793b38d873ee2e1fe682f2e0a22470a542e8af455b02af8f6b3fbdf460",
+    "main.tex": "48747671f6685c246e340b1c70dca2fb4a6667e9d9df69ed58a07b9de35796ac",
     "references.bib": "cb6cf70024f4b899d3531f8f8849d1725db5e1289a84c566d63f1202ed9814a5"
   },
-  "pass1_audit_sha256": "c24cd97a6e64ae0952d59f4dca4527b7b126ff1ddb2928d442c11fe821c82d59",
-  "blind_review_sha256": "c24cd97a6e64ae0952d59f4dca4527b7b126ff1ddb2928d442c11fe821c82d59",
-  "blind_review_recorded_at": "2026-11-20T01:30:48.138550+00:00",
-  "sealed_at": "2026-11-20T01:31:54.678453+00:00"
+  "pass1_audit_sha256": "30c8331d01526159d2687e69e3fdc222db04c85b2d574b15e4868bafa8851b04",
+  "blind_review_sha256": "30c8331d01526159d2687e69e3fdc222db04c85b2d574b15e4868bafa8851b04",
+  "blind_review_recorded_at": "2026-11-20T17:33:53.242718+00:00",
+  "sealed_at": "2026-11-20T17:34:51.912540+00:00"
 }

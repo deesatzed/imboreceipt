@@ -1188,12 +1188,181 @@ def discover_competitor_method(
     raise ValueError(f"Unknown discovery competitor method: {method}")
 
 
+def evaluate_split_pilot_step1_inference(
+    X_base_train: pd.DataFrame,
+    Z_pool_train: pd.DataFrame,
+    y_train: np.ndarray,
+    candidates: list[CandidateChannelSpec],
+    oof_base_prob: np.ndarray,
+    pilot: TwoPhasePilot,
+    *,
+    base_semantic_types: dict[str, SemanticType] | None = None,
+    alpha_select: float = 0.05,
+    seed: int = 42,
+) -> dict[str, object]:
+    """Disjoint split-pilot inference eliminating K-fold training-overlap covariance.
+
+    Partitions each Phase-2 pilot stratum h without replacement into a fitting half P_{h,fit}
+    and a disjoint evaluation half P_{h,eval}. Fits capacity-matched offset GBDTs strictly on
+    P_{fit} and evaluates two-phase SEs (V_I + V_II) and Holm LCBs on P_{eval}, plus the exact
+    full-cohort target G_N(eta_fit) across all causal-valid Phase-1 records.
+    """
+    rng = np.random.default_rng(seed + 31337)
+    idx = pilot.sampled_indices
+    h_p = pilot.stratum_ids_sampled
+    y_all = np.asarray(y_train, dtype=int).ravel()
+    sem_p = dict(base_semantic_types) if base_semantic_types is not None else {}
+
+    fit_pos_list: list[np.ndarray] = []
+    eval_pos_list: list[np.ndarray] = []
+    fit_smp_counts: dict[int, int] = {}
+    eval_smp_counts: dict[int, int] = {}
+
+    for h_val in sorted(set(h_p.tolist())):
+        loc_h = np.flatnonzero(h_p == h_val)
+        n_h = int(loc_h.size)
+        if n_h < 2:
+            fit_pos_list.append(loc_h)
+            fit_smp_counts[int(h_val)] = n_h
+            continue
+        perm = rng.permutation(loc_h)
+        n_fit = max(1, n_h // 2)
+        n_ev = n_h - n_fit
+        fit_pos_list.append(np.sort(perm[:n_fit]))
+        eval_pos_list.append(np.sort(perm[n_fit:]))
+        fit_smp_counts[int(h_val)] = n_fit
+        eval_smp_counts[int(h_val)] = n_ev
+
+    fit_loc = np.sort(np.concatenate(fit_pos_list))
+    eval_loc = np.sort(np.concatenate(eval_pos_list))
+    fit_idx = idx[fit_loc]
+    eval_idx = idx[eval_loc]
+
+    h_fit = h_p[fit_loc]
+    h_eval = h_p[eval_loc]
+    w_fit = np.array(
+        [pilot.stratum_pop_counts[int(h)] / max(1, fit_smp_counts[int(h)]) for h in h_fit],
+        dtype=float,
+    )
+    w_eval = np.array(
+        [pilot.stratum_pop_counts[int(h)] / max(1, eval_smp_counts[int(h)]) for h in h_eval],
+        dtype=float,
+    )
+    w_fit_norm = w_fit * (float(w_fit.size) / max(1e-12, float(np.sum(w_fit))))
+
+    Xb_fit = X_base_train.iloc[fit_idx].reset_index(drop=True)
+    Xb_eval = X_base_train.iloc[eval_idx].reset_index(drop=True)
+    Xb_all = X_base_train.reset_index(drop=True)
+    y_fit = y_all[fit_idx]
+    y_eval = y_all[eval_idx]
+
+    init_fit = logit(np.clip(oof_base_prob[fit_idx], _PROB_EPS, 1.0 - _PROB_EPS))
+    init_eval = logit(np.clip(oof_base_prob[eval_idx], _PROB_EPS, 1.0 - _PROB_EPS))
+    init_all = logit(np.clip(oof_base_prob, _PROB_EPS, 1.0 - _PROB_EPS))
+
+    def _fit_and_predict(
+        df_tr: pd.DataFrame,
+        df_ev: pd.DataFrame,
+        df_full: pd.DataFrame,
+        s_types: dict[str, SemanticType] | None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        prep = TabularPreprocessor(semantic_types=s_types)
+        X_tr_m = prep.fit_transform(df_tr)
+        X_ev_m = prep.transform(df_ev)
+        X_fl_m = prep.transform(df_full)
+        min_child = max(8, min(25, int(X_tr_m.shape[0] // 22)))
+        clf = lgb.LGBMClassifier(
+            n_estimators=55,
+            learning_rate=0.05,
+            num_leaves=15,
+            max_depth=4,
+            min_child_samples=min_child,
+            subsample_for_bin=min(50000, max(2000, int(X_tr_m.shape[0]))),
+            max_bin=127,
+            reg_alpha=1.0,
+            reg_lambda=5.0,
+            max_delta_step=1.0,
+            random_state=seed,
+            n_jobs=2,
+            verbose=-1,
+        )
+        clf.fit(X_tr_m, y_fit, sample_weight=w_fit_norm, init_score=init_fit)
+        tr_m = init_fit + np.asarray(clf.predict(X_tr_m, raw_score=True), dtype=float)
+        ev_m = init_eval + np.asarray(clf.predict(X_ev_m, raw_score=True), dtype=float)
+        fl_m = init_all + np.asarray(clf.predict(X_fl_m, raw_score=True), dtype=float)
+
+        cal = LogisticRegression(C=2.0, solver="lbfgs", max_iter=200)
+        cal.fit(tr_m.reshape(-1, 1), y_fit, sample_weight=w_fit_norm)
+        p_ev = np.clip(cal.predict_proba(ev_m.reshape(-1, 1))[:, 1], _PROB_EPS, 1.0 - _PROB_EPS)
+        p_fl = np.clip(cal.predict_proba(fl_m.reshape(-1, 1))[:, 1], _PROB_EPS, 1.0 - _PROB_EPS)
+        return p_ev, p_fl
+
+    p0_ev, p0_fl = _fit_and_predict(Xb_fit, Xb_eval, Xb_all, sem_p)
+    ll0_ev = _bernoulli_loglik(y_eval, p0_ev)
+    ll0_fl = _bernoulli_loglik(y_all, p0_fl)
+
+    scores: dict[str, float] = {}
+    ses_total: dict[str, float] = {}
+    ses_p1: dict[str, float] = {}
+    ses_p2: dict[str, float] = {}
+    raw_pvals: list[float] = []
+    census_targets: dict[str, float] = {}
+
+    Z_fit = Z_pool_train.iloc[fit_idx].reset_index(drop=True)
+    Z_eval = Z_pool_train.iloc[eval_idx].reset_index(drop=True)
+    Z_all = Z_pool_train.reset_index(drop=True)
+
+    for cand in candidates:
+        cols = list(cand.columns)
+        pm_ev, pm_fl = _fit_and_predict(
+            pd.concat([Xb_fit, Z_fit[cols]], axis=1),
+            pd.concat([Xb_eval, Z_eval[cols]], axis=1),
+            pd.concat([Xb_all, Z_all[cols]], axis=1),
+            sem_p,
+        )
+        psi_ev = _bernoulli_loglik(y_eval, pm_ev) - ll0_ev
+        psi_fl = _bernoulli_loglik(y_all, pm_fl) - ll0_fl
+        g_m, se_t, se_1, se_2 = two_phase_variance_decomposition(
+            psi_ev,
+            w_eval,
+            h_eval,
+            pilot.stratum_pop_counts,
+            eval_smp_counts,
+        )
+        scores[cand.channel_id] = g_m
+        ses_total[cand.channel_id] = se_t
+        ses_p1[cand.channel_id] = se_1
+        ses_p2[cand.channel_id] = se_2
+        census_targets[cand.channel_id] = float(np.mean(psi_fl))
+        raw_pvals.append(float(norm.sf(g_m / max(1e-12, se_t))))
+
+    adj_p = holm_bonferroni_adjust(raw_pvals)
+    selected_ids = [
+        cand.channel_id
+        for cand, ap in zip(candidates, adj_p, strict=True)
+        if ap < alpha_select and scores[cand.channel_id] > 0.0
+    ]
+
+    return {
+        "scores": scores,
+        "ses_total": ses_total,
+        "ses_phase1": ses_p1,
+        "ses_phase2": ses_p2,
+        "census_targets_conditional": census_targets,
+        "holm_pvals": {c.channel_id: float(ap) for c, ap in zip(candidates, adj_p, strict=True)},
+        "selected_ids": selected_ids,
+        "n_fit": int(fit_idx.size),
+        "n_eval": int(eval_idx.size),
+    }
+
+
 __all__ = [
     "DiscoverySelectionResult",
     "SequentialChannelStep",
     "TwoPhasePilot",
     "discover_competitor_method",
     "discover_sequential_conditional_gain",
+    "evaluate_split_pilot_step1_inference",
     "sample_two_phase_pilot",
     "two_phase_variance_decomposition",
 ]
