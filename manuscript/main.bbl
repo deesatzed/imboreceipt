@@ -1,9 +1,17 @@
-\begin{thebibliography}{44}
+\begin{thebibliography}{52}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Austin and Steyerberg(2019)]{austin2019integrated}
+Peter~C. Austin and Ewout~W. Steyerberg.
+\newblock The integrated calibration index ({ICI}) and related metrics for
+  quantifying the calibration of logistic regression models.
+\newblock \emph{Statistics in Medicine}, 38\penalty0 (21):\penalty0 4051--4065,
+  2019.
+\newblock \doi{10.1002/sim.8281}.
 
 \bibitem[Barber et~al.(2023)Barber, Cand{\`e}s, Ramdas, and
   Tibshirani]{barber2023conformal}
@@ -22,13 +30,19 @@ Stephen Bates, Trevor Hastie, and Robert Tibshirani.
   (546):\penalty0 1434--1445, 2024.
 \newblock \doi{10.1080/01621459.2023.2197686}.
 
-\bibitem[Benjamini and Hochberg(1995)]{benjamini1995controlling}
-Yoav Benjamini and Yosef Hochberg.
-\newblock Controlling the false discovery rate: A practical and powerful
-  approach to multiple testing.
-\newblock \emph{Journal of the Royal Statistical Society: Series B
-  (Methodological)}, 57\penalty0 (1):\penalty0 289--300, 1995.
-\newblock \doi{10.1111/j.2517-6161.1995.tb02031.x}.
+\bibitem[Bilgic and Getoor(2011)]{bilgic2011value}
+Mustafa Bilgic and Lise Getoor.
+\newblock Value of information lattice: Exploiting probabilistic independence
+  for effective feature subset acquisition.
+\newblock \emph{Journal of Artificial Intelligence Research}, 41:\penalty0
+  69--95, 2011.
+\newblock \doi{10.1613/jair.3200}.
+
+\bibitem[Breslow and Cain(1988)]{breslow1988logistic}
+N.~E. Breslow and K.~C. Cain.
+\newblock Logistic regression for two-stage case-control data.
+\newblock \emph{Biometrika}, 75\penalty0 (1):\penalty0 11--20, 1988.
+\newblock \doi{10.1093/biomet/75.1.11}.
 
 \bibitem[Breslow et~al.(2009)Breslow, Lumley, Ballantyne, Chambless, and
   Kulich]{breslow2009using}
@@ -38,15 +52,6 @@ Norman~E. Breslow, Thomas Lumley, Christie~M. Ballantyne, Lloyd~E. Chambless,
 \newblock \emph{American Journal of Epidemiology}, 169\penalty0 (11):\penalty0
   1398--1405, 2009.
 \newblock \doi{10.1093/aje/kwp055}.
-
-\bibitem[Cand{\`e}s et~al.(2018)Cand{\`e}s, Fan, Janson, and
-  Lv]{candes2018panning}
-Emmanuel Cand{\`e}s, Yingying Fan, Lucas Janson, and Jinchi Lv.
-\newblock Panning for gold: `model-{X}' knockoffs for high dimensional
-  controlled variable selection.
-\newblock \emph{Journal of the Royal Statistical Society: Series B (Statistical
-  Methodology)}, 80\penalty0 (3):\penalty0 551--577, 2018.
-\newblock \doi{10.1111/rssb.12265}.
 
 \bibitem[Chamma et~al.(2023)Chamma, Engemann, and
   Thirion]{chamma2023statistically}
@@ -65,6 +70,24 @@ Nitesh~V. Chawla, Kevin~W. Bowyer, Lawrence~O. Hall, and W.~Philip Kegelmeyer.
   321--357, 2002.
 \newblock \doi{10.1613/jair.953}.
 
+\bibitem[Collins et~al.(2024)Collins, Moons, Dhiman, Riley, Beam, Van~Calster,
+  Ghassemi, Liu, Reitsma, van Smeden, Boulesteix, Camaradou, Celi, Denaxas,
+  Denniston, Glocker, Golub, Harvey, Heinze, Hoffman, Kengne, Lam, Lee, Loder,
+  Maier-Hein, Mateen, McCradden, Oakden-Rayner, Ordish, Parnell, Rose, Singh,
+  Wynants, and Logullo]{collins2024tripodai}
+Gary~S. Collins, Karel G.~M. Moons, Paula Dhiman, Richard~D. Riley, Andrew~L.
+  Beam, Ben Van~Calster, Marzyeh Ghassemi, Xiaoxuan Liu, Johannes~B. Reitsma,
+  Maarten van Smeden, Anne-Laure Boulesteix, Jennifer~C. Camaradou, Leo~Anthony
+  Celi, Spiros Denaxas, Alastair~K. Denniston, Ben Glocker, Robert~M. Golub,
+  Hugh Harvey, Georg Heinze, Michael~M. Hoffman, Andre~Pascal Kengne, Emily
+  Lam, Naomi Lee, Elizabeth~W. Loder, Lena Maier-Hein, Bilal~A. Mateen,
+  Melissa~D. McCradden, Lauren Oakden-Rayner, Johan Ordish, Richard Parnell,
+  Sherri Rose, Karandeep Singh, Laure Wynants, and Patricia Logullo.
+\newblock {TRIPOD+AI} statement: updated guidance for reporting clinical
+  prediction models that use regression or machine learning methods.
+\newblock \emph{BMJ}, 385:\penalty0 e078378, 2024.
+\newblock \doi{10.1136/bmj-2023-078378}.
+
 \bibitem[Covert et~al.(2023)Covert, Qiu, Lu, Kim, White, and
   Lee]{covert2023learning}
 Ian Covert, Wei Qiu, Mingyu Lu, Nayoon Kim, Nathan White, and Su-In Lee.
@@ -73,6 +96,13 @@ Ian Covert, Wei Qiu, Mingyu Lu, Nayoon Kim, Nathan White, and Su-In Lee.
 \newblock In \emph{Proceedings of the 40th International Conference on Machine
   Learning (PMLR)}, volume 202, pages 6424--6447, 2023.
 \newblock \doi{10.48550/arXiv.2301.00557}.
+
+\bibitem[Dai et~al.(2025)Dai, Carroll, and Chen]{dai2025twophase}
+Guorong Dai, Raymond~J. Carroll, and Jinbo Chen.
+\newblock Valid and efficient inference for nonparametric variable importance
+  in two-phase studies.
+\newblock \emph{Biometrics}, 81\penalty0 (3):\penalty0 ujaf095, 2025.
+\newblock \doi{10.1093/biomtc/ujaf095}.
 
 \bibitem[Dal~Pozzolo et~al.(2014)Dal~Pozzolo, Caelen, Le~Borgne, Waterschoot,
   and Bontempi]{dalpozzolo2014learned}
@@ -90,6 +120,12 @@ Jesse Davis and Mark Goadrich.
 \newblock In \emph{Proceedings of the 23rd International Conference on Machine
   Learning}, pages 233--240, 2006.
 \newblock \doi{10.1145/1143844.1143874}.
+
+\bibitem[Davison and Hinkley(1997)]{davison1997bootstrap}
+A.~C. Davison and D.~V. Hinkley.
+\newblock \emph{Bootstrap Methods and Their Application}.
+\newblock Cambridge University Press, 1997.
+\newblock \doi{10.1017/CBO9780511802843}.
 
 \bibitem[DerSimonian and Laird(1986)]{dersimonian1986meta}
 Rebecca DerSimonian and Nan Laird.
@@ -131,6 +167,13 @@ Sture Holm.
 \newblock \emph{Scandinavian Journal of Statistics}, 6(2):65--70, 1979.
 \newblock URL \url{https://www.jstor.org/stable/4615733}.
 
+\bibitem[Hooker et~al.(2021)Hooker, Mentch, and Zhou]{hooker2021unrestricted}
+Giles Hooker, Lucas Mentch, and Siyu Zhou.
+\newblock Unrestricted permutation forces extrapolation: variable importance
+  requires at least one more model, or there is no free variable importance.
+\newblock \emph{Statistics and Computing}, 31\penalty0 (6):\penalty0 82, 2021.
+\newblock \doi{10.1007/s11222-021-10057-z}.
+
 \bibitem[Horvitz and Thompson(1952)]{horvitz1952generalization}
 D.~G. Horvitz and D.~J. Thompson.
 \newblock A generalization of sampling without replacement from a finite
@@ -149,12 +192,26 @@ Sergio Jesus, Jose Pombal, Duarte Alves, Andre Cruz, Pedro Saleiro, Rita~P.
   35:\penalty0 33563--33575, 2022.
 \newblock \doi{10.48550/arXiv.2211.13358}.
 
+\bibitem[Ji and Carin(2007)]{ji2007cost}
+Shihao Ji and Lawrence Carin.
+\newblock Cost-sensitive feature acquisition and classification.
+\newblock \emph{Pattern Recognition}, 40\penalty0 (5):\penalty0 1474--1485,
+  2007.
+\newblock \doi{10.1016/j.patcog.2006.11.008}.
+
 \bibitem[Jin and Cand{\`e}s(2023)]{jin2023selection}
 Ying Jin and Emmanuel~J. Cand{\`e}s.
 \newblock Selection by prediction with conformal p-values.
 \newblock \emph{Journal of Machine Learning Research}, 24\penalty0
   (244):\penalty0 1--41, 2023.
 \newblock \doi{10.48550/arXiv.2210.01408}.
+
+\bibitem[Jin and Cand{\`e}s(2025)]{jin2025wcs}
+Ying Jin and Emmanuel~J. Cand{\`e}s.
+\newblock Model-free selective inference under covariate shift via weighted
+  conformal p-values.
+\newblock \emph{Biometrika}, 113\penalty0 (1):\penalty0 asaf066, 2025.
+\newblock \doi{10.1093/biomet/asaf066}.
 
 \bibitem[Ke et~al.(2017)Ke, Meng, Finley, Wang, Chen, Ma, Ye, and
   Liu]{ke2017lightgbm}
@@ -164,6 +221,14 @@ Guolin Ke, Qi~Meng, Thomas Finley, Taifeng Wang, Wei Chen, Weidong Ma, Qiwei
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, volume~30, pages 3146--3154, 2017.
 
+\bibitem[Kerr et~al.(2016)Kerr, Brown, Zhu, and Janes]{kerr2016assessing}
+Kathleen~F. Kerr, Marshall~D. Brown, Kehao Zhu, and Holly Janes.
+\newblock Assessing the clinical impact of risk prediction models with decision
+  curves: Guidance for correct interpretation and appropriate use.
+\newblock \emph{Journal of Clinical Oncology}, 34\penalty0 (21):\penalty0
+  2534--2540, 2016.
+\newblock \doi{10.1200/JCO.2015.65.5654}.
+
 \bibitem[Lemaitre et~al.(2017)Lemaitre, Nogueira, and
   Aridas]{lemaitre2017imbalanced}
 Guillaume Lemaitre, Fernando Nogueira, and Christos~K. Aridas.
@@ -172,13 +237,6 @@ Guillaume Lemaitre, Fernando Nogueira, and Christos~K. Aridas.
 \newblock \emph{Journal of Machine Learning Research}, 18\penalty0
   (17):\penalty0 1--5, 2017.
 \newblock \doi{10.48550/arXiv.1609.06570}.
-
-\bibitem[Li and Oliva(2021)]{li2021active}
-Yang Li and Junier~B. Oliva.
-\newblock Active feature acquisition with generative surrogate models.
-\newblock In \emph{Proceedings of the 38th International Conference on Machine
-  Learning (PMLR)}, volume 139, pages 6450--6459, 2021.
-\newblock \doi{10.48550/arXiv.2010.02433}.
 
 \bibitem[Liu et~al.(2009)Liu, Wu, and Zhou]{liu2009exploratory}
 Xu-Ying Liu, Jianxin Wu, and Zhi-Hua Zhou.
@@ -234,13 +292,6 @@ Maytal Saar-Tsechansky, Prem Melville, and Foster Provost.
 \newblock \emph{Management Science}, 55\penalty0 (4):\penalty0 664--684, 2009.
 \newblock \doi{10.1287/mnsc.1080.0952}.
 
-\bibitem[Sadinle et~al.(2019)Sadinle, Lei, and Wasserman]{sadinle2019least}
-Mauricio Sadinle, Jing Lei, and Larry Wasserman.
-\newblock Least ambiguous set-valued classifiers with bounded error levels.
-\newblock \emph{Journal of the American Statistical Association}, 114\penalty0
-  (525):\penalty0 223--234, 2019.
-\newblock \doi{10.1080/01621459.2017.1395341}.
-
 \bibitem[Saerens et~al.(2002)Saerens, Latinne, and
   Decaestecker]{saerens2002adjusting}
 Marco Saerens, Patrice Latinne, and Christine Decaestecker.
@@ -279,6 +330,14 @@ Hajin Shim, Sung~Ju Hwang, and Eunho Yang.
 \newblock In \emph{Advances in Neural Information Processing Systems
   (NeurIPS)}, volume~31, pages 1368--1378, 2018.
 
+\bibitem[Storey et~al.(2004)Storey, Taylor, and Siegmund]{storey2004strong}
+John~D. Storey, Jonathan~E. Taylor, and David Siegmund.
+\newblock Strong control, conservative point estimation and simultaneous
+  conservative consistency of false discovery rates: a unified approach.
+\newblock \emph{Journal of the Royal Statistical Society: Series B (Statistical
+  Methodology)}, 66\penalty0 (1):\penalty0 187--205, 2004.
+\newblock \doi{10.1111/j.1467-9868.2004.00439.x}.
+
 \bibitem[Strack et~al.(2014)Strack, DeShazo, Gennings, Olmo, Ventura, Cios, and
   Clore]{strack2014impact}
 Beata Strack, Jonathan~P. DeShazo, Chris Gennings, Juan~L. Olmo, Sebastian
@@ -287,6 +346,14 @@ Beata Strack, Jonathan~P. DeShazo, Chris Gennings, Juan~L. Olmo, Sebastian
   of 70,000 clinical database patient records.
 \newblock \emph{BioMed Research International}, 2014:\penalty0 781670, 2014.
 \newblock \doi{10.1155/2014/781670}.
+
+\bibitem[Tao et~al.(2017)Tao, Zeng, and Lin]{tao2017efficient}
+Ran Tao, Donglin Zeng, and Dan-Yu Lin.
+\newblock Efficient semiparametric inference under two-phase sampling, with
+  applications to genetic association studies.
+\newblock \emph{Journal of the American Statistical Association}, 112\penalty0
+  (520):\penalty0 1468--1476, 2017.
+\newblock \doi{10.1080/01621459.2017.1295864}.
 
 \bibitem[Tao et~al.(2020)Tao, Zeng, and Lin]{tao2020optimal}
 Ran Tao, Donglin Zeng, and Dan-Yu Lin.
@@ -347,12 +414,13 @@ Brian~D. Williamson, Peter~B. Gilbert, Marco Carone, and Noah Simon.
 \newblock \emph{Biometrics}, 77\penalty0 (1):\penalty0 9--22, 2021.
 \newblock \doi{10.1111/biom.13392}.
 
-\bibitem[Yeh and Lien(2009)]{yeh2009comparisons}
-I-Cheng Yeh and Che-hui Lien.
-\newblock The comparisons of data mining techniques for the predictive accuracy
-  of probability of default of credit card clients.
-\newblock \emph{Expert Systems with Applications}, 36\penalty0 (2):\penalty0
-  2473--2480, 2009.
-\newblock \doi{10.1016/j.eswa.2007.12.020}.
+\bibitem[Williamson et~al.(2023)Williamson, Gilbert, Simon, and
+  Carone]{williamson2023general}
+Brian~D. Williamson, Peter~B. Gilbert, Noah~R. Simon, and Marco Carone.
+\newblock A general framework for inference on algorithm-agnostic variable
+  importance.
+\newblock \emph{Journal of the American Statistical Association}, 118\penalty0
+  (543):\penalty0 1645--1658, 2023.
+\newblock \doi{10.1080/01621459.2021.2003200}.
 
 \end{thebibliography}
