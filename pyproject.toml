@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "imboreceipt"
-version = "0.1.0"
-description = "CREDO & CREDO-Bench: Budgeted channel discovery and selective feature acquisition for imbalanced prediction"
+version = "2.2.0"
+description = "Budgeted Feature-Channel Discovery from Two-Phase Stratified Pilots, with Retrospective Evaluation of Cost-Aware Selective Querying"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 license = { text = "MIT" }

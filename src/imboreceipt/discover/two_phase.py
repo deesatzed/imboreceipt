@@ -466,22 +466,72 @@ def _prepare_fold_matrices(
     return out
 
 
+def _compute_breslow_cain_pilot_offset(
+    y_pilot: np.ndarray,
+    init_logit_pilot: np.ndarray,
+    ht_weights_pilot: np.ndarray,
+    n_bins: int = 8,
+) -> np.ndarray:
+    """Compute Breslow & Cain (1988) case-control log-odds offset delta_P(b) per baseline bin.
+
+    Within score bin b, pi_P(y, b) = n_{y,b} / N_{y,b} where N_{y,b} = sum_{i in P: Y=y, B=b} w_i.
+    Then delta_P(b) = log(pi_P(1, b) / pi_P(0, b)), so unweighted pilot Bernoulli fitting anchored
+    at logit(p_1) + delta_P(b) targets exact population log-odds after subtracting delta_P(b).
+    """
+    n_p = int(y_pilot.size)
+    if n_p < 4:
+        return np.zeros(n_p, dtype=float)
+    edges = np.unique(np.quantile(init_logit_pilot, np.linspace(0.0, 1.0, n_bins + 1)))
+    bins = (
+        np.zeros(n_p, dtype=int)
+        if edges.size <= 2
+        else np.clip(np.digitize(init_logit_pilot, edges[1:-1], right=False), 0, edges.size - 2)
+    )
+    delta = np.zeros(n_p, dtype=float)
+    # Global fallback offset
+    pos_m_all = y_pilot == 1
+    neg_m_all = y_pilot == 0
+    pi1_all = float(np.sum(pos_m_all)) / max(1.0, float(np.sum(ht_weights_pilot[pos_m_all])))
+    pi0_all = float(np.sum(neg_m_all)) / max(1.0, float(np.sum(ht_weights_pilot[neg_m_all])))
+    global_delta = float(np.log(max(1e-6, pi1_all) / max(1e-6, pi0_all)))
+
+    for b_val in np.unique(bins):
+        bm = bins == b_val
+        pos_b = bm & (y_pilot == 1)
+        neg_b = bm & (y_pilot == 0)
+        n1_b = int(np.sum(pos_b))
+        n0_b = int(np.sum(neg_b))
+        if n1_b >= 1 and n0_b >= 1:
+            pop1_b = max(float(n1_b), float(np.sum(ht_weights_pilot[pos_b])))
+            pop0_b = max(float(n0_b), float(np.sum(ht_weights_pilot[neg_b])))
+            pi1_b = float(n1_b) / pop1_b
+            pi0_b = float(n0_b) / pop0_b
+            delta[bm] = float(np.clip(np.log(max(1e-6, pi1_b) / max(1e-6, pi0_b)), -5.0, 5.0))
+        else:
+            delta[bm] = global_delta
+    return delta
+
+
 def _fit_oof_offset_gbdt_mats(
     fold_mats: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     y: np.ndarray,
     sample_weight: np.ndarray,
     init_logit: np.ndarray,
     seed: int,
+    breslow_cain_delta: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Fit shallow regularized offset-anchored GBDT + fold-internal HT Platt calibration."""
     n = int(y.size)
     p_base = expit(init_logit)
     oof_p = p_base.copy()
     valid_mask = np.zeros(n, dtype=bool)
+    use_bc = breslow_cain_delta is not None
 
     for f_idx, (tr_i, va_i, X_tr, X_va) in enumerate(fold_mats):
         w_tr = sample_weight[tr_i]
         w_tr_norm = w_tr * (float(tr_i.size) / max(1e-9, float(np.sum(w_tr))))
+        w_tree = np.ones(tr_i.size, dtype=float) if use_bc else w_tr_norm
+        init_tr = init_logit[tr_i] + breslow_cain_delta[tr_i] if use_bc else init_logit[tr_i]
 
         min_child = max(8, min(25, int(tr_i.size // 25)))
         clf = lgb.LGBMClassifier(
@@ -499,7 +549,8 @@ def _fit_oof_offset_gbdt_mats(
             n_jobs=2,
             verbose=-1,
         )
-        clf.fit(X_tr, y[tr_i], sample_weight=w_tr_norm, init_score=init_logit[tr_i])
+        clf.fit(X_tr, y[tr_i], sample_weight=w_tree, init_score=init_tr)
+        # Subtract Breslow-Cain pilot sampling offset to recover population-scale margins
         tr_margin = init_logit[tr_i] + np.asarray(clf.predict(X_tr, raw_score=True), dtype=float)
         va_margin = init_logit[va_i] + np.asarray(clf.predict(X_va, raw_score=True), dtype=float)
 
@@ -527,6 +578,8 @@ def discover_sequential_conditional_gain(
     time_order_train: np.ndarray | None = None,
     sequential: bool = True,
     use_ht_weights: bool = True,
+    use_breslow_cain_offset: bool = False,
+    allow_lazy_submodular_screen: bool = True,
     multiplicity: str = "holm",
     alpha_select: float = 0.05,
     method_name: str = "neyman_seq_cmi",
@@ -556,6 +609,11 @@ def discover_sequential_conditional_gain(
     Z_pilot_df = Z_pool_train.iloc[idx].reset_index(drop=True)
     base_p_clip = np.clip(oof_base_prob[idx], _PROB_EPS, 1.0 - _PROB_EPS)
     init_logit_0 = logit(base_p_clip)
+    bc_delta = (
+        _compute_breslow_cain_pilot_offset(y_p, init_logit_0, pilot.ht_weights)
+        if use_breslow_cain_offset
+        else None
+    )
 
     curr_mats = _prepare_fold_matrices(curr_df, y_p, cv_splits, semantic_types=sem_p)
     cand_mats = {
@@ -563,7 +621,9 @@ def discover_sequential_conditional_gain(
         for c in candidates
     }
 
-    p_curr, valid_curr = _fit_oof_offset_gbdt_mats(curr_mats, y_p, w_p, init_logit_0, seed=seed)
+    p_curr, valid_curr = _fit_oof_offset_gbdt_mats(
+        curr_mats, y_p, w_p, init_logit_0, seed=seed, breslow_cain_delta=bc_delta
+    )
     ll_curr = _bernoulli_loglik(y_p, p_curr)
 
     remaining = list(candidates)
@@ -575,7 +635,7 @@ def discover_sequential_conditional_gain(
     init_pvals: dict[str, float] = {}
     init_pospart_scores: dict[str, float] = {}
 
-    # Cache step-1 results for non-sequential mode and lazy submodular pruning
+    # Cache step-1 results for non-sequential mode and optional lazy submodular pruning
     step1_stats: dict[str, tuple[float, float, float, float, float, np.ndarray, np.ndarray]] = {}
 
     step_num = 0
@@ -597,7 +657,8 @@ def discover_sequential_conditional_gain(
 
             # Lazy submodular screen: reuse Step-1 negative bound when pool is large
             if (
-                step_num > 1
+                allow_lazy_submodular_screen
+                and step_num > 1
                 and sequential
                 and len(affordable) > 12
                 and cand.channel_id in step1_stats
@@ -615,7 +676,9 @@ def discover_sequential_conditional_gain(
                 )
             ]
             # Fit from identical Phase-1 anchor init_logit_0 and seed for matched nested capacity
-            p_m, val_m = _fit_oof_offset_gbdt_mats(aug_mats, y_p, w_p, init_logit_0, seed=seed)
+            p_m, val_m = _fit_oof_offset_gbdt_mats(
+                aug_mats, y_p, w_p, init_logit_0, seed=seed, breslow_cain_delta=bc_delta
+            )
             ev = valid_curr & val_m
             if int(np.sum(ev)) < 10:
                 g_m, se_t, se_1, se_2, p_raw = 0.0, 1.0, 1.0, 0.0, 1.0
@@ -783,10 +846,13 @@ def discover_competitor_method(
     """Execute competitive conditional and marginal feature-channel discovery baselines.
 
     Supported ``method`` values:
-    - ``"cpi_pilot"``: Stratum-Conditional Permutation Importance (Chamma et al., 2024).
+    - ``"cpi_pilot"``: Baseline-Stratified Permutation Importance (permute Z_m in X_base strata).
+    - ``"chamma_residual_cpi_pilot"``: Full-Conditioning Residualized CPI (Chamma et al., 2023;
+      predict Z_m from [X_base, Z_{-m}] on training folds and permute OOF residuals).
     - ``"loco_pilot"``: Leave-One-Channel-Out log-loss importance (Williamson et al., 2021).
     - ``"crt_knockoff_pilot"``: Gaussian-copula Model-X Knockoff / CRT (Candes et al., 2018).
-    - ``"dime_cmi_pilot"``: Unweighted discriminative CMI selector (Gadgil et al., 2024).
+    - ``"unweighted_pilot_no_lcb"`` (alias ``"dime_cmi_pilot"``): Unweighted sequential pilot CMI
+      ablation omitting Horvitz-Thompson weights and Holm LCB stopping.
     - ``"global_mi"``: Full-cohort marginal mutual information ``I(Y; Z_m) / c_m``.
     - ``"random"``: Uniform random channel selection within ``max_budget``.
     """
@@ -794,7 +860,7 @@ def discover_competitor_method(
     rng = np.random.default_rng(seed)
     sem_p = dict(base_semantic_types) if base_semantic_types is not None else {}
 
-    if method == "dime_cmi_pilot":
+    if method in {"unweighted_pilot_no_lcb", "dime_cmi_pilot"}:
         return discover_sequential_conditional_gain(
             X_base_train,
             Z_pool_train,
@@ -810,7 +876,7 @@ def discover_competitor_method(
             use_ht_weights=False,
             multiplicity="none",
             alpha_select=0.50,
-            method_name="dime_cmi_pilot",
+            method_name=method,
             seed=seed,
         )
 
@@ -1185,6 +1251,123 @@ def discover_competitor_method(
             initial_scores=w_stats,
         )
 
+    if method == "chamma_residual_cpi_pilot":
+        # Chamma et al. (2023) Residualized Conditional Permutation Importance conditional on
+        # BOTH X_base and all other candidate channels Z_{-m}.
+        n_p = int(y_p.size)
+        valid_f = np.zeros(n_p, dtype=bool)
+        perm_ll_drops = {c.channel_id: np.zeros(n_p, dtype=float) for c in candidates}
+
+        for f_idx, (tr_i, va_i) in enumerate(cv_splits):
+            if np.unique(y_p[tr_i]).size < 2:
+                continue
+            prep = TabularPreprocessor(semantic_types=sem_p)
+            X_tr = np.nan_to_num(prep.fit_transform(joint_df_p.iloc[tr_i]), nan=0.0)
+            X_va = np.nan_to_num(prep.transform(joint_df_p.iloc[va_i]), nan=0.0)
+            w_tr = w_p[tr_i] * (float(tr_i.size) / max(1e-9, float(np.sum(w_p[tr_i]))))
+            clf = lgb.LGBMClassifier(
+                n_estimators=55,
+                learning_rate=0.07,
+                num_leaves=23,
+                max_depth=5,
+                min_child_samples=max(8, min(25, int(tr_i.size // 25))),
+                max_bin=127,
+                reg_alpha=1.0,
+                reg_lambda=5.0,
+                max_delta_step=1.0,
+                random_state=seed + f_idx,
+                n_jobs=2,
+                verbose=-1,
+            )
+            clf.fit(X_tr, y_p[tr_i], sample_weight=w_tr, init_score=init_logit_0[tr_i])
+            tr_m = init_logit_0[tr_i] + np.asarray(clf.predict(X_tr, raw_score=True), dtype=float)
+            va_m = init_logit_0[va_i] + np.asarray(clf.predict(X_va, raw_score=True), dtype=float)
+            cal = LogisticRegression(C=2.0, solver="lbfgs", max_iter=200)
+            cal.fit(tr_m.reshape(-1, 1), y_p[tr_i], sample_weight=w_tr)
+            p_va = np.clip(cal.predict_proba(va_m.reshape(-1, 1))[:, 1], _PROB_EPS, 1.0 - _PROB_EPS)
+            valid_f[va_i] = True
+            ll_va_full = _bernoulli_loglik(y_p[va_i], p_va)
+
+            src_map = _source_to_transformed_indices(prep)
+            n_cols_tot = X_tr.shape[1]
+            mu_tr = np.mean(X_tr, axis=0)
+            sd_tr = np.maximum(1e-6, np.std(X_tr, axis=0))
+            X_tr_std = (X_tr - mu_tr) / sd_tr
+            X_va_std = (X_va - mu_tr) / sd_tr
+
+            for c_idx, cand in enumerate(candidates):
+                c_idxs = [j for col in cand.columns for j in src_map.get(col, [])]
+                if not c_idxs:
+                    continue
+                minus_idxs = [j for j in range(n_cols_tot) if j not in set(c_idxs)]
+                reg_c = Ridge(alpha=5.0)
+                reg_c.fit(X_tr_std[:, minus_idxs], X_tr[:, c_idxs], sample_weight=w_tr)
+                Z_hat_va = reg_c.predict(X_va_std[:, minus_idxs])
+                if Z_hat_va.ndim == 1:
+                    Z_hat_va = Z_hat_va[:, None]
+                res_va = X_va[:, c_idxs] - Z_hat_va
+
+                acc_drop = np.zeros(va_i.size, dtype=float)
+                n_perm = 3
+                for p_rep in range(n_perm):
+                    perm_rng = np.random.default_rng(seed + 1301 * f_idx + 53 * c_idx + p_rep)
+                    shuf = perm_rng.permutation(va_i.size)
+                    X_va_cf = X_va.copy()
+                    X_va_cf[:, c_idxs] = Z_hat_va + res_va[shuf]
+                    m_cf = init_logit_0[va_i] + np.asarray(
+                        clf.predict(X_va_cf, raw_score=True), dtype=float
+                    )
+                    p_cf = np.clip(
+                        cal.predict_proba(m_cf.reshape(-1, 1))[:, 1], _PROB_EPS, 1.0 - _PROB_EPS
+                    )
+                    acc_drop += ll_va_full - _bernoulli_loglik(y_p[va_i], p_cf)
+                perm_ll_drops[cand.channel_id][va_i] = acc_drop / float(n_perm)
+
+        scores_d = {}
+        ses_d = {}
+        pvals_d = {}
+        for cand in candidates:
+            psi_c = perm_ll_drops[cand.channel_id][valid_f]
+            g_c, se_c, _, _ = two_phase_variance_decomposition(
+                psi_c,
+                w_p[valid_f],
+                h_p[valid_f],
+                pilot.stratum_pop_counts,
+                pilot.stratum_sample_counts,
+                groups=grp_p[valid_f] if grp_p is not None else None,
+            )
+            scores_d[cand.channel_id] = g_c
+            ses_d[cand.channel_id] = se_c
+            pvals_d[cand.channel_id] = float(norm.sf(g_c / max(1e-12, se_c)))
+
+        adj = holm_bonferroni_adjust([pvals_d[c.channel_id] for c in candidates])
+        passing = [
+            c
+            for c, ap in zip(candidates, adj, strict=True)
+            if ap < alpha_select and scores_d[c.channel_id] > 0.0
+        ]
+        passing.sort(
+            key=lambda c: scores_d[c.channel_id] / max(1e-6, c.acquisition_cost), reverse=True
+        )
+        chosen = []
+        spent = 0.0
+        for c in passing:
+            if spent + c.acquisition_cost <= max_budget + 1e-9:
+                chosen.append(c)
+                spent += c.acquisition_cost
+        return DiscoverySelectionResult(
+            method="chamma_residual_cpi_pilot",
+            pilot_design=pilot.design,
+            pilot_fraction=pilot.pilot_fraction_of_valid,
+            pilot_channel_accesses=int(pilot.n_pilot * len(candidates)),
+            selected_channels=chosen,
+            selected_ids=[c.channel_id for c in chosen],
+            total_cost_spent=spent,
+            initial_scores=scores_d,
+            initial_ses=ses_d,
+            initial_pvals=pvals_d,
+        )
+
     raise ValueError(f"Unknown discovery competitor method: {method}")
 
 
@@ -1283,7 +1466,7 @@ def evaluate_split_pilot_step1_inference(
             reg_lambda=5.0,
             max_delta_step=1.0,
             random_state=seed,
-            n_jobs=2,
+            n_jobs=1,
             verbose=-1,
         )
         clf.fit(X_tr_m, y_fit, sample_weight=w_fit_norm, init_score=init_fit)
@@ -1356,12 +1539,237 @@ def evaluate_split_pilot_step1_inference(
     }
 
 
+def discover_sequential_split_pilot(
+    X_base_train: pd.DataFrame,
+    Z_pool_train: pd.DataFrame,
+    y_train: np.ndarray,
+    candidates: list[CandidateChannelSpec],
+    oof_base_prob: np.ndarray,
+    pilot: TwoPhasePilot,
+    max_budget: float,
+    *,
+    base_semantic_types: dict[str, SemanticType] | None = None,
+    alpha_select: float = 0.05,
+    n_jobs: int = 1,
+    seed: int = 42,
+) -> DiscoverySelectionResult:
+    """Multi-step sequential discovery on a disjoint 50/50 split-pilot (Theorem 1).
+
+    Partitions each Phase-2 pilot stratum ``h`` without replacement into a fitting half
+    ``P_{h,fit}`` and a disjoint evaluation half ``P_{h,eval}``. At each forward step ``t``,
+    conditional on ``P_{fit}``, fits capacity-matched offset GBDTs strictly on ``P_{fit}`` and
+    computes design-based two-phase variance (``V_I + V_II``) and Holm-adjusted one-sided stopping
+    strictly on ``P_{eval}``, eliminating cross-fitting fold-overlap covariance.
+    """
+    rng = np.random.default_rng(seed + 31337)
+    idx = pilot.sampled_indices
+    h_p = pilot.stratum_ids_sampled
+    y_all = np.asarray(y_train, dtype=int).ravel()
+    sem_p = dict(base_semantic_types) if base_semantic_types is not None else {}
+
+    fit_pos_list: list[np.ndarray] = []
+    eval_pos_list: list[np.ndarray] = []
+    fit_smp_counts: dict[int, int] = {}
+    eval_smp_counts: dict[int, int] = {}
+
+    for h_val in sorted(set(h_p.tolist())):
+        loc_h = np.flatnonzero(h_p == h_val)
+        n_h = int(loc_h.size)
+        if n_h < 2:
+            fit_pos_list.append(loc_h)
+            fit_smp_counts[int(h_val)] = n_h
+            continue
+        perm = rng.permutation(loc_h)
+        n_fit = max(1, n_h // 2)
+        n_ev = n_h - n_fit
+        fit_pos_list.append(np.sort(perm[:n_fit]))
+        eval_pos_list.append(np.sort(perm[n_fit:]))
+        fit_smp_counts[int(h_val)] = n_fit
+        eval_smp_counts[int(h_val)] = n_ev
+
+    fit_loc = np.sort(np.concatenate(fit_pos_list))
+    eval_loc = np.sort(np.concatenate(eval_pos_list))
+    fit_idx = idx[fit_loc]
+    eval_idx = idx[eval_loc]
+
+    h_fit = h_p[fit_loc]
+    h_eval = h_p[eval_loc]
+    w_fit = np.array(
+        [pilot.stratum_pop_counts[int(h)] / max(1, fit_smp_counts[int(h)]) for h in h_fit],
+        dtype=float,
+    )
+    w_eval = np.array(
+        [pilot.stratum_pop_counts[int(h)] / max(1, eval_smp_counts[int(h)]) for h in h_eval],
+        dtype=float,
+    )
+    w_fit_norm = w_fit * (float(w_fit.size) / max(1e-12, float(np.sum(w_fit))))
+
+    Xb_fit = X_base_train.iloc[fit_idx].reset_index(drop=True)
+    Xb_eval = X_base_train.iloc[eval_idx].reset_index(drop=True)
+    Z_fit = Z_pool_train.iloc[fit_idx].reset_index(drop=True)
+    Z_eval = Z_pool_train.iloc[eval_idx].reset_index(drop=True)
+    y_fit = y_all[fit_idx]
+    y_eval = y_all[eval_idx]
+
+    init_fit = logit(np.clip(oof_base_prob[fit_idx], _PROB_EPS, 1.0 - _PROB_EPS))
+    init_eval = logit(np.clip(oof_base_prob[eval_idx], _PROB_EPS, 1.0 - _PROB_EPS))
+
+    def _fit_eval_probs(df_tr: pd.DataFrame, df_ev: pd.DataFrame, step_seed: int) -> np.ndarray:
+        prep = TabularPreprocessor(semantic_types=sem_p)
+        X_tr_m = prep.fit_transform(df_tr)
+        X_ev_m = prep.transform(df_ev)
+        min_child = max(8, min(25, int(X_tr_m.shape[0] // 22)))
+        clf = lgb.LGBMClassifier(
+            n_estimators=55,
+            learning_rate=0.05,
+            num_leaves=15,
+            max_depth=4,
+            min_child_samples=min_child,
+            subsample_for_bin=min(50000, max(2000, int(X_tr_m.shape[0]))),
+            max_bin=127,
+            reg_alpha=1.0,
+            reg_lambda=5.0,
+            max_delta_step=1.0,
+            random_state=step_seed,
+            n_jobs=n_jobs,
+            verbose=-1,
+        )
+        clf.fit(X_tr_m, y_fit, sample_weight=w_fit_norm, init_score=init_fit)
+        tr_m = init_fit + np.asarray(clf.predict(X_tr_m, raw_score=True), dtype=float)
+        ev_m = init_eval + np.asarray(clf.predict(X_ev_m, raw_score=True), dtype=float)
+        cal = LogisticRegression(C=2.0, solver="lbfgs", max_iter=200)
+        cal.fit(tr_m.reshape(-1, 1), y_fit, sample_weight=w_fit_norm)
+        return np.clip(cal.predict_proba(ev_m.reshape(-1, 1))[:, 1], _PROB_EPS, 1.0 - _PROB_EPS)
+
+    chosen: list[CandidateChannelSpec] = []
+    chosen_ids: set[str] = set()
+    spent = 0.0
+    step_trace: list[SequentialChannelStep] = []
+    init_scores: dict[str, float] = {}
+    init_ses: dict[str, float] = {}
+    init_pvals: dict[str, float] = {}
+
+    step_num = 0
+    while True:
+        step_num += 1
+        rem_budget = max_budget - spent
+        affordable = [
+            c
+            for c in candidates
+            if c.channel_id not in chosen_ids and c.acquisition_cost <= rem_budget + 1e-9
+        ]
+        if not affordable:
+            break
+
+        sel_cols = [col for c in chosen for col in c.columns]
+        cur_fit = pd.concat([Xb_fit, Z_fit[sel_cols]], axis=1) if sel_cols else Xb_fit
+        cur_eval = pd.concat([Xb_eval, Z_eval[sel_cols]], axis=1) if sel_cols else Xb_eval
+        p_base_ev = _fit_eval_probs(cur_fit, cur_eval, seed + 100 * step_num)
+        ll_base_ev = _bernoulli_loglik(y_eval, p_base_ev)
+
+        step_g: dict[str, float] = {}
+        step_se: dict[str, tuple[float, float, float]] = {}
+        raw_ps: list[float] = []
+        for m_i, cand in enumerate(affordable):
+            c_cols = sel_cols + list(cand.columns)
+            pm_ev = _fit_eval_probs(
+                pd.concat([Xb_fit, Z_fit[c_cols]], axis=1),
+                pd.concat([Xb_eval, Z_eval[c_cols]], axis=1),
+                seed + 100 * step_num + m_i + 1,
+            )
+            psi_ev = _bernoulli_loglik(y_eval, pm_ev) - ll_base_ev
+            g_m, se_t, se_1, se_2 = two_phase_variance_decomposition(
+                psi_ev, w_eval, h_eval, pilot.stratum_pop_counts, eval_smp_counts
+            )
+            step_g[cand.channel_id] = g_m
+            step_se[cand.channel_id] = (se_t, se_1, se_2)
+            p_r = float(norm.sf(g_m / max(1e-12, se_t)))
+            raw_ps.append(p_r)
+            if step_num == 1:
+                init_scores[cand.channel_id] = g_m
+                init_ses[cand.channel_id] = se_t
+                init_pvals[cand.channel_id] = p_r
+
+        adj_ps = holm_bonferroni_adjust(raw_ps)
+        passing: list[tuple[float, CandidateChannelSpec, float, float]] = []
+        best_any: tuple[float, CandidateChannelSpec, float, float] | None = None
+        for cand, pr, pa in zip(affordable, raw_ps, adj_ps, strict=True):
+            gm = step_g[cand.channel_id]
+            ratio = gm / max(1e-6, cand.acquisition_cost)
+            if best_any is None or ratio > best_any[0]:
+                best_any = (ratio, cand, pr, float(pa))
+            if pa < alpha_select and gm > 0.0:
+                passing.append((ratio, cand, pr, float(pa)))
+
+        if not passing:
+            if best_any is not None:
+                _, bc, bpr, bpa = best_any
+                b_se, b_s1, b_s2 = step_se[bc.channel_id]
+                bg = step_g[bc.channel_id]
+                step_trace.append(
+                    SequentialChannelStep(
+                        step=step_num,
+                        selected_channel_id=None,
+                        gain_nats=bg,
+                        se_total=b_se,
+                        se_phase1=b_s1,
+                        se_phase2=b_s2,
+                        z_stat=bg / max(1e-12, b_se),
+                        p_raw=bpr,
+                        p_adjusted=bpa,
+                        lcb_95=bg - float(norm.ppf(1.0 - alpha_select)) * b_se,
+                        cost=0.0,
+                        stopped_by_error_control=True,
+                    )
+                )
+            break
+
+        passing.sort(key=lambda t: t[0], reverse=True)
+        _, win_c, win_pr, win_pa = passing[0]
+        w_se, w_s1, w_s2 = step_se[win_c.channel_id]
+        wg = step_g[win_c.channel_id]
+        chosen.append(win_c)
+        chosen_ids.add(win_c.channel_id)
+        spent += win_c.acquisition_cost
+        step_trace.append(
+            SequentialChannelStep(
+                step=step_num,
+                selected_channel_id=win_c.channel_id,
+                gain_nats=wg,
+                se_total=w_se,
+                se_phase1=w_s1,
+                se_phase2=w_s2,
+                z_stat=wg / max(1e-12, w_se),
+                p_raw=win_pr,
+                p_adjusted=win_pa,
+                lcb_95=wg - float(norm.ppf(1.0 - alpha_select)) * w_se,
+                cost=win_c.acquisition_cost,
+                stopped_by_error_control=False,
+            )
+        )
+
+    return DiscoverySelectionResult(
+        method="neyman_split_pilot_seq_cmi",
+        pilot_design=pilot.design,
+        pilot_fraction=pilot.pilot_fraction_of_valid,
+        pilot_channel_accesses=int(pilot.n_pilot * len(candidates)),
+        selected_channels=chosen,
+        selected_ids=[c.channel_id for c in chosen],
+        total_cost_spent=spent,
+        step_trace=step_trace,
+        initial_scores=init_scores,
+        initial_ses=init_ses,
+        initial_pvals=init_pvals,
+    )
+
+
 __all__ = [
     "DiscoverySelectionResult",
     "SequentialChannelStep",
     "TwoPhasePilot",
     "discover_competitor_method",
     "discover_sequential_conditional_gain",
+    "discover_sequential_split_pilot",
     "evaluate_split_pilot_step1_inference",
     "sample_two_phase_pilot",
     "two_phase_variance_decomposition",

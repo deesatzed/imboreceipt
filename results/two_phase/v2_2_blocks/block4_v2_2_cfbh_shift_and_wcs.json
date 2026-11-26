@@ -1,0 +1,113 @@
+{
+  "elapsed_sec": 36.53,
+  "cfbh_wcs_burnin_100rep": {
+    "IEEE_CIS_Fraud": {
+      "n_replications": 100,
+      "target_fdr": 0.4,
+      "era0_prev": 0.019822992865528764,
+      "era3_prev": 0.04072970288088142,
+      "lagged_citl": 0.876662280734239,
+      "lagged_slope": 0.8936167362593751,
+      "methods": {
+        "in_era_exchangeable_cfbh": {
+          "mean_fdr": 0.4056404677196518,
+          "se_fdr": 0.00642385656201883,
+          "q025_fdr": 0.2988609480417068,
+          "q975_fdr": 0.5350769230769229,
+          "mean_recall": 0.4113551846411033,
+          "se_recall": 0.003039195342807658,
+          "mean_alerts_per_100": 2.8714
+        },
+        "stale_era0_unweighted_cfbh": {
+          "mean_fdr": 0.397130076647669,
+          "se_fdr": 0.006037320288644588,
+          "q025_fdr": 0.273734610123119,
+          "q975_fdr": 0.4887138364779874,
+          "mean_recall": 0.4078492143561284,
+          "se_recall": 0.00273472964005987,
+          "mean_alerts_per_100": 2.797599999999999
+        },
+        "unlabeled_covariate_shift_wcs": {
+          "mean_fdr": 0.39811212200104945,
+          "se_fdr": 0.007161619046011497,
+          "q025_fdr": 0.2441324200913242,
+          "q975_fdr": 0.50568094022897,
+          "mean_recall": 0.4095582020258789,
+          "se_recall": 0.003178783831354498,
+          "mean_alerts_per_100": 2.830700000000001
+        },
+        "labeled_burnin_2500_cfbh": {
+          "mean_fdr": 0.3307269050832912,
+          "se_fdr": 0.007577422931907732,
+          "q025_fdr": 0.1721766848816029,
+          "q975_fdr": 0.47313316993464044,
+          "mean_recall": 0.3882562106705458,
+          "se_recall": 0.0035532163493491586,
+          "mean_alerts_per_100": 2.4147
+        }
+      },
+      "paired_fdr_diffs": {
+        "stale_minus_exchangeable_mean": -0.008510391071982855,
+        "stale_minus_exchangeable_se": 0.007750925777793209,
+        "wcs_minus_stale_mean": 0.0009820453533804828,
+        "burnin_minus_stale_mean": -0.06640317156437782,
+        "burnin_minus_wcs_mean": -0.06738521691775828,
+        "burnin_minus_wcs_se": 0.010488316645959986
+      }
+    },
+    "NeurIPS_BAF": {
+      "n_replications": 100,
+      "target_fdr": 0.75,
+      "era0_prev": 0.00856,
+      "era3_prev": 0.014693333333333333,
+      "lagged_citl": 0.5619031675473337,
+      "lagged_slope": 1.013319685634313,
+      "methods": {
+        "in_era_exchangeable_cfbh": {
+          "mean_fdr": 0.71843419042467,
+          "se_fdr": 0.019345862860470756,
+          "q025_fdr": 0.0,
+          "q975_fdr": 0.8809333991464241,
+          "mean_recall": 0.23804623481647125,
+          "se_recall": 0.01564946350199447,
+          "mean_alerts_per_100": 2.0267
+        },
+        "stale_era0_unweighted_cfbh": {
+          "mean_fdr": 0.7985834016159687,
+          "se_fdr": 0.009370411053376645,
+          "q025_fdr": 0.710050505050505,
+          "q975_fdr": 0.8821930780406807,
+          "mean_recall": 0.3084842197345287,
+          "se_recall": 0.010967323875449428,
+          "mean_alerts_per_100": 2.6423
+        },
+        "unlabeled_covariate_shift_wcs": {
+          "mean_fdr": 0.8154403836228616,
+          "se_fdr": 0.010253108104420832,
+          "q025_fdr": 0.7267276422764227,
+          "q975_fdr": 0.89259343681712,
+          "mean_recall": 0.3659768069532112,
+          "se_recall": 0.013013296851556852,
+          "mean_alerts_per_100": 3.5793999999999992
+        },
+        "labeled_burnin_2500_cfbh": {
+          "mean_fdr": 0.6026203787513906,
+          "se_fdr": 0.030690695007397805,
+          "q025_fdr": 0.0,
+          "q975_fdr": 0.8842104717316581,
+          "mean_recall": 0.18245096190492213,
+          "se_recall": 0.01589951029146281,
+          "mean_alerts_per_100": 1.4728000000000003
+        }
+      },
+      "paired_fdr_diffs": {
+        "stale_minus_exchangeable_mean": 0.08014921119129889,
+        "stale_minus_exchangeable_se": 0.02142489931079226,
+        "wcs_minus_stale_mean": 0.01685698200689254,
+        "burnin_minus_stale_mean": -0.1959630228645784,
+        "burnin_minus_wcs_mean": -0.21282000487147093,
+        "burnin_minus_wcs_se": 0.030770154096157975
+      }
+    }
+  }
+}

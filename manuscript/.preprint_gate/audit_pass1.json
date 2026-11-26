@@ -6,19 +6,20 @@
   "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
   "manuscript_file": null,
   "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
-  "manuscript_sha256": "30c8331d01526159d2687e69e3fdc222db04c85b2d574b15e4868bafa8851b04",
-  "file_count": 8,
+  "manuscript_sha256": "a4d48c37084883acdef21700ff5ff99e32d181ec9dfe2fc37a8c2e1732e740fa",
+  "file_count": 9,
   "tracked_files": {
-    "fig1_discovery_noninferiority_and_stress.pdf": "54399a0d2cad0db3728cf584ea123d9d690587b298015afa8275897f46284ec3",
-    "fig2_streaming_budget_curves.pdf": "b48f0dcc2db2393017ae41c26c6e3f962836881503d297c317a79b91f7c76a74",
-    "fig3_conformal_fdr_selection.pdf": "56619fce34a7e4b7c922d6c57f4483b3e637f94cbf5f09ed80a3b336fed51e2c",
-    "fig4_pilot_curve_and_flip_decomposition.pdf": "bf46c570e64d0cc04aee74955e96f4be59777e4106f4811c0ba01f5695ad1d72",
-    "main.bbl": "e0bb139231d75217fb21c7929d8ea5ac791abc042bd4a58d98bc5a5f6b8c6a2d",
-    "main.pdf": "b0187a793b38d873ee2e1fe682f2e0a22470a542e8af455b02af8f6b3fbdf460",
-    "main.tex": "48747671f6685c246e340b1c70dca2fb4a6667e9d9df69ed58a07b9de35796ac",
-    "references.bib": "cb6cf70024f4b899d3531f8f8849d1725db5e1289a84c566d63f1202ed9814a5"
+    "fig1_discovery_noninferiority_and_stress.pdf": "346ba4a2deaa69bedcd4ada8a822161832671d1b34e608d0c2035d304d5db312",
+    "fig2_streaming_budget_curves.pdf": "3490509a870568e76c8a733b3427e081380106b12930c12d025485e43305f118",
+    "fig3_conformal_fdr_selection.pdf": "9e2b8160e8fe8f6abd36708245c9eed86dceedfb84d2fa993adc1465c4e743b0",
+    "fig4_pilot_curve_and_flip_decomposition.pdf": "04092c489ce24283d9f2c4942308e3c57fedd03b263508e2ca5370c0bb81fcd0",
+    "fig5_clinical_triad_and_calibration.pdf": "fd39fb94b6c98163bc4105dd33667104389dba1b38fd66882caa028af459ca65",
+    "main.bbl": "02c3b7c93c2934a16e6d7d786bc3d3ae8f43daec7d35eb003e1e93e09a7a1213",
+    "main.pdf": "36a90be4de9700b241b19a37d519ec79bdbe058264e75841c6a4080978903d8a",
+    "main.tex": "93b623c05bd1cc156df15c6f0507f47e6998fbf2b0b58df3158147e9dffa22aa",
+    "references.bib": "5840d39353969926192cdbe8cbd95ff12482bd860e7ee63ce17f8313db3d9841"
   },
-  "evaluated_at": "2026-11-20T17:26:21.832664+00:00",
+  "evaluated_at": "2026-11-26T14:48:49.324465+00:00",
   "gates": {
     "G1_AI_ATTRIBUTION": {
       "gate": "G1_AI_ATTRIBUTION",
@@ -43,9 +44,9 @@
       "passed": true,
       "citation_summary": {
         "mode": "online",
-        "bib_entry_count": 44,
-        "cited_key_count": 44,
-        "verified_count": 40
+        "bib_entry_count": 52,
+        "cited_key_count": 51,
+        "verified_count": 48
       },
       "failures": [],
       "warnings": [
@@ -80,7 +81,7 @@
     },
     "G5_CLAIM_GROUNDING": {
       "gate": "G5_CLAIM_GROUNDING",
-      "purely_computational": false,
+      "purely_computational": true,
       "passed": true,
       "failures": [],
       "warnings": []

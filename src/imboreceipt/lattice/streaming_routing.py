@@ -36,12 +36,13 @@ _GH_WEIGHTS = _GH_W_RAW / np.sqrt(np.pi)
 
 @dataclass(frozen=True, slots=True)
 class CalibrationSummary:
-    """Probability calibration diagnostics (Van Calster et al., 2019)."""
+    """Probability calibration diagnostics (Van Calster et al., 2019; Austin & Steyerberg, 2019)."""
 
     ece: float
     brier: float
     cal_intercept: float
     cal_slope: float
+    ici: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,13 +212,66 @@ def decompose_routing_flips(
     )
 
 
+def compute_smooth_ici(y_true: np.ndarray, prob: np.ndarray, n_grid: int = 80) -> float:
+    """Compute smooth tricube LOESS Integrated Calibration Index (Austin & Steyerberg, 2019)."""
+    y = np.asarray(y_true, dtype=float).ravel()
+    p = np.clip(np.asarray(prob, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
+    n = int(y.size)
+    if n < 20 or np.unique(y).size < 2:
+        return abs(float(np.mean(y) - np.mean(p)))
+
+    lp = logit(p)
+    lo_q, hi_q = np.quantile(lp, [0.005, 0.995])
+    if hi_q - lo_q < 1e-6:
+        return abs(float(np.mean(y) - np.mean(p)))
+
+    grid = np.linspace(float(lo_q), float(hi_q), n_grid)
+    span = max(0.35, float(hi_q - lo_q) * 0.28)
+    smooth_grid = np.empty(n_grid, dtype=float)
+
+    for g_i, g_val in enumerate(grid):
+        dist = np.abs(lp - g_val)
+        bw = max(
+            span,
+            float(
+                np.partition(dist, min(n - 1, max(25, int(0.25 * n))))[
+                    min(n - 1, max(25, int(0.25 * n)))
+                ]
+            ),
+        )
+        u = np.clip(dist / max(1e-8, bw), 0.0, 1.0)
+        w = (1.0 - (u**3)) ** 3
+        mask = w > 1e-6
+        if int(np.sum(mask)) < 10:
+            smooth_grid[g_i] = float(np.mean(y))
+            continue
+        wm = w[mask]
+        xm = lp[mask] - g_val
+        ym = y[mask]
+        sw = float(np.sum(wm))
+        sx = float(np.sum(wm * xm))
+        sxx = float(np.sum(wm * xm * xm))
+        sy = float(np.sum(wm * ym))
+        sxy = float(np.sum(wm * xm * ym))
+        denom = sw * sxx - sx * sx
+        if denom > 1e-8:
+            b0 = (sxx * sy - sx * sxy) / denom
+        else:
+            b0 = sy / max(1e-12, sw)
+        smooth_grid[g_i] = float(np.clip(b0, 0.0, 1.0))
+
+    p_hat_smooth = np.interp(np.clip(lp, float(lo_q), float(hi_q)), grid, smooth_grid)
+    return float(np.mean(np.abs(p_hat_smooth - p)))
+
+
 def compute_calibration_summary(
     y_true: np.ndarray, prob: np.ndarray, n_bins: int = 15
 ) -> CalibrationSummary:
-    """Compute quantile-binned ECE, Brier score, calibration-in-the-large, and calibration slope."""
+    """Compute smooth LOESS ICI, ECE, Brier score, calibration-in-the-large, and slope."""
     y = np.asarray(y_true, dtype=float).ravel()
     p = np.clip(np.asarray(prob, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
     brier = float(np.mean((y - p) ** 2))
+    ici = compute_smooth_ici(y, p)
 
     edges = np.unique(np.quantile(p, np.linspace(0.0, 1.0, n_bins + 1)))
     if edges.size <= 2:
@@ -234,7 +288,9 @@ def compute_calibration_summary(
 
     lp = logit(p)
     if np.unique(y).size < 2 or float(np.std(lp)) < 1e-8:
-        return CalibrationSummary(ece=float(ece), brier=brier, cal_intercept=0.0, cal_slope=1.0)
+        return CalibrationSummary(
+            ece=float(ece), brier=brier, cal_intercept=0.0, cal_slope=1.0, ici=ici
+        )
 
     def _nll_int(a_arr: np.ndarray) -> float:
         eta = a_arr[0] + lp
@@ -255,6 +311,7 @@ def compute_calibration_summary(
         brier=brier,
         cal_intercept=cal_int,
         cal_slope=cal_slope,
+        ici=ici,
     )
 
 
@@ -347,8 +404,124 @@ def conformal_fdr_selection(
     )
 
 
+def weighted_conformal_fdr_selection(
+    scores_cal: np.ndarray,
+    y_cal: np.ndarray,
+    weights_cal: np.ndarray,
+    scores_test: np.ndarray,
+    y_test: np.ndarray,
+    weights_test: np.ndarray,
+    target_fdr: float,
+    seed: int = 42,
+) -> ConformalFDRResult:
+    """Jin & Candes (2025, Biometrika) Weighted Conformalized Selection (WCS) under covariate shift.
+
+    Computes covariate-shift-weighted conformal p-values using unlabeled likelihood-ratio weights
+    ``w(x) = dP_test(x) / dP_cal(x) > 0`` followed by Benjamini-Hochberg step-up selection:
+
+        p_j^WCS = [sum_{i in D_cal: Y_i=0} w_i * 1{S_i > S_test,j}
+                   + U_j * (w_test,j + sum_{i in D_cal: Y_i=0} w_i * 1{S_i == S_test,j})]
+                  / (w_test,j + sum_{i in D_cal} w_i).
+    """
+    sc = np.asarray(scores_cal, dtype=float).ravel()
+    yc = np.asarray(y_cal, dtype=int).ravel()
+    wc = np.maximum(1e-8, np.asarray(weights_cal, dtype=float).ravel())
+    st = np.asarray(scores_test, dtype=float).ravel()
+    yt = np.asarray(y_test, dtype=int).ravel()
+    wt = np.maximum(1e-8, np.asarray(weights_test, dtype=float).ravel())
+
+    n_cal = sc.size
+    n_test = st.size
+    m0 = int(np.sum(yc == 0))
+    target_ppv = 1.0 - float(target_fdr)
+    if n_cal == 0 or m0 == 0 or n_test == 0:
+        return ConformalFDRResult(
+            target_fdr=float(target_fdr),
+            target_ppv=target_ppv,
+            n_selected=0,
+            selection_rate=0.0,
+            realized_fdp=0.0,
+            realized_ppv=1.0,
+            realized_recall=0.0,
+        )
+
+    neg_mask = yc == 0
+    sc_neg = sc[neg_mask]
+    wc_neg = wc[neg_mask]
+    ord_neg = np.argsort(sc_neg)
+    sc_neg_s = sc_neg[ord_neg]
+    wc_neg_s = wc_neg[ord_neg]
+    cum_w = np.concatenate([[0.0], np.cumsum(wc_neg_s)])
+    tot_w_neg = float(cum_w[-1])
+    tot_w_cal = float(np.sum(wc))
+
+    idx_l = np.searchsorted(sc_neg_s, st, side="left")
+    idx_r = np.searchsorted(sc_neg_s, st, side="right")
+    w_gt = tot_w_neg - cum_w[idx_r]
+    w_eq = cum_w[idx_r] - cum_w[idx_l]
+
+    u_rand = np.random.default_rng(seed).uniform(0.0, 1.0, size=n_test)
+    p_wcs = (w_gt + u_rand * (wt + w_eq)) / (wt + tot_w_cal)
+
+    order = np.argsort(p_wcs)
+    p_sorted = p_wcs[order]
+    thresh = float(target_fdr) * (np.arange(1, n_test + 1, dtype=float) / float(n_test))
+    passing = np.flatnonzero(p_sorted <= thresh)
+    if passing.size == 0:
+        return ConformalFDRResult(
+            target_fdr=float(target_fdr),
+            target_ppv=target_ppv,
+            n_selected=0,
+            selection_rate=0.0,
+            realized_fdp=0.0,
+            realized_ppv=1.0,
+            realized_recall=0.0,
+        )
+
+    k_hat = int(passing[-1]) + 1
+    sel_mask = np.zeros(n_test, dtype=bool)
+    sel_mask[order[:k_hat]] = True
+    n_sel = int(np.sum(sel_mask))
+    tp = int(np.sum((yt == 1) & sel_mask))
+    fp = n_sel - tp
+    n_pos = max(1, int(np.sum(yt == 1)))
+    return ConformalFDRResult(
+        target_fdr=float(target_fdr),
+        target_ppv=target_ppv,
+        n_selected=n_sel,
+        selection_rate=float(n_sel) / float(n_test),
+        realized_fdp=float(fp) / float(n_sel),
+        realized_ppv=float(tp) / float(n_sel),
+        realized_recall=float(tp) / float(n_pos),
+    )
+
+
 def _bayes_action_loss(p: np.ndarray, cost_fp: float, cost_fn: float) -> np.ndarray:
     return np.minimum(p * cost_fn, (1.0 - p) * cost_fp)
+
+
+def solve_empirical_quantile_logit_offset(
+    p1: np.ndarray, quantile_deltas: np.ndarray
+) -> np.ndarray:
+    """Solve (1/K) sum_{r=1}^K expit(logit(p_1) + mu* + delta_{b,r}) = p_1 via Newton-Raphson."""
+    p = np.clip(np.asarray(p1, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
+    deltas = np.asarray(quantile_deltas, dtype=float)  # (N, K)
+    if deltas.size == 0 or float(np.max(np.abs(deltas))) < 1e-12:
+        return np.zeros_like(p)
+    lp = logit(p)
+    mu = -np.mean(deltas, axis=1)
+    base_arg = lp[:, None] + deltas
+
+    for _ in range(12):
+        probs = expit(base_arg + mu[:, None])
+        f_val = np.mean(probs, axis=1) - p
+        if float(np.max(np.abs(f_val))) < 1e-14:
+            break
+        f_der = np.mean(probs * (1.0 - probs), axis=1)
+        step = np.clip(f_val / np.maximum(1e-14, f_der), -4.0, 4.0)
+        mu = mu - step
+
+    return mu
 
 
 class StreamingSelectiveRouter:
@@ -360,13 +533,18 @@ class StreamingSelectiveRouter:
         per_instance_query_cost: float = 0.05,
         n_voi_bins: int = 12,
         mean_centered: bool = True,
+        quadrature_mode: str = "gauss_hermite",
+        n_emp_quantiles: int = 33,
     ) -> None:
         self.contract = contract
         self.query_cost = float(per_instance_query_cost)
         self.n_voi_bins = int(n_voi_bins)
         self.mean_centered = bool(mean_centered)
+        self.quadrature_mode = str(quadrature_mode)
+        self.n_emp_quantiles = max(5, int(n_emp_quantiles))
         self.bin_edges_: np.ndarray = np.array([0.0, 1.0])
         self.bin_logit_sd_: np.ndarray = np.array([0.5])
+        self.bin_emp_quantiles_: np.ndarray = np.zeros((1, self.n_emp_quantiles), dtype=float)
         self.bin_diagnostics_: list[dict[str, float]] = []
         self.p1_cal_: np.ndarray = np.empty(0)
         self.p2_cal_: np.ndarray = np.empty(0)
@@ -383,6 +561,16 @@ class StreamingSelectiveRouter:
         self.p2_cal_ = np.clip(np.asarray(p2_cal, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
 
         delta_logit = logit(self.p2_cal_) - logit(self.p1_cal_)
+        q_grid = np.linspace(
+            1.0 / (self.n_emp_quantiles + 1),
+            self.n_emp_quantiles / (self.n_emp_quantiles + 1),
+            self.n_emp_quantiles,
+        )
+        global_emp_q = (
+            np.quantile(delta_logit - float(np.mean(delta_logit)), q_grid)
+            if delta_logit.size > 0
+            else np.zeros(self.n_emp_quantiles, dtype=float)
+        )
         edges = np.unique(np.quantile(self.p1_cal_, np.linspace(0.0, 1.0, self.n_voi_bins + 1)))
         self.bin_diagnostics_ = []
         if edges.size <= 2:
@@ -393,6 +581,7 @@ class StreamingSelectiveRouter:
                 else float(np.sqrt(np.mean(delta_logit**2)))
             )
             self.bin_logit_sd_ = np.array([max(0.02, sd_g)])
+            self.bin_emp_quantiles_ = global_emp_q[None, :]
             self.bin_diagnostics_.append(
                 {
                     "bin_idx": 0.0,
@@ -415,6 +604,7 @@ class StreamingSelectiveRouter:
                 else float(np.std(delta_logit)),
             )
             sds = np.empty(edges.size - 1, dtype=float)
+            emp_qs = np.empty((edges.size - 1, self.n_emp_quantiles), dtype=float)
             for b in range(edges.size - 1):
                 m = bins == b
                 cnt = int(np.sum(m))
@@ -423,8 +613,10 @@ class StreamingSelectiveRouter:
                         sds[b] = max(0.02, float(np.std(delta_logit[m], ddof=1)))
                     else:
                         sds[b] = max(0.02, float(np.sqrt(np.mean(delta_logit[m] ** 2))))
+                    emp_qs[b] = np.quantile(delta_logit[m] - float(np.mean(delta_logit[m])), q_grid)
                 else:
                     sds[b] = global_sd
+                    emp_qs[b] = global_emp_q
                 if cnt > 0:
                     self.bin_diagnostics_.append(
                         {
@@ -439,6 +631,7 @@ class StreamingSelectiveRouter:
                         }
                     )
             self.bin_logit_sd_ = sds
+            self.bin_emp_quantiles_ = emp_qs
 
         self.voi_raw_cal_ = self._compute_raw_voi(
             self.p1_cal_, self.contract.cost_fp, self.contract.cost_fn, self.mean_centered
@@ -454,6 +647,14 @@ class StreamingSelectiveRouter:
         )
         return self.bin_logit_sd_[bins]
 
+    def _lookup_emp_quantiles(self, p: np.ndarray) -> np.ndarray:
+        if self.bin_edges_.size <= 2:
+            return np.repeat(self.bin_emp_quantiles_[0:1, :], p.size, axis=0)
+        bins = np.clip(
+            np.digitize(p, self.bin_edges_[1:-1], right=False), 0, self.bin_edges_.size - 2
+        )
+        return self.bin_emp_quantiles_[bins]
+
     def _compute_raw_voi(
         self,
         p1: np.ndarray,
@@ -463,14 +664,21 @@ class StreamingSelectiveRouter:
     ) -> np.ndarray:
         p = np.clip(np.asarray(p1, dtype=float).ravel(), _PROB_EPS, 1.0 - _PROB_EPS)
         lp = logit(p)
-        sig = self._lookup_sigma(p)
-        mu = (
-            solve_mean_preserving_logit_offset(p, sig)
-            if mean_centered
-            else np.zeros_like(p)
-        )
-
         prior_loss = _bayes_action_loss(p, cost_fp, cost_fn)
+
+        if self.quadrature_mode == "empirical_quantile":
+            q_deltas = self._lookup_emp_quantiles(p)  # (N, K)
+            mu = (
+                solve_empirical_quantile_logit_offset(p, q_deltas)
+                if mean_centered
+                else np.zeros_like(p)
+            )
+            p_post_mat = expit(lp[:, None] + mu[:, None] + q_deltas)
+            post_loss = np.mean(_bayes_action_loss(p_post_mat, cost_fp, cost_fn), axis=1)
+            return prior_loss - post_loss
+
+        sig = self._lookup_sigma(p)
+        mu = solve_mean_preserving_logit_offset(p, sig) if mean_centered else np.zeros_like(p)
         post_loss = np.zeros(p.size, dtype=float)
         for node, wt in zip(_GH_NODES, _GH_WEIGHTS, strict=True):
             p_post = expit(lp + mu + sig * float(node))
@@ -826,9 +1034,7 @@ class StreamingSelectiveRouter:
             voi_uncentered_cal, voi_uncentered_tst, 0.20, u_cal, u_tst
         )
         legacy_nontiebroken_v20_t = voi_uncentered_tst >= gamma_v20_uncentered
-        jaccard_20 = float(np.sum(m_v20_t & m_uv20_t)) / max(
-            1.0, float(np.sum(m_v20_t | m_uv20_t))
-        )
+        jaccard_20 = float(np.sum(m_v20_t & m_uv20_t)) / max(1.0, float(np.sum(m_v20_t | m_uv20_t)))
         disagree_20 = float(np.mean(m_v20_t != m_uv20_t))
 
         e0_e1_diagnostics = {
@@ -880,9 +1086,7 @@ class StreamingSelectiveRouter:
             "voi_uncentered_autonomous": asdict(pt_auto_unc),
             "e0_e1_diagnostics": e0_e1_diagnostics,
             "bin_diagnostics": self.bin_diagnostics_,
-            "contract_sensitivity": self.evaluate_contract_sensitivity(
-                yt, p1_t, p2_t, seed=seed
-            ),
+            "contract_sensitivity": self.evaluate_contract_sensitivity(yt, p1_t, p2_t, seed=seed),
             "conformal_fdr_comparison": {
                 "target_fdr": target_fdr,
                 "target_ppv": 1.0 - target_fdr,
@@ -906,8 +1110,11 @@ __all__ = [
     "StreamingSelectiveRouter",
     "calibrated_randomized_threshold_masks",
     "compute_calibration_summary",
+    "compute_smooth_ici",
     "conformal_fdr_selection",
     "decompose_routing_flips",
     "precision_at_target_recall",
+    "solve_empirical_quantile_logit_offset",
     "solve_mean_preserving_logit_offset",
+    "weighted_conformal_fdr_selection",
 ]

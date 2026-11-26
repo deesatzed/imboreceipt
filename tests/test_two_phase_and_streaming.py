@@ -305,4 +305,3 @@ def test_split_pilot_step1_inference_runs_and_controls_nulls() -> None:
     assert "sig" in out["selected_ids"]
     assert "nul" not in out["selected_ids"]
     assert out["ses_total"]["sig"] > 0.0
-

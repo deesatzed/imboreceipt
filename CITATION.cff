@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software or methodology, please cite the Preprints.org manuscript below."
+type: software
+title: "imboreceipt: Budgeted Feature-Channel Discovery from Two-Phase Stratified Pilots, with Retrospective Evaluation of Cost-Aware Selective Querying"
+version: 2.2.0
+date-released: "2026-11-26"
+license: MIT
+repository-code: "https://github.com/deesatzed/imboreceipt"
+authors:
+  - family-names: "Satz"
+    given-names: "Wayne A."
+    affiliation: "Department of Emergency Medicine, Lewis Katz School of Medicine at Temple University"
+    email: "satzwa@temple.edu"
+preferred-citation:
+  type: article
+  title: "Budgeted Feature-Channel Discovery from Two-Phase Stratified Pilots, with Retrospective Evaluation of Cost-Aware Selective Querying"
+  authors:
+    - family-names: "Satz"
+      given-names: "Wayne A."
+  year: 2026
+  journal: "Preprints.org"
+  doi: "10.20944/preprints202611.2517.v1"
+  url: "https://doi.org/10.20944/preprints202611.2517.v1"

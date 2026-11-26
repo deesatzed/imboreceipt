@@ -70,16 +70,32 @@ def _staggered_chrono_window(
     return df.iloc[lo:hi].reset_index(drop=True)
 
 
+TWIN_SOURCE_IDS_BY_COHORT: dict[str, tuple[str, ...]] = {
+    "UCI_Diabetes_Discharge": ("hie_prior_inpatient", "icd_primary_grouper", "lab_hba1c_panel"),
+    "Home_Credit_7Table": ("ext_bureau_vendor_2", "ext_bureau_vendor_3", "inst_dpd_delinquency"),
+    "IEEE_CIS_Fraud": ("cnt_card_links_C1_4", "cnt_device_links_C12_14", "vesta_block_01"),
+    "Scania_APS_Fleet": ("hist_sensor_ag", "hist_sensor_ee", "hist_sensor_ba"),
+    "NeurIPS_BAF": ("credit_bureau_score", "device_email_graph_8w", "other_cards_registry"),
+    "UCI_Taiwan_Credit": ("repay_status_m1", "repay_status_m2", "cash_payment_m1"),
+}
+
+
 def _append_stress_channels(
     X_base: pd.DataFrame,
     z_dict: dict[str, Any],
     candidates: list[CandidateChannelSpec],
     twin_source_ids: tuple[str, ...],
     seed: int,
+    train_idx: np.ndarray | None = None,
 ) -> None:
-    """Append 4 pure-noise null channels, 3 Stage-2 redundant twins, and 3 baseline echoes."""
+    """Append 4 pure-noise null channels, 3 Stage-2 redundant twins, and 3 baseline echoes.
+
+    When ``train_idx`` is provided, all location/scale statistics (medians, means, SDs) used to
+    construct noisy Stage-2 twins and baseline echoes are estimated strictly on ``train_idx``.
+    """
     n = len(X_base)
     rng = np.random.default_rng(seed + 9103)
+    fit_idx = np.arange(n, dtype=int) if train_idx is None else np.asarray(train_idx, dtype=int)
 
     # 1. Four pure-noise null channels Z_null _|_ (Y, X_base, Z_native)
     for k in range(1, 5):
@@ -106,23 +122,19 @@ def _append_stress_channels(
         twin_cols: list[str] = []
         for j, col in enumerate(src_spec.columns[:3]):
             raw_s = z_dict[col]
-            if isinstance(raw_s, pd.Series):
-                arr_v = (
-                    pd.to_numeric(raw_s, errors="coerce").to_numpy(dtype=float)
-                    if raw_s.dtype != object and str(raw_s.dtype) != "category"
-                    else raw_s.astype("category").cat.codes.to_numpy(dtype=float)
-                )
+            s_tmp = raw_s if isinstance(raw_s, pd.Series) else pd.Series(raw_s)
+            if s_tmp.dtype != object and str(s_tmp.dtype) != "category":
+                arr_v = pd.to_numeric(s_tmp, errors="coerce").to_numpy(dtype=float)
             else:
-                s_tmp = pd.Series(raw_s)
-                arr_v = (
-                    pd.to_numeric(s_tmp, errors="coerce").to_numpy(dtype=float)
-                    if s_tmp.dtype != object
-                    else s_tmp.astype("category").cat.codes.to_numpy(dtype=float)
-                )
-            arr_clean = np.nan_to_num(
-                arr_v, nan=float(np.nanmedian(arr_v)) if np.any(~np.isnan(arr_v)) else 0.0
-            )
-            sd_v = max(1e-3, float(np.std(arr_clean)))
+                # Fit category code vocabulary strictly on fit_idx
+                fit_cats = pd.Index(s_tmp.iloc[fit_idx].dropna().astype(str).unique())
+                cat_type = pd.CategoricalDtype(categories=fit_cats, ordered=False)
+                arr_v = s_tmp.astype(str).astype(cat_type).cat.codes.to_numpy(dtype=float)
+                arr_v[arr_v < 0] = np.nan
+            fit_sub = arr_v[fit_idx]
+            med_fit = float(np.nanmedian(fit_sub)) if np.any(~np.isnan(fit_sub)) else 0.0
+            arr_clean = np.nan_to_num(arr_v, nan=med_fit)
+            sd_v = max(1e-3, float(np.std(arr_clean[fit_idx])))
             t_col = f"s2_twin_{t_idx}_{j}"
             # Correlated noisy twin (Corr ~ 0.94) of native Stage-2 channel src_id
             z_dict[t_col] = (arr_clean + rng.normal(0.0, 0.35 * sd_v, n)).astype(np.float32)
@@ -141,12 +153,18 @@ def _append_stress_channels(
     for col in X_base.columns[:6]:
         s = X_base[col]
         if s.dtype == object or str(s.dtype) == "category":
-            v = s.astype("category").cat.codes.to_numpy(dtype=float)
+            fit_cats = pd.Index(s.iloc[fit_idx].dropna().astype(str).unique())
+            cat_type = pd.CategoricalDtype(categories=fit_cats, ordered=False)
+            v = s.astype(str).astype(cat_type).cat.codes.to_numpy(dtype=float)
+            v[v < 0] = 0.0
         else:
             v = pd.to_numeric(s, errors="coerce").to_numpy(dtype=float)
-        v = np.nan_to_num(v, nan=0.0)
-        sd = max(1e-6, float(np.std(v)))
-        num_base_arrays.append((v - float(np.mean(v))) / sd)
+            fit_v = v[fit_idx]
+            med_b = float(np.nanmedian(fit_v)) if np.any(~np.isnan(fit_v)) else 0.0
+            v = np.nan_to_num(v, nan=med_b)
+        mu_fit = float(np.mean(v[fit_idx]))
+        sd = max(1e-6, float(np.std(v[fit_idx])))
+        num_base_arrays.append((v - mu_fit) / sd)
 
     while len(num_base_arrays) < 3:
         num_base_arrays.append(rng.normal(0.0, 1.0, n))
@@ -182,6 +200,31 @@ def _append_stress_channels(
             ),
         ]
     )
+
+
+def materialize_leak_free_stress_pool(
+    cohort: FineGrainedCohort,
+    train_idx: np.ndarray,
+    seed: int = 42,
+    twin_source_ids: tuple[str, ...] | None = None,
+) -> tuple[pd.DataFrame, list[CandidateChannelSpec]]:
+    """Construct augmented stress pool with all twin/echo moments fit strictly on ``train_idx``."""
+    z_dict: dict[str, Any] = {col: cohort.Z_pool[col].copy() for col in cohort.Z_pool.columns}
+    cands = list(cohort.candidates)
+    t_ids = (
+        twin_source_ids
+        if twin_source_ids is not None
+        else TWIN_SOURCE_IDS_BY_COHORT.get(cohort.name, tuple(c.channel_id for c in cands[:3]))
+    )
+    _append_stress_channels(
+        cohort.X_base,
+        z_dict,
+        cands,
+        twin_source_ids=t_ids,
+        seed=seed,
+        train_idx=np.asarray(train_idx, dtype=int),
+    )
+    return pd.DataFrame(z_dict), cands
 
 
 def _icd9_organ_grouper(series: pd.Series) -> pd.Series:
@@ -1214,10 +1257,12 @@ def load_fine_taiwan_credit(
 
 __all__ = [
     "FineGrainedCohort",
+    "TWIN_SOURCE_IDS_BY_COHORT",
     "load_fine_diabetes_discharge",
     "load_fine_home_credit",
     "load_fine_ieee_cis",
     "load_fine_neurips_baf",
     "load_fine_scania_aps",
     "load_fine_taiwan_credit",
+    "materialize_leak_free_stress_pool",
 ]
