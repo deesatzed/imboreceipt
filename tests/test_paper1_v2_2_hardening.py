@@ -221,3 +221,18 @@ def test_discover_sequential_split_pilot_recovers_orthogonal_signals_without_twi
     assert "ch_b" in res_sp.selected_ids
     assert len(set(res_sp.selected_ids) & {"ch_a", "ch_a_twin"}) == 1
     assert "ch_null" not in res_sp.selected_ids
+
+
+def test_v2_2_blocks_regenerate_manuscript_tables() -> None:
+    """Committed v2_2_blocks JSON checkpoints deterministically regenerate Tables 1, 3, 4, 5, 6."""
+    import importlib.util
+    from pathlib import Path
+
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "verify_v2_2_tables.py"
+    spec = importlib.util.spec_from_file_location("verify_v2_2_tables", script_path)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    checks = mod.verify_all_tables(verbose=False)
+    assert all(checks.values())
+

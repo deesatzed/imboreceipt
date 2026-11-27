@@ -1,3 +1,3 @@
-"""imboreceipt: CREDO & CREDO-Bench for rare-event learning."""
+"""imboreceipt: Budgeted Feature-Channel Discovery from Two-Phase Stratified Pilots."""
 
-__version__ = "0.1.0"
+__version__ = "2.2.1"
