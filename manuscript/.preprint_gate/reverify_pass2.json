@@ -1,0 +1,101 @@
+{
+  "overall_passed": true,
+  "sealed_for_submission": true,
+  "mode": "reverify",
+  "target_server": "arxiv",
+  "manuscript_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript",
+  "manuscript_file": null,
+  "gate_state_dir": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate",
+  "manuscript_sha256": "70ff6fb2ad93a4d56494e3ac6ecfc290b65941f00237b5d0fd47c39ca6feb827",
+  "file_count": 9,
+  "tracked_files": {
+    "fig1_discovery_noninferiority_and_stress.pdf": "712ea1cf42c4bea3ef486bb59d65eaac769e2f9779703aca7d1907429700f55f",
+    "fig2_streaming_budget_curves.pdf": "2b593a89faee867d26c40bee46d59cd1a692ee9d1b248c148d07108d328d070a",
+    "fig3_conformal_fdr_selection.pdf": "41d140dd92c8976904739c4d2c96de9282849795d4b12e39e33681a00c1d692f",
+    "fig4_pilot_curve_and_flip_decomposition.pdf": "43a7b01129c20dc5e5178c908f40a0e5e9c7f69e250aca8f3c0854e1edec76f8",
+    "fig5_clinical_triad_and_calibration.pdf": "74dd34611cb38eebd6c8fb5125a29ee02494b7d5a41cdec90e716ce89b4e57f3",
+    "main.bbl": "dc844933086484d52c9c2f2612651258d9f6b5f0c0b5bac796099e9670155107",
+    "main.pdf": "fef9e3448603ea42de71af76e946cc258520f62276ea7b69c3cefdc103e3d061",
+    "main.tex": "0c02be45a8272bc78ed7982a889c3c60abe97035a2c0a372545e8e808f08d240",
+    "references.bib": "a1fff590ce535b708fa673590a454187fc82dfa5ff310780ffa0f42414fad146"
+  },
+  "evaluated_at": "2026-11-27T17:54:36.368871+00:00",
+  "gates": {
+    "G1_AI_ATTRIBUTION": {
+      "gate": "G1_AI_ATTRIBUTION",
+      "passed": true,
+      "failures": [],
+      "warnings": [
+        {
+          "code": "UNSPECIFIED_GEMINI_MODEL_VERSION",
+          "detail": "Manuscript mentions 'Gemini' generically without specifying the exact model version (e.g., 'Gemini 4 Argon' or 'Gemini 4 Carbon') recommended for computational reproducibility."
+        }
+      ]
+    },
+    "G2_SKILL_LICENSES": {
+      "gate": "G2_SKILL_LICENSES",
+      "passed": true,
+      "detected_resources": [],
+      "failures": [],
+      "warnings": []
+    },
+    "G3_CITATIONS": {
+      "gate": "G3_CITATIONS",
+      "passed": true,
+      "citation_summary": {
+        "mode": "online",
+        "bib_entry_count": 58,
+        "cited_key_count": 52,
+        "verified_count": 54
+      },
+      "failures": [],
+      "warnings": [
+        {
+          "code": "NON_ARTICLE_NO_DOI",
+          "key": "shim2018joint",
+          "detail": "Entry 'shim2018joint' (@inproceedings) has no DOI/PMID/arXiv ID; verify URL/report manually."
+        },
+        {
+          "code": "NON_ARTICLE_NO_DOI",
+          "key": "elkan2001foundations",
+          "detail": "Entry 'elkan2001foundations' (@inproceedings) has no DOI/PMID/arXiv ID; verify URL/report manually."
+        },
+        {
+          "code": "NON_ARTICLE_NO_DOI",
+          "key": "holm1979simple",
+          "detail": "Entry 'holm1979simple' (@misc) has no DOI/PMID/arXiv ID; verify URL/report manually."
+        },
+        {
+          "code": "NON_ARTICLE_NO_DOI",
+          "key": "ke2017lightgbm",
+          "detail": "Entry 'ke2017lightgbm' (@inproceedings) has no DOI/PMID/arXiv ID; verify URL/report manually."
+        }
+      ]
+    },
+    "G4_SERVER_SCREENING": {
+      "gate": "G4_SERVER_SCREENING",
+      "server": "arxiv",
+      "passed": true,
+      "failures": [],
+      "warnings": []
+    },
+    "G5_CLAIM_GROUNDING": {
+      "gate": "G5_CLAIM_GROUNDING",
+      "purely_computational": false,
+      "passed": true,
+      "failures": [],
+      "warnings": []
+    },
+    "G6_REVERIFICATION_SEAL": {
+      "gate": "G6_REVERIFICATION_SEAL",
+      "mode": "reverify",
+      "passed": true,
+      "sealed": true,
+      "status": "SEALED_FOR_SUBMISSION",
+      "seal_id": "7f37cf0f135b31146c913b41",
+      "seal_path": "/Users/o2satz/antigravity/imboreceipt/manuscript/.preprint_gate/release_seal.json",
+      "failures": [],
+      "warnings": []
+    }
+  }
+}

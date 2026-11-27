@@ -1,0 +1,36 @@
+{
+  "auditor": "preprint-blind-auditor",
+  "target_server": "arxiv",
+  "verdict": "PASS",
+  "summary": "Independent zero-context screening audit of /Users/o2satz/antigravity/imboreceipt/manuscript under the arXiv / Preprints.org Version 2 profile passed with zero blockers. Human-only authorship, explicit Google Antigravity/Gemini workflow disclosure with human verification, Google Antigravity for Science acknowledgment, 45 CFR 46.102(e) IRB exemption and non-clinical-use caveats for the retrospective UCI Diabetes simulation, MIT v2.2.1 reproducibility artifacts (commit af55e56), 27-item TRIPOD+AI mapping, and 52/52 resolved bibliography entries and checkpoint-matched tables/figures are all verified.",
+  "blockers": [],
+  "warnings": [
+    {
+      "id": "W1",
+      "category": "AI_ATTRIBUTION",
+      "location": "main.tex:L461",
+      "detail": "AI-Assisted Workflows Disclosure transparently names Google Antigravity and Gemini with full human verification attestation, but references 'Gemini' generically without specifying the exact Gemini model version string."
+    },
+    {
+      "id": "W2",
+      "category": "DATABASE_AND_TOOL_ATTRIBUTION",
+      "location": "references.bib:L105-L515",
+      "detail": "Six valid entries in references.bib (candes2018panning, li2021active, benjamini1995controlling, yeh2009comparisons, sadinle2019least, clopper1934use) are not cited via \\cite{} in main.tex (main.bbl cleanly compiles all 52 cited entries; optional future cleanup)."
+    }
+  ],
+  "checked_files": [
+    "fig1_discovery_noninferiority_and_stress.pdf",
+    "fig2_streaming_budget_curves.pdf",
+    "fig3_conformal_fdr_selection.pdf",
+    "fig4_pilot_curve_and_flip_decomposition.pdf",
+    "fig5_clinical_triad_and_calibration.pdf",
+    "main.bbl",
+    "main.pdf",
+    "main.tex",
+    "references.bib"
+  ],
+  "manuscript_file": null,
+  "manuscript_sha256": "70ff6fb2ad93a4d56494e3ac6ecfc290b65941f00237b5d0fd47c39ca6feb827",
+  "file_count": 9,
+  "recorded_at": "2026-11-27T17:54:25.410806+00:00"
+}
